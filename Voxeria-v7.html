@@ -1,0 +1,2808 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Voxeria - V5 Single Clean Chicken</title>
+<style>
+/* =========================================================
+   VOXERIA V5 SINGLE CLEAN - CSS
+   Alles in einer Datei, damit es auf Handy einfacher läuft.
+   ========================================================= */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      background: radial-gradient(circle at center, #2a2a3e 0%, #111118 100%); 
+      overflow: hidden; color: white;
+      touch-action: none; /* Verhindert Wischen auf Mobile */
+    }
+    #game-wrapper {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; user-select: none;
+      padding: 15px; min-height: 100vh; position: relative;
+    }
+
+    /* Responsive Canvas Container */
+    #canvas-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 1280px;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    #canvas { 
+      border: 4px solid rgba(255, 255, 255, 0.1); border-radius: 10px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+      display: block; cursor: crosshair; image-rendering: pixelated; margin-bottom: 0;
+      width: 100%; max-height: 85vh; object-fit: contain;
+    }
+
+    #ui { display: flex; flex-direction: column; width: 100%; max-width: 1280px; position: relative; }
+
+    #info-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(20, 20, 30, 0.85); backdrop-filter: blur(8px);
+      padding: 10px 16px; border-radius: 8px;
+      color: #e0e0e0; font-size: 14px; font-weight: 600; letter-spacing: 0.5px;
+      border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 4px 15px rgba(0,0,0,0.4); margin-bottom: 12px;
+      flex-wrap: wrap; gap: 10px;
+    }
+
+    #seed-container {
+      display: flex; gap: 6px; align-items: center;
+      background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+    }
+    #seed-input {
+      background: rgba(0,0,0,0.5); border: 1px solid #4facfe; color: white;
+      padding: 4px 8px; border-radius: 4px; font-family: monospace; width: 110px;
+      font-size: 12px; outline: none; transition: border-color 0.2s;
+    }
+    #seed-input:focus { border-color: #00f2fe; box-shadow: 0 0 5px rgba(79, 172, 254, 0.5); }
+    #seed-btn {
+      background: linear-gradient(135deg, #4facfe, #00f2fe);
+      border: none; color: white; padding: 4px 10px; border-radius: 4px; 
+      cursor: pointer; font-weight: bold; font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    #seed-btn:hover { filter: brightness(1.1); transform: scale(1.05); }
+
+    #health { display: flex; gap: 4px; align-items: center; }
+
+    @keyframes heartbeat {
+      0% { transform: scale(1); }
+      20% { transform: scale(1.2); }
+      40% { transform: scale(1); }
+      100% { transform: scale(1); }
+    }
+    .heart { color: #ff4757; font-size: 18px; filter: drop-shadow(0 2px 2px rgba(255,0,0,0.4)); animation: heartbeat 1.5s infinite; display: inline-block; transition: all 0.3s; }
+    .heart.cracked { color: #ff8c00; filter: drop-shadow(0 2px 4px rgba(255,100,0,0.7)); animation: none; }
+    .heart.empty { color: rgba(255, 255, 255, 0.2); filter: none; animation: none; }
+
+    @keyframes heartLost {
+      0% { transform: scale(1.4); opacity: 1; }
+      60% { transform: scale(0.5) rotate(20deg); opacity: 0.5; }
+      100% { transform: scale(0) rotate(-30deg); opacity: 0; }
+    }
+    .heart.losing { animation: heartLost 0.5s forwards; }
+
+    /* Block-Name Tooltip */
+    #block-tooltip {
+      position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+      background: rgba(10,10,20,0.92); border: 1px solid rgba(79,172,254,0.5);
+      color: #fff; font-size: 14px; font-weight: bold; padding: 6px 16px;
+      border-radius: 8px; pointer-events: none; z-index: 200;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6); letter-spacing: 0.5px;
+      opacity: 0; transition: opacity 0.15s;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    #block-tooltip.visible { opacity: 1; }
+
+    #pos-info { color: #aaddff; font-size: 13px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+    #mp-status { color: #00ffaa; font-size: 13px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); font-weight: bold; }
+
+    #shop-btn {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      padding: 8px 16px; border-radius: 6px; cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s;
+    }
+    #shop-btn:hover { transform: scale(1.05); }
+
+    #hotbar {
+      display: flex; justify-content: center; gap: 8px;
+      background: rgba(20, 20, 30, 0.85); backdrop-filter: blur(8px);
+      padding: 12px; border-radius: 12px; min-height: 64px;
+      border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 50;
+    }
+
+    .slot {
+      width: 54px; height: 54px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; 
+      background: linear-gradient(180deg, rgba(50,50,60,0.9) 0%, rgba(30,30,40,0.9) 100%);
+      border: 2px solid #333; box-shadow: inset 0 2px 4px rgba(255,255,255,0.1), 0 4px 8px rgba(0,0,0,0.4);
+      flex-direction: column; font-size: 11px; color: #fff; gap: 1px;
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .slot:hover {
+      transform: translateY(-4px) scale(1.05); border-color: #666;
+      background: linear-gradient(180deg, rgba(70,70,80,0.9) 0%, rgba(40,40,50,0.9) 100%);
+    }
+    .slot.selected { 
+      border-color: #4facfe; background: linear-gradient(180deg, rgba(60,90,120,0.9) 0%, rgba(30,40,60,0.9) 100%);
+      transform: translateY(-8px) scale(1.15); box-shadow: inset 0 2px 4px rgba(255,255,255,0.2), 0 8px 16px rgba(79, 172, 254, 0.4);
+    }
+    .slot canvas { width: 36px; height: 36px; image-rendering: pixelated; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
+
+    #controls-hint {
+      color: rgba(255,255,255,0.4); font-size: 13px; font-weight: 500;
+      padding: 8px; text-align: center; margin-top: 5px; letter-spacing: 0.5px;
+    }
+
+    #notification {
+      position: absolute; top: 20px; right: 20px;
+      background: linear-gradient(135deg, #00b09b, #96c93d);
+      color: white; padding: 12px 24px; border-radius: 8px; 
+      font-weight: 700; letter-spacing: 0.5px; font-size: 16px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.3); text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      opacity: 0; pointer-events: none; transform: translateY(-20px) scale(0.9);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100;
+    }
+    #notification.show { opacity: 1; transform: translateY(0) scale(1); }
+
+    #dynamite-timer-box {
+      position: absolute; top: 15px; left: 15px;
+      background: rgba(10, 20, 30, 0.85); backdrop-filter: blur(8px);
+      border: 2px solid #00ffff; border-radius: 8px;
+      padding: 8px 12px; display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 4px 20px rgba(0, 255, 255, 0.4); z-index: 100;
+      pointer-events: none;
+    }
+    #dyn-icon { filter: drop-shadow(0 2px 4px rgba(0,255,255,0.5)); }
+    .dyn-title { color: #00ffff; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+    .dyn-time { color: #ffffff; font-size: 22px; font-weight: bold; text-shadow: 0 0 8px #00ffff; font-family: monospace; line-height: 1; }
+
+    #shop-modal {
+      display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(20, 20, 30, 0.95); backdrop-filter: blur(15px); border: 2px solid rgba(255,255,255,0.1);
+      padding: 25px; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); z-index: 200; width: 500px;
+      max-height: 85vh;
+    }
+    #shop-modal.open { display: flex; flex-direction: column; gap: 15px; }
+
+    #close-shop-top {
+      position: absolute; top: 15px; right: 15px;
+      background: rgba(255, 50, 50, 0.2); color: #ff5555; border: 1px solid #ff5555;
+      width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+      font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; z-index: 10;
+    }
+    #close-shop-top:hover { background: #ff5555; color: white; }
+
+    .shop-items-container {
+      display: flex; flex-direction: column; gap: 15px;
+      overflow-y: auto;
+      padding-right: 10px;
+    }
+    .shop-items-container::-webkit-scrollbar { width: 8px; }
+    .shop-items-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+    .shop-items-container::-webkit-scrollbar-thumb { background: #667eea; border-radius: 4px; }
+
+    .shop-item {
+      background: rgba(0,0,0,0.4); padding: 12px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .shop-item h4 { font-size: 16px; margin-bottom: 4px;}
+    .buy-btn {
+      background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;
+    }
+    .buy-btn:hover { background: #2ecc71; }
+    .buy-btn.disabled { background: #555; cursor: not-allowed; color: #888; }
+    #close-shop {
+      align-self: flex-end; background: #c0392b; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 10px;
+    }
+
+    /* --- MOBILE STEUERUNG --- */
+    #touch-controls {
+      display: none; position: absolute; bottom: 100px; left: 0; width: 100%; padding: 0 20px;
+      justify-content: space-between; pointer-events: none; z-index: 100;
+    }
+    .tc-group { display: flex; gap: 15px; pointer-events: auto; }
+    .tc-btn {
+      width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.15); 
+      border: 2px solid rgba(255,255,255,0.4); color: white; font-size: 24px;
+      display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); touch-action: manipulation;
+    }
+    .tc-btn:active { background: rgba(255,255,255,0.4); }
+
+
+    #fullscreen-btn {
+      display: none;
+      position: fixed;
+      top: calc(12px + env(safe-area-inset-top));
+      right: calc(12px + env(safe-area-inset-right));
+      z-index: 300;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.35);
+      background: rgba(20, 20, 30, 0.75);
+      color: white;
+      font-size: 24px;
+      font-weight: bold;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    #fullscreen-btn:active { background: rgba(255,255,255,0.25); transform: scale(0.96); }
+    body.fullscreen-active #fullscreen-btn { background: rgba(0, 180, 120, 0.75); }
+
+    /* QUERFORMAT ERZWINGEN */
+    #rotate-overlay {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #111118; z-index: 9999; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: white;
+    }
+    #rotate-overlay h2 { margin-top: 20px; }
+    .phone-icon { font-size: 60px; animation: rotatePhone 2s infinite ease-in-out; }
+    @keyframes rotatePhone { 0% { transform: rotate(0deg); } 50% { transform: rotate(-90deg); } 100% { transform: rotate(-90deg); } }
+
+    @media (max-width: 1024px) {
+      #touch-controls { display: flex; }
+      #fullscreen-btn { display: flex; align-items: center; justify-content: center; }
+      #info-bar { font-size: 12px; }
+    }
+    @media screen and (orientation: portrait) and (max-width: 900px) {
+      #rotate-overlay { display: flex; }
+      #game-wrapper { display: none; }
+    }
+
+</style>
+</head>
+<body>
+
+
+<!-- OVERLAY: GERÄT DREHEN -->
+<div id="rotate-overlay">
+    <div class="phone-icon">📱</div>
+    <h2>Bitte Gerät drehen</h2>
+    <p>Voxeria wird im Querformat gespielt.</p>
+</div>
+
+<div id="game-wrapper">
+  <div id="ui">
+    <div id="info-bar">
+      <div id="health"></div>
+      
+      <div id="seed-container">
+        <span style="color: #aaa; font-size: 11px; font-weight: bold; text-transform: uppercase;">Seed:</span>
+        <input type="text" id="seed-input" placeholder="Zufall" autocomplete="off" spellcheck="false" title="Zahl oder Text eingeben">
+        <button id="seed-btn" onclick="applySeedFromUI()">Neu Starten</button>
+      </div>
+
+      <div id="pos-info">X: 0  Y: 0 | Biome: FOREST</div>
+      <div id="mp-status">Warte auf Multiplayer...</div>
+      <div id="shop-btn" onclick="toggleShop()">🛒 Upgrades</div>
+    </div>
+    
+    <div id="canvas-wrapper">
+      <button id="fullscreen-btn" onclick="toggleFullscreenMode()" aria-label="Vollbild umschalten" title="Vollbild">⛶</button>
+
+      <div id="dynamite-timer-box">
+        <canvas id="dyn-icon" width="32" height="32"></canvas>
+        <div id="dyn-text-container">
+          <div class="dyn-title">Diamant-Dynamit</div>
+          <div class="dyn-time" id="dyn-time">03:00</div>
+        </div>
+      </div>
+      
+      <div id="notification">Block Unlocked!</div>
+      
+      <div id="shop-modal">
+        <button id="close-shop-top" onclick="toggleShop()">X</button>
+        <h2 style="text-align: center; margin-bottom: 10px; margin-top: 5px;">Upgrade Shop</h2>
+        <div class="shop-items-container">
+          <div class="shop-item">
+            <div><h4 style="color: #4facfe;">Longer Reach</h4><span style="font-size: 12px; color: #aaa;">Cost: 30 Dirt</span></div>
+            <button class="buy-btn" id="btn-reach" onclick="buyUpgrade('reach', BLOCKS.DIRT, 30)">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div><h4 style="color: #c49a3a;">Faster Boots</h4><span style="font-size: 12px; color: #aaa;">Cost: 20 Wood</span></div>
+            <button class="buy-btn" id="btn-speed" onclick="buyUpgrade('speed', BLOCKS.WOOD, 20)">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div><h4 style="color: #e0c86e;">Spring Boots (Higher Jump)</h4><span style="font-size: 12px; color: #aaa;">Cost: 20 Sand</span></div>
+            <button class="buy-btn" id="btn-jump" onclick="buyUpgrade('jump', BLOCKS.SAND, 20)">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div><h4 style="color: #aaaaaa;">Double Drops (Mining)</h4><span style="font-size: 12px; color: #aaa;">Cost: 30 Stone</span></div>
+            <button class="buy-btn" id="btn-yield" onclick="buyUpgrade('yield', BLOCKS.STONE, 30)">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div><h4 style="color: #ff5555;">Buy Lighter</h4><span style="font-size: 12px; color: #aaa;">Cost: 5 Coal Ore</span></div>
+            <button class="buy-btn" id="btn-lighter" onclick="buyUpgrade('lighter', BLOCKS.COAL_ORE, 5)">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div><h4 style="color: #a0a0a0;">Eisen-Spitzhacke (3x3)</h4><span style="font-size: 12px; color: #aaa;">Cost: 20 Iron Ore</span></div>
+            <button class="buy-btn" id="btn-pickaxe" onclick="buyUpgrade('pickaxe', BLOCKS.IRON_ORE, 20)">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div><h4 style="color: #ffd700;">Doppelsprung-Stiefel</h4><span style="font-size: 12px; color: #aaa;">Cost: 15 Gold Ore</span></div>
+            <button class="buy-btn" id="btn-doublejump" onclick="buyUpgrade('doublejump', BLOCKS.GOLD_ORE, 15)">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div><h4 style="color: #55ffff;">Diamant-Glück (3x Drops)</h4><span style="font-size: 12px; color: #aaa;">Cost: 5 Diamond Ore</span></div>
+            <button class="buy-btn" id="btn-triple" onclick="buyUpgrade('triple', BLOCKS.DIAMOND_ORE, 5)">Buy</button>
+          </div>
+          <div class="shop-item">
+            <div><h4 style="color: #ff5555;">Heiltrank (Voll heilen)</h4><span style="font-size: 12px; color: #aaa;">Cost: 10 Flowers</span></div>
+            <button class="buy-btn" id="btn-heal" onclick="buyUpgrade('heal', BLOCKS.FLOWER, 10)">Buy</button>
+          </div>
+        </div>
+        <button id="close-shop" onclick="toggleShop()">Close X</button>
+      </div>
+
+      <canvas id="canvas" width="1280" height="720"></canvas>
+      
+      <!-- ON-SCREEN MOBILE CONTROLS -->
+      <div id="touch-controls">
+        <div class="tc-group">
+            <button id="tc-left" class="tc-btn">◀</button>
+            <button id="tc-right" class="tc-btn">▶</button>
+        </div>
+        <div class="tc-group">
+            <button id="tc-mine" class="tc-btn">⛏️</button>
+            <button id="tc-place" class="tc-btn">🧱</button>
+            <button id="tc-jump" class="tc-btn">▲</button>
+        </div>
+      </div>
+
+      <div id="hotbar"></div>
+      <div id="block-tooltip"></div>
+    </div>
+    
+    <div id="controls-hint">Baue ein Gold-Kreuz mit Regenbogen-Mitte für das Portal!</div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   VOXERIA V5 SINGLE CLEAN
+   Eine einzige HTML-Datei.
+   Abschnitte: Firebase, Audio, Blöcke, Welt, UI, Inventar, Spieler, Rendering, Game Loop.
+   ========================================================= */
+
+
+// =========================================================
+// 00 - 00-firebase-sdk-loader.js
+// =========================================================
+// Lädt Firebase als ES-Modul und stellt die Funktionen für die klassischen Game-Scripts bereit.
+window.firebaseReady = import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js")
+  .then(appMod => Promise.all([
+    Promise.resolve(appMod),
+    import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"),
+    import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")
+  ]))
+  .then(([appMod, authMod, storeMod]) => ({
+    initializeApp: appMod.initializeApp,
+    getAuth: authMod.getAuth,
+    signInAnonymously: authMod.signInAnonymously,
+    signInWithCustomToken: authMod.signInWithCustomToken,
+    onAuthStateChanged: authMod.onAuthStateChanged,
+    getFirestore: storeMod.getFirestore,
+    collection: storeMod.collection,
+    doc: storeMod.doc,
+    setDoc: storeMod.setDoc,
+    onSnapshot: storeMod.onSnapshot
+  }));
+
+
+// =========================================================
+// 01 - 01-firebase-multiplayer.js
+// =========================================================
+let initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, doc, setDoc, onSnapshot;
+
+// --- FIREBASE MULTIPLAYER SETUP ---
+let db, auth, userId, appId;
+let isMultiplayerActive = false;
+let otherPlayers = {};
+let isApplyingRemoteSeed = false;
+
+async function initFirebase() {
+    try {
+        ({ initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, doc, setDoc, onSnapshot } = await window.firebaseReady);
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        appId = typeof __app_id !== 'undefined' ? __app_id : 'voxeria-multiplayer-app';
+        
+        if (!firebaseConfig) {
+            document.getElementById('mp-status').innerText = "Offline (Lokal)";
+            return;
+        }
+
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                isMultiplayerActive = true;
+                document.getElementById('mp-status').innerText = "Online 🟢";
+                document.getElementById('mp-status').style.color = "#00ffaa";
+                startMultiplayerSync();
+            }
+        });
+    } catch (e) {
+        console.error("Firebase Fehler:", e);
+        document.getElementById('mp-status').innerText = "Offline (Fehler)";
+        document.getElementById('mp-status').style.color = "#ff5555";
+    }
+}
+
+function startMultiplayerSync() {
+    if (!userId || !db) return;
+
+    const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'voxeria_players');
+    const worldRef = collection(db, 'artifacts', appId, 'public', 'data', 'voxeria_world');
+    const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'voxeria_state', 'current');
+
+    onSnapshot(stateRef, (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        if (!data || data.seedRaw === undefined || data.seedRaw === rawSeedString) return;
+
+        isApplyingRemoteSeed = true;
+        rawSeedString = String(data.seedRaw);
+        SEED = seedToNumber(rawSeedString);
+        const seedInput = document.getElementById('seed-input');
+        if (seedInput) seedInput.value = rawSeedString;
+        resetGameAndWorld();
+        isApplyingRemoteSeed = false;
+        showNotification("🌍 Multiplayer-Seed synchronisiert: " + rawSeedString);
+    }, (error) => console.error("Snapshot Error (Seed):", error));
+
+    onSnapshot(playersRef, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            if (change.doc.id === userId) return; 
+            if (change.type === "added" || change.type === "modified") {
+                otherPlayers[change.doc.id] = change.doc.data();
+            }
+            if (change.type === "removed") {
+                delete otherPlayers[change.doc.id];
+            }
+        });
+    }, (error) => console.error("Snapshot Error (Players):", error));
+
+    onSnapshot(worldRef, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added" || change.type === "modified") {
+                const data = change.doc.data();
+                if (data.userId !== userId && data.type !== undefined) {
+                    localSetBlock(data.wx, data.wy, data.type, data.dim);
+                }
+            }
+        });
+    }, (error) => console.error("Snapshot Error (World):", error));
+}
+
+// window-Funktionen werden unten nach allen Funktionen korrekt gesetzt
+
+
+function isFullscreenNow() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+}
+
+function updateFullscreenButton() {
+  const btn = document.getElementById('fullscreen-btn');
+  if (!btn) return;
+  const active = isFullscreenNow();
+  document.body.classList.toggle('fullscreen-active', active);
+  btn.textContent = active ? '↙' : '⛶';
+  btn.title = active ? 'Vollbild verlassen' : 'Vollbild';
+}
+
+async function toggleFullscreenMode() {
+  initAudio();
+  const target = document.getElementById('game-wrapper') || document.documentElement;
+  try {
+    if (!isFullscreenNow()) {
+      if (target.requestFullscreen) await target.requestFullscreen();
+      else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+      else if (target.msRequestFullscreen) target.msRequestFullscreen();
+      else showNotification('⚠️ Vollbild wird von diesem Browser nicht unterstützt.');
+
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    } else {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      else if (document.msExitFullscreen) document.msExitFullscreen();
+    }
+  } catch (e) {
+    console.warn('Fullscreen Fehler:', e);
+    showNotification('⚠️ Vollbild konnte nicht gestartet werden.');
+  }
+  updateFullscreenButton();
+}
+
+document.addEventListener('fullscreenchange', updateFullscreenButton);
+document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+
+const dynIconCanvas = document.getElementById('dyn-icon');
+const dCtx = dynIconCanvas.getContext('2d');
+dCtx.fillStyle = '#00ffff'; dCtx.fillRect(2, 2, 28, 28);
+
+
+// =========================================================
+// 02 - 02-audio-intro-config.js
+// =========================================================
+dCtx.fillStyle = '#00cccc'; dCtx.fillRect(2, 2, 28, 4);
+dCtx.fillStyle = '#ffffff'; dCtx.fillRect(6, 2, 5, 28); dCtx.fillRect(21, 2, 5, 28);
+dCtx.fillStyle = '#ffffff';
+dCtx.beginPath(); dCtx.moveTo(16, 11); dCtx.lineTo(21, 16); dCtx.lineTo(16, 21); dCtx.lineTo(11, 16); dCtx.fill();
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const TILE = 20;
+const COLS = Math.floor(1280 / TILE); // 64
+const ROWS = Math.floor(720 / TILE); // 36
+const WORLD_H = 120; // Erhöht von 80 auf 120 – gibt viel mehr Platz nach oben für Berge & Bäume
+const CHUNK_W = 32; 
+const GRAVITY = 0.4;
+
+let dynamiteTimer = 180; 
+let activeDynamites = []; 
+
+let audioCtx;
+let lastIntroSoundTime = 0; 
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playIntroSettleSound(col) {
+  if (!audioCtx) return;
+  const now = performance.now();
+  if (now - lastIntroSoundTime < 25) return; 
+  lastIntroSoundTime = now;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.type = 'sine';
+  const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
+  const freq = notes[col % notes.length];
+  osc.frequency.setValueAtTime(freq, t);
+  osc.frequency.exponentialRampToValueAtTime(freq * 1.8, t + 0.05);
+  gain.gain.setValueAtTime(0.02, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+  osc.start(t); osc.stop(t + 0.05);
+}
+
+function playSound(type) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  
+  if (type === 'jump') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, t); osc.frequency.exponentialRampToValueAtTime(600, t + 0.15);
+    gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    osc.start(t); osc.stop(t + 0.15);
+  } else if (type === 'place') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, t); osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
+    gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    osc.start(t); osc.stop(t + 0.1);
+  } else if (type === 'buy') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1000, t); osc.frequency.setValueAtTime(1500, t + 0.1);
+    gain.gain.setValueAtTime(0.2, t); gain.gain.linearRampToValueAtTime(0, t + 0.3);
+    osc.start(t); osc.stop(t + 0.3);
+  } else if (type === 'portal') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(200, t); osc.frequency.exponentialRampToValueAtTime(800, t + 1.5);
+    gain.gain.setValueAtTime(0.4, t); gain.gain.linearRampToValueAtTime(0, t + 1.5);
+    osc.start(t); osc.stop(t + 1.5);
+  } else if (type === 'hurt') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, t); osc.frequency.exponentialRampToValueAtTime(80, t + 0.2);
+    gain.gain.setValueAtTime(0.35, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+    osc.start(t); osc.stop(t + 0.2);
+  } else if (type === 'bite') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, t); osc.frequency.exponentialRampToValueAtTime(200, t + 0.12);
+    gain.gain.setValueAtTime(0.25, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+    osc.start(t); osc.stop(t + 0.12);
+  }
+}
+
+function playBlockSound(blockType) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  
+  let isStone = [BLOCKS.STONE, BLOCKS.COAL_ORE, BLOCKS.IRON_ORE, BLOCKS.GOLD_ORE, BLOCKS.DIAMOND_ORE, BLOCKS.RAINBOW_ORE, BLOCKS.BEDROCK, BLOCKS.YELLOW_LIMESTONE, BLOCKS.GOLD_BRICK].includes(blockType);
+  let isWood = [BLOCKS.WOOD, BLOCKS.LOG, BLOCKS.PLANKS, BLOCKS.BG_PLANKS].includes(blockType);
+  let isGlass = [BLOCKS.GLASS, BLOCKS.ICE].includes(blockType);
+  let isPlant = [BLOCKS.GRASS, BLOCKS.LEAVES, BLOCKS.FLOWER, BLOCKS.CACTUS].includes(blockType);
+  
+  if (isGlass) {
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(1500, t); osc.frequency.exponentialRampToValueAtTime(2500, t + 0.05);
+    gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    osc.start(t); osc.stop(t + 0.1);
+  } else if (isStone) {
+    osc.type = 'square'; osc.frequency.setValueAtTime(300, t); osc.frequency.exponentialRampToValueAtTime(50, t + 0.1);
+    gain.gain.setValueAtTime(0.15, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    osc.start(t); osc.stop(t + 0.1);
+  } else if (isWood) {
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(50, t + 0.1);
+    gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    osc.start(t); osc.stop(t + 0.1);
+  } else if (isPlant) {
+    osc.type = 'sine'; osc.frequency.setValueAtTime(250, t); gain.gain.setValueAtTime(0.15, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    osc.start(t); osc.stop(t + 0.1);
+  } else { 
+    osc.type = 'square'; osc.frequency.setValueAtTime(100, t); osc.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+    gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    osc.start(t); osc.stop(t + 0.15);
+  }
+}
+
+window.addEventListener('click', initAudio, { once: true });
+window.addEventListener('keydown', initAudio, { once: true });
+window.addEventListener('touchstart', initAudio, { once: true });
+
+let gameState = "INTRO";
+let introBlocks = [];
+let introGrid = [];
+let introAlpha = 1.0;
+let introPhase = "FALLING";
+let introFillCount = 0;
+const INTRO_COLS = Math.floor(1280 / 20) + 1; 
+const INTRO_ROWS = Math.floor(720 / 20) + 1;  
+const TOTAL_INTRO_BLOCKS = INTRO_COLS * INTRO_ROWS;
+
+for(let i = 0; i < INTRO_COLS; i++) introGrid[i] = [];
+
+let jumpForce = -9;
+let maxReach = 5.0;
+let playerSpeed = 3.5;
+let yieldMultiplier = 1; 
+let hasSuperPickaxe = false; 
+let maxJumps = 1; 
+let jumpsLeft = 1; 
+let prevJump = false; 
+
+let screenShake = 0;
+let drawCamX = 0;
+let drawCamY = 0;
+let floatingTexts = [];
+let particles = []; 
+let teleportCooldown = 0; 
+
+// Einfache Tier-Logik: Hühner spawnen nur auf Gras und laufen herum.
+let animals = [];
+let animalSpawnTick = 0;
+const MAX_ANIMALS = 10;
+const ANIMAL_LIMITS = { chicken: 3, parrot: 5, lizard: 4 };
+
+let clouds = [];
+for(let i=0; i<20; i++) {
+  clouds.push({ x: Math.random() * 2500, y: Math.random() * 120 + 10, speed: 0.1 + Math.random() * 0.3, scale: 0.6 + Math.random() * 1.5, seed: Math.random() * 100 });
+}
+
+// NEUER BLOCK: GOLD_BRICK (29) für die Tempel der Gold-Dimension
+const BLOCKS = {
+  AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, WOOD: 4,
+  LEAVES: 5, SAND: 6, WATER: 7, COAL_ORE: 8,
+
+
+// =========================================================
+// 03 - 03-blocks-seed-world-start.js
+// =========================================================
+  IRON_ORE: 9, GOLD_ORE: 10, BEDROCK: 11, LOG: 12,
+  GLASS: 13, PLANKS: 14, TORCH: 15,
+  DIAMOND_ORE: 16, FLOWER: 19, LIGHTER: 20, BG_PLANKS: 21,
+  SNOW: 22, CACTUS: 23, ICE: 24, RAINBOW_ORE: 25, PORTAL: 26, YELLOW_LIMESTONE: 27,
+  DIAMOND_DYNAMITE: 28, GOLD_BRICK: 29
+};
+
+const blockColors = {
+  0: null,
+  1: ['#5a9a3a','#4a7a2a','#7ab347','#6ab040'], 2: ['#8B6914','#7a5c10','#9a7520','#a07a22'],
+  3: ['#888','#777','#999','#aaa'], 4: ['#6b4c11','#5a3e0e','#7a5515','#886020'],
+  5: ['#2d6e1e','#266019','#338022','#2e7a1e'], 6: ['#e0c86e','#d4bc62','#ead070','#f0dc78'],
+  7: ['#1a6fd0','#1560bb','#2278dd','#1a72d8'], 8: ['#888','#777','#999','#333'],
+  9: ['#888','#777','#999','#a06040'], 10: ['#888','#777','#999','#d4a017'],
+  11: ['#333','#222','#444','#444'], 12: ['#6b4c11','#5a3e0e','#7a5515','#886020'],
+  13: ['#aaddff','#bbddff','#99ccee','#cceeff'], 14: ['#c49a3a','#b48a2a','#d4aa44','#ba9030'],
+  15: ['#ffcc44','#ffdd55','#ffbb33','#ee9900'], 16: ['#888','#777','#999','#55ffff'], 
+  19: null, 20: null, 21: ['#7a5c10','#684e0c','#8c6a15','#74550a'],
+  22: ['#f0f8ff','#e0e8f0','#ffffff','#d0d8e0'], 
+  23: ['#1e591e','#154015','#267326','#1a4d1a'], 
+  24: ['#a0d4ff','#80c4ff','#c0e4ff','#90ccff'],
+  25: ['#888','#777','#999','#aaa'],
+  27: ['#e6c85e','#d1b349','#ebd06f','#c4a53d'],
+  28: ['#00ffff','#00cccc','#ffffff','#00aaaa'],
+  29: ['#f1c40f','#f39c12','#e67e22','#d35400'] // Gold Brick
+};
+
+const blockNames = {
+  1:'Grass', 2:'Dirt', 3:'Stone', 4:'Wood', 5:'Leaves',
+  6:'Sand', 7:'Water', 8:'Coal', 9:'Iron', 10:'Gold',
+  11:'Bedrock', 12:'Log', 13:'Glass', 14:'Planks', 15:'Torch',
+  16:'Diamond!', 19:'Flower', 20:'Lighter', 21:'Deco Wood',
+  22:'Snow', 23:'Cactus', 24:'Ice', 25:'Rainbow Ore!', 26: 'Portal', 27: 'Kalkstein',
+  28: 'Diamant-Dynamit', 29: 'Gold Ziegel'
+};
+
+const dimensions = {
+  "OVERWORLD": new Map(),
+  "GOLD": new Map()
+};
+let currentDim = "OVERWORLD";
+let rawSeedString = String(Date.now() % 9999999);
+let SEED = seedToNumber(rawSeedString);
+const burningBlocks = [];
+const piranhas = []; // Piranha-Pflanzen Liste
+
+function hashCode(str) {
+  // Stabile 32-bit-Hashfunktion: gleicher Text/Zahl = immer gleiche Seed-Zahl
+  let hash = 2166136261;
+  str = String(str);
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seedToNumber(value) {
+  const raw = String(value).trim();
+  if (raw !== "" && isFinite(Number(raw))) return Number(raw);
+  return hashCode(raw);
+}
+
+function seededRandom(...parts) {
+  // Deterministischer Zufall für Weltgeneration. Kein Math.random in Terrain/Chunks.
+  let h = hashCode([rawSeedString, currentDim, ...parts].join('|'));
+  h += 0x6D2B79F5;
+  h = Math.imul(h ^ (h >>> 15), h | 1);
+  h ^= h + Math.imul(h ^ (h >>> 7), h | 61);
+  return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
+}
+
+function seededInt(min, max, ...parts) {
+  return Math.floor(seededRandom(...parts) * (max - min + 1)) + min;
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('seed-input').value = rawSeedString;
+  document.getElementById('seed-input').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') applySeedFromUI();
+  });
+});
+
+function applySeedFromUI() {
+  const inputVal = document.getElementById('seed-input').value.trim();
+  if (inputVal === "") rawSeedString = String(Date.now() % 9999999);
+  else rawSeedString = inputVal;
+  
+  SEED = seedToNumber(rawSeedString);
+  
+  document.getElementById('seed-input').value = rawSeedString;
+  resetGameAndWorld();
+
+  // Multiplayer: Der Host/Spieler, der einen Seed setzt, schreibt ihn in Firestore.
+  // Neue Spieler lesen diesen Seed automatisch und generieren dadurch dieselbe Welt.
+  if (!isApplyingRemoteSeed && isMultiplayerActive && db && userId) {
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'voxeria_state', 'current'), {
+      seedRaw: rawSeedString,
+      seedNumber: SEED,
+      userId: userId,
+      ts: Date.now()
+    }).catch(e => console.error("Seed Sync Fehler:", e));
+  }
+}
+
+function resetGameAndWorld() {
+  dimensions["OVERWORLD"].clear();
+  dimensions["GOLD"].clear();
+  currentDim = "OVERWORLD";
+  burningBlocks.length = 0;
+  activeDynamites.length = 0;
+  particles.length = 0;
+  floatingTexts.length = 0;
+  animals.length = 0;
+  piranhas.length = 0;
+  damageCooldown = 0;
+  animalSpawnTick = 0;
+  fallStartY = null;
+  teleportCooldown = 0;
+  dynamiteTimer = 180;
+  
+  jumpForce = -9;
+  maxReach = 5.0;
+  playerSpeed = 3.5;
+  yieldMultiplier = 1; 
+  hasSuperPickaxe = false; 
+  maxJumps = 1; 
+  jumpsLeft = 1; 
+  player.health = 20;
+  player.vx = 0; player.vy = 0;
+  
+  inventory = [ { block: BLOCKS.DIRT, count: 10 } ];
+  selectedSlot = 0;
+  drawHotbar();
+  updateShopButtons();
+  drawHealth();
+
+  const spawnX = findSafeSpawnX();
+  const newSy = getSurfaceYAt(spawnX, "OVERWORLD");
+  player.x = spawnX * TILE;
+  player.y = (newSy - 2) * TILE;
+  camX = player.x - (COLS >> 1) * TILE;
+  camY = player.y - (ROWS >> 1) * TILE;
+  drawCamX = camX; drawCamY = camY;
+
+  gameState = "INTRO";
+  introBlocks = [];
+  for(let i = 0; i < INTRO_COLS; i++) introGrid[i] = [];
+  introAlpha = 1.0;
+  introPhase = "FALLING";
+  introFillCount = 0;
+  lastIntroSoundTime = 0; 
+  
+  showNotification("🌍 Neue Welt mit Seed: " + rawSeedString + " geladen! Spawn: " + getBiome(Math.floor(spawnX / CHUNK_W)));
+  playSound('portal');
+}
+
+function noise(x) {
+  return Math.sin(x * 0.13 + SEED) * 3 + Math.sin(x * 0.07 + SEED * 2) * 5 + Math.sin(x * 0.03 + SEED * 3) * 8;
+}
+
+// Bessere Biome-Generierung
+function getBiome(cx) {
+  const bNoise = Math.sin(cx * 0.08 + SEED * 4.2); // Breitere Biome
+  if (bNoise > 0.5) return "DESERT";
+  if (bNoise > 0.1) return "JUNGLE"; 
+  if (bNoise < -0.4) return "SNOW";
+  return "FOREST";
+}
+
+// Spezifische Terrainhöhe pro Biome für cooleres Gefühl
+function getBiomeHeight(x, biome) {
+  let base = 65; // Erhöht von 30 auf 65 – Terrain tiefer setzen, damit Bäume/Berge nach oben Platz haben
+  let n = noise(x);
+  if (biome === "DESERT") return Math.floor(base + Math.sin(x * 0.05 + SEED) * 4); // Sanfte Dünen
+  if (biome === "JUNGLE") return Math.floor(base - 10 + n * 1.8); // Hoch & chaotisch
+  if (biome === "SNOW") return Math.floor(base + n * 0.8 + Math.sin(x * 0.2) * 3); // Zerklüftet
+  return Math.floor(base + n); // Forest (Normal)
+}
+
+function getSurfaceYAt(wx, targetDim = currentDim) {
+  const oldDim = currentDim;
+  currentDim = targetDim;
+  for (let y = 0; y < WORLD_H; y++) {
+    const b = getBlock(wx, y);
+    if (b !== BLOCKS.AIR && b !== BLOCKS.WATER && b !== BLOCKS.ICE) {
+      currentDim = oldDim;
+      return y;
+    }
+  }
+  currentDim = oldDim;
+  return 30;
+}
+
+function isValidSpawnGround(blockType) {
+  return blockType === BLOCKS.GRASS ||
+         blockType === BLOCKS.SAND ||
+         blockType === BLOCKS.SNOW ||
+         blockType === BLOCKS.DIRT ||
+         blockType === BLOCKS.STONE;
+}
+
+function findSafeSpawnX() {
+  // Minecraft-artig: Jeder Seed bekommt einen eigenen Spawn-Chunk.
+  // Wir erzwingen KEIN bestimmtes Biom mehr. Dadurch kann der Start je nach Seed
+  // in Forest, Desert, Jungle oder Snow liegen, bleibt aber für alle Spieler gleich.
+  const spawnRangeChunks = 160;
+  const startCx = seededInt(-spawnRangeChunks, spawnRangeChunks, 'spawn-chunk');
+
+  for (let radius = 0; radius <= spawnRangeChunks; radius++) {
+    const candidates = radius === 0 ? [startCx] : [startCx + radius, startCx - radius];
+    for (const cx of candidates) {
+      const baseX = cx * CHUNK_W + Math.floor(CHUNK_W / 2);
+
+      // Erst nahe der Chunk-Mitte suchen, damit der Spawn wirklich zu diesem Seed-Chunk passt.
+      for (let dx = -12; dx <= 12; dx++) {
+        const wx = baseX + dx;
+        const sy = getSurfaceYAt(wx, "OVERWORLD");
+        const ground = getBlock(wx, sy);
+        const air1 = getBlock(wx, sy - 1);
+        const air2 = getBlock(wx, sy - 2);
+
+        if (isValidSpawnGround(ground) && air1 === BLOCKS.AIR && air2 === BLOCKS.AIR) {
+          return wx;
+        }
+      }
+    }
+  }
+
+  return 0;
+}
+
+
+function canSpawnFlowerAt(worldX, surfaceY) {
+  // Blumen dürfen nur direkt auf einem Grass-Block entstehen.
+  // Zusätzlich muss der Platz darüber frei sein, damit keine Blumen in Sand, Schnee,
+  // Häusern, Bäumen oder anderen Blöcken stecken.
+  return getBlock(worldX, surfaceY) === BLOCKS.GRASS &&
+         getBlock(worldX, surfaceY - 1) === BLOCKS.AIR;
+}
+
+function spawnJuiceBurst(x, y, color = '#ffffff', amount = 12, power = 5) {
+  for (let i = 0; i < amount; i++) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 8,
+      y: y + (Math.random() - 0.5) * 8,
+      vx: (Math.random() - 0.5) * power,
+      vy: -Math.random() * power - 1,
+      color,
+      size: 2 + Math.random() * 4,
+      life: 18 + Math.random() * 18,
+      maxLife: 36,
+      type: 'spark'
+    });
+  }
+}
+
+function addJuiceText(x, y, text, color = '#ffffff') {
+  floatingTexts.push({
+    x, y, text, color,
+    life: 28,
+    maxLife: 28,
+    vy: -1.25
+  });
+}
+
+function getChunk(cx, targetDim = currentDim) {
+  let cmap = dimensions[targetDim];
+  if (cmap.has(cx)) return cmap.get(cx);
+
+
+// =========================================================
+// 04 - 04-world-generation.js
+// =========================================================
+  
+  let oldDim = currentDim;
+  currentDim = targetDim;
+  const chunk = new Uint8Array(CHUNK_W * WORLD_H);
+
+  if (currentDim === "GOLD") {
+    // Überarbeitete Gold Dimension - Klippen und dramatische Berge
+    for (let i = 0; i < CHUNK_W; i++) {
+      let gNoise = Math.sin((cx*CHUNK_W+i)*0.08 + SEED)*15 + Math.cos((cx*CHUNK_W+i)*0.03)*10;
+      let sy = Math.floor(50 + gNoise); 
+      for (let y = 0; y < WORLD_H; y++) {
+        let idx = y * CHUNK_W + i;
+        if (y === WORLD_H - 1) chunk[idx] = BLOCKS.BEDROCK;
+        else if (y >= sy) chunk[idx] = BLOCKS.GOLD_ORE;
+        else chunk[idx] = BLOCKS.AIR;
+      }
+    }
+    cmap.set(cx, chunk);
+
+    // Generiere GOLD TEMPEL in der Gold-Dimension
+    // Tempel spawnt alle paar Chunks
+    if (Math.abs(Math.sin(cx * 3.7 + SEED)) > 0.8) {
+       let tX = Math.floor(CHUNK_W / 2) - 5;
+       let worldX = cx * CHUNK_W + tX;
+       // Finde höchste Stelle im Bereich
+       let sy = 80;
+       for(let dx=0; dx<11; dx++) {
+          for(let y=0; y<WORLD_H; y++) {
+             if(chunk[y*CHUNK_W + (tX+dx)] !== BLOCKS.AIR) {
+                if(y < sy) sy = y; break;
+             }
+          }
+       }
+       sy -= 1; // Baue über dem Boden
+       
+       if (sy > 10 && sy < 70) {
+         // Tempel-Plattform
+         for(let dx=-2; dx<13; dx++) {
+           for(let dy=0; dy<4; dy++) localSetBlock(worldX+dx, sy+dy, BLOCKS.GOLD_BRICK, "GOLD");
+         }
+         // Säulen
+         for(let dx=0; dx<=10; dx+=5) {
+           for(let dy=1; dy<=5; dy++) {
+              localSetBlock(worldX+dx, sy-dy, BLOCKS.YELLOW_LIMESTONE, "GOLD");
+           }
+         }
+         // Dach
+         for(let dx=-1; dx<12; dx++) localSetBlock(worldX+dx, sy-6, BLOCKS.GOLD_BRICK, "GOLD");
+         for(let dx=0; dx<11; dx++) localSetBlock(worldX+dx, sy-7, BLOCKS.GOLD_BRICK, "GOLD");
+         for(let dx=2; dx<9; dx++) localSetBlock(worldX+dx, sy-8, BLOCKS.RAINBOW_ORE, "GOLD");
+         
+         // Schatz in der Mitte
+         localSetBlock(worldX+5, sy-1, BLOCKS.DIAMOND_ORE, "GOLD");
+         localSetBlock(worldX+5, sy-2, BLOCKS.DIAMOND_DYNAMITE, "GOLD");
+         
+         // Fackeln
+         localSetBlock(worldX+1, sy-3, BLOCKS.TORCH, "GOLD");
+         localSetBlock(worldX+9, sy-3, BLOCKS.TORCH, "GOLD");
+       }
+    }
+
+    currentDim = oldDim;
+    return chunk;
+  }
+
+  // OVERWORLD Generierung
+  const surfaceY = new Array(CHUNK_W);
+  const biome = getBiome(cx);
+
+  for (let i = 0; i < CHUNK_W; i++) {
+      surfaceY[i] = getBiomeHeight(cx * CHUNK_W + i, biome);
+  }
+  
+  let hasVillage = biome === "DESERT" ? (seededRandom('village', cx) < 0.10) : (seededRandom('village', cx) < 0.15);
+  let vX = seededInt(2, CHUNK_W - 14, 'village-x', cx); 
+  let vY = surfaceY[vX];
+  const villageSeed = Math.abs(Math.sin(cx * 1.3 + SEED));
+
+  if (hasVillage && cx !== 0) { 
+    let structureWidth = biome === "DESERT" ? 13 : 9;
+    for (let i = 0; i < structureWidth; i++) surfaceY[vX + i] = vY; 
+  }
+
+  for (let y = 0; y < WORLD_H; y++) {
+    for (let i = 0; i < CHUNK_W; i++) {
+      const sy = surfaceY[i];
+      const idx = y * CHUNK_W + i;
+      
+      if (y === WORLD_H - 1) chunk[idx] = BLOCKS.BEDROCK;
+      else if (y > sy + 3) {
+        const depth = y - sy;
+        const r = seededRandom('ore', cx, i, y);
+        
+        if (depth > 35 && r < 0.005) chunk[idx] = BLOCKS.RAINBOW_ORE;
+        else if (depth > 25 && r < 0.008) chunk[idx] = BLOCKS.DIAMOND_ORE;
+        else if (depth > 15 && r < 0.015) chunk[idx] = BLOCKS.GOLD_ORE;
+        else if (depth > 8 && r < 0.03) chunk[idx] = BLOCKS.IRON_ORE;
+        else if (depth > 4 && r < 0.05) chunk[idx] = BLOCKS.COAL_ORE;
+        else chunk[idx] = BLOCKS.STONE;
+      } 
+      else if (y > sy) {
+        if (biome === "DESERT") chunk[idx] = BLOCKS.SAND;
+        else chunk[idx] = BLOCKS.DIRT;
+      } else if (y === sy) {
+        if (biome === "DESERT") chunk[idx] = BLOCKS.SAND;
+        else if (biome === "SNOW") chunk[idx] = BLOCKS.SNOW;
+        else chunk[idx] = BLOCKS.GRASS; 
+      } else {
+        chunk[idx] = BLOCKS.AIR;
+      }
+
+      // Wasser/Eis (Seen & Oasen)
+      if (y === sy && noise(cx*CHUNK_W+i + 100) > 6) {
+         if (biome === "SNOW") chunk[idx] = BLOCKS.ICE;
+         else chunk[idx] = BLOCKS.WATER;
+      }
+    }
+  }
+  cmap.set(cx, chunk);
+
+  // Dekoration & HÄUSER
+  for (let i = 0; i < CHUNK_W; i++) {
+    const worldX = cx * CHUNK_W + i;
+    const sy = surfaceY[i];
+    
+    // Strukturen
+    if (hasVillage && cx !== 0 && i >= vX && i < vX + 9) {
+      if (i === vX) {
+        if (biome === "DESERT") {
+          for(let dx = 0; dx < 13; dx++) {
+             let h = 6 - Math.abs(dx - 6);
+             for(let dy = 0; dy <= h; dy++) {
+               localSetBlock(worldX + dx, sy - dy, BLOCKS.YELLOW_LIMESTONE); 
+             }
+          }
+          localSetBlock(worldX + 6, sy - 6, BLOCKS.GOLD_ORE); 
+          localSetBlock(worldX + 6, sy, BLOCKS.AIR);
+          localSetBlock(worldX + 6, sy - 1, BLOCKS.AIR);
+          localSetBlock(worldX + 6, sy - 2, BLOCKS.AIR);
+          localSetBlock(worldX + 6, sy - 3, BLOCKS.TORCH); 
+          
+          localSetBlock(worldX + 5, sy, BLOCKS.WOOD);
+          localSetBlock(worldX + 5, sy - 1, BLOCKS.WOOD);
+          localSetBlock(worldX + 7, sy, BLOCKS.WOOD);
+          localSetBlock(worldX + 7, sy - 1, BLOCKS.WOOD);
+
+          for(let dx = 4; dx <= 8; dx++) {
+            for(let dy = 2; dy <= 5; dy++) {
+              localSetBlock(worldX + dx, sy + dy, BLOCKS.AIR); 
+            }
+          }
+          localSetBlock(worldX + 6, sy + 5, BLOCKS.RAINBOW_ORE); 
+        }
+        else if (biome === "SNOW") {
+          for(let dx=1; dx<8; dx++) localSetBlock(worldX+dx, sy, BLOCKS.SNOW);
+          localSetBlock(worldX+1, sy-1, BLOCKS.SNOW); localSetBlock(worldX+7, sy-1, BLOCKS.SNOW);
+          localSetBlock(worldX+2, sy-2, BLOCKS.SNOW); localSetBlock(worldX+6, sy-2, BLOCKS.SNOW);
+          localSetBlock(worldX+3, sy-3, BLOCKS.SNOW); localSetBlock(worldX+4, sy-3, BLOCKS.SNOW); localSetBlock(worldX+5, sy-3, BLOCKS.SNOW);
+          localSetBlock(worldX+4, sy, BLOCKS.ICE); 
+        } 
+        else {
+          // Standard Haus
+          for(let dx=0; dx<7; dx++) localSetBlock(worldX+dx+1, sy, BLOCKS.PLANKS);
+          localSetBlock(worldX+1, sy-1, BLOCKS.AIR);   
+          localSetBlock(worldX+1, sy-2, BLOCKS.AIR);   
+          localSetBlock(worldX+1, sy-3, BLOCKS.PLANKS);
+          localSetBlock(worldX+1, sy-4, BLOCKS.PLANKS);
+          for(let dy=1; dy<=4; dy++) localSetBlock(worldX+7, sy-dy, BLOCKS.PLANKS);
+          for(let dx=-1; dx<=7; dx++) localSetBlock(worldX+dx+1, sy-5, BLOCKS.WOOD);
+          for(let dx=1; dx<=5; dx++) {
+            for(let dy=1; dy<=4; dy++) localSetBlock(worldX+dx+1, sy-dy, BLOCKS.BG_PLANKS);
+          }
+          localSetBlock(worldX+4, sy-3, BLOCKS.TORCH);
+          localSetBlock(worldX+6, sy-2, BLOCKS.GLASS);
+        }
+      }
+      continue; 
+    }
+    
+    // Vegetation basierend auf Biomen
+    const r = seededRandom('decor', cx, i);
+    
+    if (biome === "DESERT") {
+      // Wüsten-Oase Deko
+      if (getBlock(worldX, sy) === BLOCKS.WATER) {
+         if (seededRandom('oasis-cactus', cx, i) < 0.4 && getBlock(worldX-1, sy) === BLOCKS.SAND) localSetBlock(worldX-1, sy-1, BLOCKS.CACTUS);
+      }
+      else if (r < 0.05 && getBlock(worldX, sy) === BLOCKS.SAND) { 
+        let h = 2 + seededInt(0, 2, 'cactus-height', cx, i);
+        for(let dy=0; dy<h; dy++) localSetBlock(worldX, sy - dy - 1, BLOCKS.CACTUS);
+      }
+    } 
+    else if (biome === "SNOW") {
+      // Tannenbäume
+      if (r < 0.06 && getBlock(worldX, sy) === BLOCKS.SNOW) { 
+        let h = 3 + seededInt(0, 1, 'snow-tree-height', cx, i);
+        if (sy - h - 4 >= 2) { // Nur setzen wenn Platz vorhanden
+          for(let dy=0; dy<h; dy++) localSetBlock(worldX, sy - dy - 1, BLOCKS.LOG);
+          // Kegel-Blätter
+          for(let dy=0; dy<4; dy++) {
+              let width = 3 - dy;
+              for(let dx=-width; dx<=width; dx++) {
+                  if (getBlock(worldX+dx, sy-h+1-dy) === BLOCKS.AIR) {
+                      localSetBlock(worldX+dx, sy-h+1-dy, BLOCKS.LEAVES);
+                  }
+              }
+          }
+          localSetBlock(worldX, sy-h-3, BLOCKS.LEAVES);
+        }
+      }
+    } 
+    else if (biome === "JUNGLE") {
+      // Gigantische Dschungelbäume
+      if (r < 0.12 && getBlock(worldX, sy) === BLOCKS.GRASS) { 
+        let treeH = 8 + seededInt(0, 4, 'jungle-tree-height', cx, i); 
+        if (sy - treeH - 4 >= 2) { // Nur setzen wenn vollständig Platz
+          for(let dy=0; dy<treeH; dy++) {
+             localSetBlock(worldX, sy - dy - 1, BLOCKS.LOG);
+             if (dy > 3) {
+               if (seededRandom('jungle-side-left', cx, i, dy) < 0.4) localSetBlock(worldX - 1, sy - dy - 1, BLOCKS.LEAVES);
+               if (seededRandom('jungle-side-right', cx, i, dy) < 0.4) localSetBlock(worldX + 1, sy - dy - 1, BLOCKS.LEAVES);
+             }
+          }
+          // Breite Baumkrone
+          for(let dx=-4; dx<=4; dx++) {
+            for(let dy=-3; dy<=3; dy++) {
+              if(Math.abs(dx)+Math.abs(dy) <= 5 && getBlock(worldX+dx, sy-treeH+dy) === BLOCKS.AIR) {
+                localSetBlock(worldX+dx, sy-treeH+dy, BLOCKS.LEAVES);
+              }
+            }
+          }
+        }
+      } else if (r < 0.3 && canSpawnFlowerAt(worldX, sy)) {
+        localSetBlock(worldX, sy - 1, BLOCKS.FLOWER);
+      } else if (r < 0.4 && getBlock(worldX, sy) === BLOCKS.GRASS) {
+        localSetBlock(worldX, sy - 1, BLOCKS.LEAVES); // Buschiges Gras
+      }
+    }
+    else { // FOREST
+      if (r < 0.08 && getBlock(worldX, sy) === BLOCKS.GRASS) { 
+        const treeH = 4;
+        if (sy - treeH - 3 >= 2) { // Baum nur setzen wenn genug Platz nach oben (nie abgeschnitten)
+          for(let dy=0; dy<treeH; dy++) localSetBlock(worldX, sy - dy - 1, BLOCKS.LOG);
+          for(let dx=-2; dx<=2; dx++) {
+            for(let dy=-2; dy<=1; dy++) {
+              if(Math.abs(dx)+Math.abs(dy) <= 3 && getBlock(worldX+dx, sy-treeH+dy) === BLOCKS.AIR) {
+                localSetBlock(worldX+dx, sy-treeH+dy, BLOCKS.LEAVES);
+              }
+            }
+          }
+        }
+      } else if (r < 0.2 && canSpawnFlowerAt(worldX, sy)) localSetBlock(worldX, sy - 1, BLOCKS.FLOWER);
+    }
+  }
+
+  currentDim = oldDim;
+  return chunk;
+}
+
+function getBlock(x, y) {
+  if (y < 0 || y >= WORLD_H) return BLOCKS.AIR;
+  const cx = Math.floor(x / CHUNK_W);
+  let lx = x % CHUNK_W;
+  if (lx < 0) lx += CHUNK_W;
+  return getChunk(cx, currentDim)[y * CHUNK_W + lx];
+}
+
+function localSetBlock(x, y, type, targetDim = currentDim) {
+  if (y < 0 || y >= WORLD_H) return;
+  const cx = Math.floor(x / CHUNK_W);
+  let lx = x % CHUNK_W;
+  if (lx < 0) lx += CHUNK_W;
+  getChunk(cx, targetDim)[y * CHUNK_W + lx] = type;
+}
+
+function setBlock(x, y, type) {
+    localSetBlock(x, y, type, currentDim);
+}
+
+function setBlockAndBroadcast(x, y, type) {
+    localSetBlock(x, y, type, currentDim);
+    
+    if(isMultiplayerActive && db && userId) {
+        const docId = `${currentDim}_${x}_${y}`;
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'voxeria_world', docId), {
+            wx: x, wy: y, type: type, dim: currentDim, userId: userId, ts: Date.now()
+        }).catch(e => console.error("Block Sync Fehler:", e));
+    }
+}
+
+function checkPortal(wx, wy) {
+  for(let dx=-1; dx<=1; dx++) {
+    for(let dy=-1; dy<=1; dy++) {
+       let cx = wx+dx, cy = wy+dy;
+       if(getBlock(cx, cy) === BLOCKS.RAINBOW_ORE) {
+          if(getBlock(cx-1, cy) === BLOCKS.GOLD_ORE &&
+             getBlock(cx+1, cy) === BLOCKS.GOLD_ORE &&
+             getBlock(cx, cy-1) === BLOCKS.GOLD_ORE &&
+             getBlock(cx, cy+1) === BLOCKS.GOLD_ORE) {
+               
+               setBlockAndBroadcast(cx, cy, BLOCKS.PORTAL);
+               setBlockAndBroadcast(cx-1, cy, BLOCKS.PORTAL);
+               setBlockAndBroadcast(cx+1, cy, BLOCKS.PORTAL);
+               setBlockAndBroadcast(cx, cy-1, BLOCKS.PORTAL);
+               setBlockAndBroadcast(cx, cy+1, BLOCKS.PORTAL);
+               
+               showNotification("🌀 Ein Magisches Portal hat sich geöffnet!");
+               playSound('portal'); 
+               screenShake = 15;
+          }
+       }
+    }
+  }
+}
+
+const initialSpawnX = findSafeSpawnX();
+const startY = getSurfaceYAt(initialSpawnX, "OVERWORLD");
+
+const player = {
+  x: initialSpawnX * TILE, y: (startY - 2) * TILE,
+  vx: 0, vy: 0, w: TILE * 0.8, h: TILE * 1.8, onGround: false, health: 20,
+  scaleX: 1.0, scaleY: 1.0, tilt: 0,
+  color: `hsl(${Math.floor(Math.random() * 360)}, 100%, 70%)` 
+};
+
+// Landungs-Juice erst nach echtem Runterfallen: 3 Blöcke = 60 px
+let fallStartY = null;
+const MIN_THUMP_FALL_BLOCKS = 3;
+
+let camX = player.x - (COLS >> 1) * TILE;
+let camY = player.y - (ROWS >> 1) * TILE;
+
+let inventory = [ { block: BLOCKS.DIRT, count: 10 } ];
+let selectedSlot = 0;
+const keys = {};
+let frameCount = 0;
+let notifTimeout;
+
+let mouseScreenX = -100;
+let mouseScreenY = -100;
+
+function updateMouseScreenPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+
+
+// =========================================================
+// 05 - 05-input-ui-shop.js
+// =========================================================
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  mouseScreenX = (clientX - rect.left) * (1280 / rect.width);
+  mouseScreenY = (clientY - rect.top) * (720 / rect.height);
+}
+
+function getMouseWorldCoords() {
+  const wx = Math.floor((mouseScreenX + camX) / TILE);
+  const wy = Math.floor((mouseScreenY + camY) / TILE);
+  return { wx, wy };
+}
+
+canvas.addEventListener('mousemove', (e) => { updateMouseScreenPos(e); });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); updateMouseScreenPos(e); }, {passive: false});
+canvas.addEventListener('touchstart', e => { e.preventDefault(); updateMouseScreenPos(e); }, {passive: false});
+
+
+function showNotification(text) {
+  const notif = document.getElementById('notification');
+  notif.textContent = text;
+  notif.classList.add('show'); 
+  clearTimeout(notifTimeout);
+  notifTimeout = setTimeout(() => { notif.classList.remove('show'); }, 2500);
+}
+
+function toggleShop() {
+  const modal = document.getElementById('shop-modal');
+  modal.classList.toggle('open');
+  updateShopButtons();
+}
+
+function updateShopButtons() {
+  const dirtCount = (inventory.find(i => i.block === BLOCKS.DIRT) || {count: 0}).count;
+  const woodCount = (inventory.find(i => i.block === BLOCKS.WOOD) || {count: 0}).count;
+  const sandCount = (inventory.find(i => i.block === BLOCKS.SAND) || {count: 0}).count;
+  const stoneCount = (inventory.find(i => i.block === BLOCKS.STONE) || {count: 0}).count;
+  const coalCount = (inventory.find(i => i.block === BLOCKS.COAL_ORE) || {count: 0}).count;
+  
+  const ironCount = (inventory.find(i => i.block === BLOCKS.IRON_ORE) || {count: 0}).count;
+  const goldCount = (inventory.find(i => i.block === BLOCKS.GOLD_ORE) || {count: 0}).count;
+  const diamondCount = (inventory.find(i => i.block === BLOCKS.DIAMOND_ORE) || {count: 0}).count;
+  const flowerCount = (inventory.find(i => i.block === BLOCKS.FLOWER) || {count: 0}).count;
+  
+  function toggleBtn(id, condition) {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('disabled', !condition);
+  }
+
+  toggleBtn('btn-reach', dirtCount >= 30);
+  toggleBtn('btn-speed', woodCount >= 20);
+  toggleBtn('btn-jump', sandCount >= 20);
+  toggleBtn('btn-yield', stoneCount >= 30);
+  toggleBtn('btn-lighter', coalCount >= 5);
+  toggleBtn('btn-pickaxe', ironCount >= 20);
+  toggleBtn('btn-doublejump', goldCount >= 15);
+  toggleBtn('btn-triple', diamondCount >= 5);
+  toggleBtn('btn-heal', flowerCount >= 10);
+}
+
+function buyUpgrade(type, costBlock, costAmount) {
+  let item = inventory.find(i => i.block === costBlock);
+  if (item && item.count >= costAmount) {
+
+
+// =========================================================
+// 06 - 06-inventory-upgrades.js
+// =========================================================
+    item.count -= costAmount;
+    if(item.count <= 0) inventory = inventory.filter(i => i.block !== costBlock);
+    
+    playSound('buy'); 
+    
+    if (type === 'reach') { maxReach += 1.5; showNotification("✨ Upgrade: Reach increased!"); }
+    else if (type === 'speed') { playerSpeed += 1.0; showNotification("👟 Upgrade: Faster Boots!"); }
+    else if (type === 'jump') { jumpForce -= 1.5; showNotification("🦘 Upgrade: Higher Jump!"); }
+    else if (type === 'yield') { yieldMultiplier = Math.max(yieldMultiplier, 2); showNotification("⛏️ Upgrade: Double Drops!"); }
+    else if (type === 'lighter') {
+      let l = inventory.find(i => i.block === BLOCKS.LIGHTER);
+      if(l) l.count++; else inventory.push({block: BLOCKS.LIGHTER, count: 1});
+      showNotification("🔥 Item: Bought a Lighter!");
+    }
+    else if (type === 'pickaxe') { hasSuperPickaxe = true; showNotification("⛏️ Upgrade: 3x3 Abbau freigeschaltet!"); }
+    else if (type === 'doublejump') { maxJumps = 2; showNotification("🚀 Upgrade: Doppelsprung aktiviert!"); }
+    else if (type === 'triple') { yieldMultiplier = Math.max(yieldMultiplier, 3); showNotification("💎 Upgrade: 3x Drops!"); }
+    else if (type === 'heal') { player.health = 20; drawHealth(); showNotification("💖 Komplett geheilt!"); }
+    
+    drawHotbar(); updateShopButtons();
+  }
+}
+
+function isInRange(wx, wy) {
+  const px = player.x / TILE + 0.4; 
+  const py = player.y / TILE + 0.9;
+  const dist = Math.sqrt(Math.pow((wx + 0.5) - px, 2) + Math.pow((wy + 0.5) - py, 2));
+  return dist <= maxReach; 
+}
+
+function isSolid(btype) {
+  return btype && btype !== BLOCKS.AIR && btype !== BLOCKS.WATER && 
+         btype !== BLOCKS.TORCH && btype !== BLOCKS.FLOWER && 
+         btype !== BLOCKS.LIGHTER && btype !== BLOCKS.BG_PLANKS &&
+         btype !== BLOCKS.PORTAL; 
+}
+
+function resolveCollisionX() {
+  const tiles = getTiles(player.x, player.y + 0.1, player.w, player.h - 0.2);
+  for (const t of tiles) {
+    if (!isSolid(t.b)) continue;
+    const tx = t.x * TILE, ty = t.y * TILE;
+    if (player.x + player.w > tx && player.x < tx + TILE && player.y + player.h - 0.1 > ty && player.y + 0.1 < ty + TILE) {
+      if (player.vx > 0) player.x = tx - player.w;
+      else if (player.vx < 0) player.x = tx + TILE;
+      player.vx = 0;
+    }
+  }
+}
+
+function resolveCollisionY() {
+  player.onGround = false;
+  const tiles = getTiles(player.x + 0.1, player.y, player.w - 0.2, player.h);
+  for (const t of tiles) {
+    if (!isSolid(t.b)) continue;
+    const tx = t.x * TILE, ty = t.y * TILE;
+    if (player.x + player.w - 0.1 > tx && player.x + 0.1 < tx + TILE && player.y + player.h > ty && player.y < ty + TILE) {
+      if (player.vy > 0) { player.y = ty - player.h; player.onGround = true; }
+      else if (player.vy < 0) player.y = ty + TILE;
+      player.vy = 0;
+    }
+  }
+}
+
+function spawnDust(x, y) {
+   particles.push({
+     x: x + (Math.random()-0.5)*12, y: y,
+     vx: (Math.random() - 0.5) * 1.5, vy: -Math.random() * 1.5 - 0.2,
+     color: 'rgba(220, 220, 230, 0.6)',
+     size: 3 + Math.random() * 4, life: 10 + Math.random() * 15, maxLife: 25, type: 'dust'
+   });
+}
+function spawnDustBurst(x, y) {
+  for(let i=0; i<8; i++) spawnDust(x, y);
+}
+
+function updatePlayer(dt) {
+  let wasOnGround = player.onGround;
+
+
+
+// =========================================================
+// 07 - 07-player-physics.js
+// =========================================================
+  if (keys['a'] || keys['arrowleft']) player.vx = -playerSpeed;
+  else if (keys['d'] || keys['arrowright']) player.vx = playerSpeed;
+  else player.vx *= Math.pow(0.7, dt);
+
+  const jumpPressed = keys[' '] || keys['arrowup'] || keys['w'];
+  const jumpJustPressed = jumpPressed && !prevJump;
+  
+  if (player.onGround) jumpsLeft = maxJumps;
+
+  if (jumpJustPressed && jumpsLeft > 0) {
+    player.vy = jumpForce; 
+    player.onGround = false;
+    jumpsLeft--;
+    player.scaleX = 0.6; player.scaleY = 1.4;
+    spawnDustBurst(player.x + player.w/2, player.y + player.h);
+    playSound('jump'); 
+  }
+
+  prevJump = jumpPressed;
+
+  player.vy += GRAVITY * dt;
+  if (player.vy > 15) player.vy = 15;
+
+  // Fallhöhe messen: Erst ab dem Moment, wo der Spieler wirklich nach unten fällt.
+  if (!player.onGround && player.vy >= 0 && fallStartY === null) fallStartY = player.y;
+
+  player.x += player.vx * dt; resolveCollisionX();
+  player.y += player.vy * dt; resolveCollisionY();
+
+  if (!wasOnGround && player.onGround) {
+    const fallBlocks = fallStartY === null ? 0 : (player.y - fallStartY) / TILE;
+    const hardLanding = fallBlocks >= MIN_THUMP_FALL_BLOCKS;
+
+    player.scaleX = hardLanding ? 1.4 : 1.12;
+    player.scaleY = hardLanding ? 0.6 : 0.88;
+
+    if (hardLanding) {
+      screenShake = Math.max(screenShake, 3 + Math.min(8, fallBlocks)); 
+      spawnDustBurst(player.x + player.w/2, player.y + player.h);
+      addJuiceText(player.x + player.w/2, player.y, 'thump', 'rgba(255,255,255,0.8)');
+    } else if (Math.abs(player.vx) > 2) {
+      spawnDust(player.x + player.w/2, player.y + player.h);
+    }
+
+    fallStartY = null;
+  }
+
+  if (player.onGround && Math.abs(player.vx) > 0.5 && Math.random() < 0.15) {
+     spawnDust(player.x + player.w/2, player.y + player.h);
+  }
+
+  if (player.y > WORLD_H * TILE) { player.y = -100; player.vy = 0; }
+
+  const tcamX = player.x - (COLS >> 1) * TILE;
+  const tcamY = player.y - (ROWS >> 1) * TILE;
+  camX += (tcamX - camX) * (1 - Math.pow(0.80, dt)); 
+  camY += (tcamY - camY) * (1 - Math.pow(0.80, dt));
+  camY = Math.max(-ROWS * TILE, Math.min(camY, (WORLD_H - ROWS) * TILE)); // Kamera darf auch über y=0 scrollen
+}
+
+let physicsTick = 0;
+function updatePhysics() {
+  physicsTick++;
+  const runSand = physicsTick % 3 === 0; 
+  const runWater = physicsTick % 15 === 0;
+
+  if (!runSand && !runWater) return; 
+
+  const startX = Math.floor(camX / TILE) - 2;
+  const endX = startX + COLS + 4;
+  const startY = Math.max(0, Math.floor(camY / TILE) - 2);
+  const endY = Math.min(WORLD_H - 2, startY + ROWS + 4);
+
+  for (let y = endY; y >= startY; y--) {
+    let xs = [];
+    for (let x = startX; x <= endX; x++) xs.push(x);
+    xs.sort(() => Math.random() - 0.5);
+
+    for (let x of xs) {
+      const b = getBlock(x, y);
+      
+      if (b === BLOCKS.SAND && runSand) {
+        const below = getBlock(x, y+1);
+        if (below === BLOCKS.AIR || below === BLOCKS.WATER) {
+          setBlock(x, y, below); setBlock(x, y+1, BLOCKS.SAND);
+        } else {
+          let dl = getBlock(x-1, y+1);
+          let dr = getBlock(x+1, y+1);
+          let canDl = dl === BLOCKS.AIR || dl === BLOCKS.WATER;
+          let canDr = dr === BLOCKS.AIR || dr === BLOCKS.WATER;
+          if (canDl && canDr) { if (Math.random() < 0.5) canDl = false; else canDr = false; }
+          if (canDl) { setBlock(x, y, dl); setBlock(x-1, y+1, BLOCKS.SAND); }
+          else if (canDr) { setBlock(x, y, dr); setBlock(x+1, y+1, BLOCKS.SAND); }
+        }
+      } 
+      else if (b === BLOCKS.WATER && runWater) {
+        const below = getBlock(x, y+1);
+        if (below === BLOCKS.AIR) {
+          setBlock(x, y, BLOCKS.AIR); setBlock(x, y+1, BLOCKS.WATER);
+        } else {
+          let dl = getBlock(x-1, y+1) === BLOCKS.AIR;
+          let dr = getBlock(x+1, y+1) === BLOCKS.AIR;
+          if (dl && dr) { if (Math.random() < 0.5) dl = false; else dr = false; }
+          
+          if (dl) { setBlock(x, y, BLOCKS.AIR); setBlock(x-1, y+1, BLOCKS.WATER); }
+          else if (dr) { setBlock(x, y, BLOCKS.AIR); setBlock(x+1, y+1, BLOCKS.WATER); }
+          else {
+            let sl = getBlock(x-1, y) === BLOCKS.AIR;
+            let sr = getBlock(x+1, y) === BLOCKS.AIR;
+            if (sl && sr) { if (Math.random() < 0.5) sl = false; else sr = false; }
+            if (sl) { setBlock(x, y, BLOCKS.AIR); setBlock(x-1, y, BLOCKS.WATER); }
+            else if (sr) { setBlock(x, y, BLOCKS.AIR); setBlock(x+1, y, BLOCKS.WATER); }
+          }
+        }
+      }
+    }
+  }
+}
+
+function getTiles(px, py, pw, ph) {
+  const x0 = Math.floor(px / TILE), y0 = Math.floor(py / TILE);
+  const x1 = Math.floor((px + pw - 0.1) / TILE), y1 = Math.floor((py + ph - 0.1) / TILE);
+  const tiles = [];
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) tiles.push({ x, y, b: getBlock(x, y) });
+  return tiles;
+}
+
+function drawBlock(x, y, btype) {
+  if (btype === BLOCKS.AIR) return;
+  const sx = x * TILE - drawCamX, sy = y * TILE - drawCamY;
+  if (sx + TILE < -30 || sx > 1310 || sy + TILE < -30 || sy > 750) return;
+
+  if (btype === BLOCKS.PORTAL) {
+    const hue = (frameCount * 8 + x * 10 + y * 10) % 360;
+    ctx.fillStyle = `hsla(${hue}, 100%, 60%, 0.7)`;
+    ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.strokeStyle = `hsla(${(hue + 180) % 360}, 100%, 80%, 0.9)`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
+    return;
+  }
+  
+  if (btype === BLOCKS.DIAMOND_DYNAMITE) {
+    let flash = false;
+    let dyn = activeDynamites.find(d => d.wx === x && d.wy === y);
+    if (dyn && (Math.floor(dyn.timeLeft / 10) % 2 === 0)) flash = true;
+
+    if (flash) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(sx, sy, TILE, TILE);
+    } else {
+      ctx.fillStyle = '#00ffff'; ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = '#00cccc'; ctx.fillRect(sx, sy, TILE, 3);
+      ctx.fillStyle = '#00aaaa'; ctx.fillRect(sx, sy+TILE-3, TILE, 3);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(sx + 4, sy, 3, TILE); ctx.fillRect(sx + TILE - 7, sy, 3, TILE);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.moveTo(sx + 10, sy + 10); ctx.lineTo(sx + 14, sy + 6); ctx.lineTo(sx + 18, sy + 10); ctx.lineTo(sx + 14, sy + 14); ctx.fill();
+    }
+    return;
+  }
+
+  if (btype === BLOCKS.FLOWER) {
+    const sway = Math.sin(frameCount * 0.08 + x * 0.7) * 1.5;
+    ctx.fillStyle = '#22aa22'; ctx.fillRect(sx + 9 + sway * 0.3, sy + 8, 2, 12);
+    ctx.fillStyle = '#ff3333'; ctx.fillRect(sx + 6 + sway, sy + 4, 8, 6);
+    ctx.fillStyle = '#ff88aa'; ctx.fillRect(sx + 4 + sway, sy + 6, 4, 4);
+    ctx.fillStyle = '#ffff55'; ctx.fillRect(sx + 8 + sway, sy + 5, 4, 4);
+    return;
+  }
+  if (btype === BLOCKS.LIGHTER) {
+    ctx.fillStyle = '#888'; ctx.fillRect(sx + 6, sy + 10, 8, 10);
+    ctx.fillStyle = '#ccc'; ctx.fillRect(sx + 6, sy + 6, 8, 4);
+    ctx.fillStyle = '#ff3333'; ctx.fillRect(sx + 10, sy + 8, 3, 2);
+    return;
+  }
+  if (btype === BLOCKS.ICE) {
+    ctx.fillStyle = 'rgba(150, 200, 255, 0.6)'; ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 1; ctx.strokeRect(sx, sy, TILE, TILE);
+    return;
+  }
+
+  // Hole die Basis-Farben
+  let colors = blockColors[btype];
+  if (!colors) return;
+  
+  // BIOME COLOR TWEAKS (Gras & Blätter)
+  if (btype === BLOCKS.GRASS || btype === BLOCKS.LEAVES) {
+     const biome = currentDim === "GOLD" ? "FOREST" : getBiome(Math.floor(x / CHUNK_W));
+     colors = [...colors]; // Kopieren, um global zu schützen
+     if (biome === "JUNGLE") {
+        if(btype===BLOCKS.GRASS) { colors[0] = '#388e3c'; colors[1]='#2e7d32'; colors[2]='#4caf50'; }
+        else { colors[0] = '#1b5e20'; }
+     } else if (biome === "SNOW") {
+        if(btype===BLOCKS.GRASS) { colors[0] = '#b2dfdb'; colors[1]='#80cbc4'; colors[2]='#e0f2f1'; }
+        else { colors[0] = '#4db6ac'; }
+     } else if (biome === "DESERT" && btype===BLOCKS.GRASS) {
+        colors[0] = '#9e9d24'; colors[1]='#827717'; colors[2]='#c0ca33';
+     }
+  }
+
+  if (btype === BLOCKS.BG_PLANKS) {
+    ctx.fillStyle = colors[0]; ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.fillStyle = colors[2]; ctx.fillRect(sx, sy, TILE, 2);
+    ctx.fillStyle = colors[3]; ctx.fillRect(sx + TILE - 2, sy, 2, TILE);
+    ctx.fillStyle = colors[1]; ctx.fillRect(sx, sy + TILE - 2, TILE, 2);
+    ctx.fillStyle = colors[1]; ctx.fillRect(sx, sy, 2, TILE);
+    return; 
+  }
+  
+  ctx.fillStyle = colors[0]; ctx.fillRect(sx, sy, TILE, TILE);
+  ctx.fillStyle = colors[2]; ctx.fillRect(sx, sy, TILE, 3);
+  ctx.fillStyle = colors[3]; ctx.fillRect(sx + TILE - 3, sy, 3, TILE);
+  ctx.fillStyle = colors[1]; ctx.fillRect(sx, sy + TILE - 3, TILE, 3);
+  ctx.fillStyle = colors[1]; ctx.fillRect(sx, sy, 3, TILE);
+
+  if (btype === BLOCKS.GRASS) { 
+      ctx.fillStyle = colors[2]; // Biome adaptives Gras-Top
+      ctx.fillRect(sx, sy, TILE, 5); 
+  }
+  
+  if (btype === BLOCKS.CACTUS) {
+    ctx.fillStyle = '#0a290a'; 
+    ctx.fillRect(sx+2, sy+4, 2, 2); ctx.fillRect(sx+16, sy+12, 2, 2);
+    ctx.fillRect(sx+8, sy+8, 2, 2); ctx.fillRect(sx+14, sy+4, 2, 2);
+  }
+  
+  if ([BLOCKS.COAL_ORE, BLOCKS.IRON_ORE, BLOCKS.GOLD_ORE, BLOCKS.DIAMOND_ORE, BLOCKS.RAINBOW_ORE].includes(btype)) {
+    if (btype === BLOCKS.RAINBOW_ORE) {
+      const hue = (frameCount * 5 + x * 15 + y * 15) % 360;
+      ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
+    } else {
+      ctx.fillStyle = colors[3];
+    }
+    ctx.fillRect(sx+4, sy+4, 4, 4); ctx.fillRect(sx+11, sy+9, 4, 4); ctx.fillRect(sx+4, sy+11, 4, 4);
+  }
+
+  if (btype === BLOCKS.TORCH) {
+    ctx.fillStyle = '#8B6914'; ctx.fillRect(sx + 8, sy + 4, 4, 12);
+    ctx.fillStyle = '#ff9900'; ctx.fillRect(sx + 7, sy + 1, 6, 5);
+    ctx.fillStyle = '#ffff00'; ctx.fillRect(sx + 9, sy + 2, 2, 3);
+  }
+  if (btype === BLOCKS.WATER) {
+    // Wassertiefe bestimmen (Blöcke darüber zählen)
+    let depth = 0;
+    for (let dy = 1; dy <= 5; dy++) {
+      if (getBlock(x, y - dy) === BLOCKS.WATER) depth++; else break;
+    }
+    const isTop = getBlock(x, y - 1) !== BLOCKS.WATER;
+    
+    // Farbe abhängig von Tiefe (oben heller, unten dunkler)
+    const depthFactor = Math.min(depth / 5, 1);
+    const r = Math.floor(20 - depthFactor * 10);
+    const g = Math.floor(100 - depthFactor * 40);
+    const b2 = Math.floor(220 - depthFactor * 60);
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b2}, ${0.65 + depthFactor * 0.25})`;
+    ctx.fillRect(sx, sy, TILE, TILE);
+    
+    if (isTop) {
+      // Wellenanimation nur an der Oberfläche
+      const wave1 = Math.sin(frameCount * 0.07 + x * 0.6) * 2.5;
+      const wave2 = Math.sin(frameCount * 0.05 + x * 0.4 + 1.5) * 1.5;
+      
+      // Hellere Oberflächen-Wellenlinie
+      ctx.fillStyle = `rgba(100, 180, 255, 0.55)`;
+      ctx.fillRect(sx, sy + 3 + wave1, TILE, 2);
+      ctx.fillStyle = `rgba(160, 220, 255, 0.35)`;
+      ctx.fillRect(sx, sy + 7 + wave2, TILE, 1);
+      
+      // Lichtreflexe (Shimmer)
+      const shimmer = Math.sin(frameCount * 0.12 + x * 1.3 + y * 0.7);
+      if (shimmer > 0.5) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${(shimmer - 0.5) * 0.5})`;
+        ctx.fillRect(sx + 3, sy + 2 + wave1, 4, 2);
+        ctx.fillRect(sx + 13, sy + 5 + wave2, 3, 2);
+      }
+    } else {
+      // Unterwasser-Lichtstrahlen (Kaustik-Effekt)
+      const ray = Math.sin(frameCount * 0.06 + x * 0.8 + y * 0.5) * 0.15 + 0.05;
+      if (ray > 0.1) {
+        ctx.fillStyle = `rgba(120, 200, 255, ${ray})`;
+        ctx.fillRect(sx + 6, sy, 3, TILE);
+      }
+    }
+    return;
+  }
+  if (btype === BLOCKS.LEAVES) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; // Leichte Schattierung für Blätter
+    for (let i = 0; i < 6; i++) ctx.fillRect(sx + (i * 5 + 2) % TILE, sy + (i * 7 + 3) % TILE, 3, 3);
+  }
+  if (btype === BLOCKS.GLASS) {
+    ctx.strokeStyle = 'rgba(100,200,255,0.6)'; ctx.lineWidth = 1; ctx.strokeRect(sx+2, sy+2, TILE-4, TILE-4);
+  }
+  if (btype === BLOCKS.LOG) {
+    ctx.fillStyle = '#4a3008'; ctx.fillRect(sx+2, sy, 2, TILE); ctx.fillRect(sx+TILE-4, sy, 2, TILE);
+    ctx.fillStyle = '#9a7030'; ctx.fillRect(sx, sy+3, TILE, 2); ctx.fillRect(sx, sy+9, TILE, 2); ctx.fillRect(sx, sy+15, TILE, 2);
+  }
+  if (btype === BLOCKS.GOLD_BRICK) {
+     ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(sx, sy+8, TILE, 2); ctx.fillRect(sx+8, sy, 2, TILE);
+  }
+  
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 0.5; ctx.strokeRect(sx, sy, TILE, TILE);
+}
+
+function drawWorld() {
+  const startX = Math.floor(camX / TILE) - 1;
+  const endX = startX + COLS + 2;
+  const startY = Math.max(0, Math.floor(camY / TILE) - 1);
+  const endY = Math.min(WORLD_H - 1, startY + ROWS + 2);
+
+  for (let y = startY; y <= endY; y++) {
+    for (let x = startX; x <= endX; x++) {
+      const b = getBlock(x, y);
+      if (b !== BLOCKS.AIR) drawBlock(x, y, b);
+    }
+  }
+}
+
+function drawSky() {
+  if (currentDim === "GOLD") {
+    const grad = ctx.createLinearGradient(0, 0, 0, 720); 
+
+
+// =========================================================
+// 08 - 08-rendering.js
+// =========================================================
+    grad.addColorStop(0, '#5a1236'); // Dunkles Violett/Rot für Alien-Vibe
+    grad.addColorStop(1, '#ff8c00'); // Gold-Orange
+    ctx.fillStyle = grad; 
+    ctx.fillRect(0, 0, 1280, 720); 
+    
+    // Schwebende Gold-Partikel im Hintergrund
+    for(let i=0; i<30; i++) {
+       let sx = (Math.sin(i*123) * 1000 - drawCamX*0.1) % 1280;
+       if (sx < 0) sx += 1280; 
+       let sy = (Math.abs(Math.cos(i*321)) * 700 - frameCount * 0.2) % 720;
+       if (sy < 0) sy += 720;
+       ctx.fillStyle = `rgba(255, 215, 0, ${Math.abs(Math.sin(frameCount*0.05 + i))})`;
+       ctx.beginPath(); ctx.arc(sx, sy, 2 + Math.random(), 0, Math.PI*2); ctx.fill();
+    }
+    return; 
+  }
+
+  const playerCx = Math.floor(player.x / (CHUNK_W * TILE));
+  const biome = getBiome(playerCx);
+  
+  const grad = ctx.createLinearGradient(0, 0, 0, 720); 
+  
+  if (biome === "DESERT") { grad.addColorStop(0, '#ff9966'); grad.addColorStop(1, '#ffb347'); } 
+  else if (biome === "SNOW") { grad.addColorStop(0, '#8e9eab'); grad.addColorStop(1, '#eef2f3'); } 
+  else if (biome === "JUNGLE") { grad.addColorStop(0, '#4fc3f7'); grad.addColorStop(1, '#81c784'); } 
+  else { grad.addColorStop(0, '#64b5f6'); grad.addColorStop(1, '#bbdefb'); }
+  
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 1280, 720); 
+  
+  if (biome !== "SNOW") {
+    const sunX = 640 + Math.cos(frameCount * 0.001) * 200 - (drawCamX * 0.05);
+    ctx.fillStyle = biome === "DESERT" ? '#ffed4a' : '#ffe680'; 
+    ctx.beginPath(); ctx.arc(sunX, 80, 18, 0, Math.PI * 2); ctx.fill();
+  }
+
+  for (let c of clouds) {
+    c.x += c.speed;
+    let drawX = (c.x - drawCamX * 0.15) % 2500; 
+    if (drawX < -300) drawX += 2500; 
+    else if (drawX > 2200) drawX -= 2500;
+
+    let drawY = c.y + Math.sin(frameCount * 0.02 + c.seed) * 12;
+
+    let alpha = 0.5;
+    if (biome === "DESERT") alpha = 0.15; 
+    if (biome === "SNOW") alpha = 0.8;    
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(drawX, drawY, 30 * c.scale, 0, Math.PI*2);
+    ctx.arc(drawX + 25 * c.scale, drawY - 15 * c.scale, 25 * c.scale, 0, Math.PI*2);
+    ctx.arc(drawX + 50 * c.scale, drawY + 5 * c.scale, 20 * c.scale, 0, Math.PI*2);
+    ctx.arc(drawX - 25 * c.scale, drawY + 5 * c.scale, 22 * c.scale, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+
+function canSpawnAnimalAt(wx, type) {
+  if (currentDim !== "OVERWORLD") return null;
+  const cx = Math.floor(wx / CHUNK_W);
+  const biome = getBiome(cx);
+  const sy = getSurfaceYAt(wx, "OVERWORLD");
+  const ground = getBlock(wx, sy);
+
+  if (type === 'chicken') {
+    // Hühner nur im Forest, deutlich seltener als vorher.
+    if (biome !== "FOREST" || ground !== BLOCKS.GRASS) return null;
+  } else if (type === 'parrot') {
+    // Papageien nur im Jungle und nur auf Gras / Blättern / Logs.
+    if (biome !== "JUNGLE") return null;
+    if (![BLOCKS.GRASS, BLOCKS.LEAVES, BLOCKS.LOG].includes(ground)) return null;
+  } else if (type === 'lizard') {
+    // Eidechsen nur in der Wüste und auf Sand.
+    if (biome !== "DESERT" || ground !== BLOCKS.SAND) return null;
+  }
+
+  if (getBlock(wx, sy - 1) !== BLOCKS.AIR || getBlock(wx, sy - 2) !== BLOCKS.AIR) return null;
+  return sy;
+}
+
+function countAnimals(type) {
+  return animals.filter(a => a.type === type).length;
+}
+
+function createAnimal(type, wx, sy) {
+  const common = {
+    type,
+    x: wx * TILE + 2,
+    y: (sy - 1) * TILE + 4,
+    vx: Math.random() < 0.5 ? -0.35 : 0.35,
+    vy: 0,
+    dir: Math.random() < 0.5 ? -1 : 1,
+    hop: 0,
+    idle: Math.floor(Math.random() * 100),
+    blink: Math.floor(Math.random() * 160),
+    flap: Math.random() * Math.PI * 2,
+    scared: 0
+  };
+
+  if (type === 'chicken') return { ...common, w: 15, h: 14 };
+  if (type === 'parrot') return { ...common, w: 14, h: 17, vx: common.dir * (0.25 + Math.random() * 0.35), colorSeed: Math.floor(Math.random() * 3) };
+  if (type === 'lizard') return { ...common, w: 18, h: 8, vx: common.dir * (0.30 + Math.random() * 0.45) };
+  return common;
+}
+
+function spawnAnimalNearPlayer() {
+  if (animals.length >= MAX_ANIMALS || currentDim !== "OVERWORLD") return;
+
+  const playerTileX = Math.floor(player.x / TILE);
+
+  // bewusst weniger Hühner: Hühner haben nur 20 %, Papageien / Eidechsen je nach Biom mehr Chancen.
+  const roll = Math.random();
+  const preferredTypes = roll < 0.20 ? ['chicken', 'parrot', 'lizard'] : roll < 0.60 ? ['parrot', 'lizard', 'chicken'] : ['lizard', 'parrot', 'chicken'];
+
+  for (const type of preferredTypes) {
+    if (countAnimals(type) >= ANIMAL_LIMITS[type]) continue;
+
+    for (let tries = 0; tries < 22; tries++) {
+      const wx = playerTileX + Math.floor((Math.random() - 0.5) * 110);
+      if (Math.abs(wx - playerTileX) < 10) continue;
+      const sy = canSpawnAnimalAt(wx, type);
+      if (sy === null) continue;
+
+      // Nicht mehrere Tiere direkt übereinander spawnen.
+      if (animals.some(a => Math.abs(a.x / TILE - wx) < 6)) continue;
+
+      animals.push(createAnimal(type, wx, sy));
+      break;
+    }
+    break;
+  }
+}
+
+function updateAnimals(dt) {
+  animalSpawnTick++;
+  // Tiere spawnen langsamer als vorher, damit es nicht überfüllt wirkt.
+  if (animalSpawnTick % 150 === 0) spawnAnimalNearPlayer();
+
+  for (let i = animals.length - 1; i >= 0; i--) {
+    const a = animals[i];
+
+    // Tiere weit ausserhalb der Kamera wieder entfernen, damit es leicht bleibt.
+    if (Math.abs(a.x - player.x) > TILE * 150 || currentDim !== "OVERWORLD") {
+      animals.splice(i, 1);
+      continue;
+    }
+
+    const distToPlayer = Math.abs((a.x + a.w / 2) - (player.x + player.w / 2));
+    if (a.type === 'lizard' && distToPlayer < TILE * 4) {
+      a.scared = 35;
+      a.dir = a.x < player.x ? -1 : 1;
+      a.vx = a.dir * 1.35;
+    }
+
+    a.idle -= dt;
+    if (a.idle <= 0) {
+      a.dir = Math.random() < 0.5 ? -1 : 1;
+      if (a.type === 'chicken') a.vx = a.dir * (0.12 + Math.random() * 0.28);
+      else if (a.type === 'parrot') a.vx = a.dir * (0.20 + Math.random() * 0.38);
+      else if (a.type === 'lizard') a.vx = a.dir * (0.22 + Math.random() * 0.55);
+
+      a.idle = 55 + Math.random() * 140;
+      if ((a.type === 'chicken' || a.type === 'parrot') && Math.random() < 0.35 && a.onGround) a.vy = a.type === 'parrot' ? -4.0 : -3.2;
+    }
+
+    if (a.scared > 0) a.scared -= dt;
+    if (a.type === 'parrot') a.flap += 0.22 * dt;
+
+    a.vy += GRAVITY * (a.type === 'parrot' ? 0.55 : 0.75) * dt;
+    if (a.vy > 8) a.vy = 8;
+
+    const nextX = a.x + a.vx * dt;
+    const footY = Math.floor((a.y + a.h - 2) / TILE);
+    const sideX = Math.floor((nextX + (a.vx > 0 ? a.w : 0)) / TILE);
+    if (isSolid(getBlock(sideX, footY)) || isSolid(getBlock(sideX, footY - 1))) {
+      a.vx *= -1;
+      a.dir *= -1;
+    } else {
+      a.x = nextX;
+    }
+
+    a.y += a.vy * dt;
+    a.onGround = false;
+    const left = Math.floor((a.x + 2) / TILE);
+    const right = Math.floor((a.x + a.w - 2) / TILE);
+    const bottom = Math.floor((a.y + a.h) / TILE);
+    for (let tx = left; tx <= right; tx++) {
+      if (isSolid(getBlock(tx, bottom)) && a.vy >= 0) {
+        a.y = bottom * TILE - a.h;
+        a.vy = 0;
+        a.onGround = true;
+        break;
+      }
+    }
+
+    // Kante erkennen und umdrehen.
+    if (a.onGround) {
+      const aheadX = Math.floor((a.x + a.w / 2 + a.dir * 12) / TILE);
+      const aheadBelow = Math.floor((a.y + a.h + 2) / TILE);
+      if (!isSolid(getBlock(aheadX, aheadBelow))) {
+        a.vx *= -1;
+        a.dir *= -1;
+      }
+    }
+  }
+}
+
+function drawChicken(a) {
+  const sx = a.x - drawCamX;
+  const sy = a.y - drawCamY;
+  const bob = a.onGround ? Math.sin(frameCount * 0.18 + a.x * 0.02) * 1.2 : 0;
+  const face = a.dir >= 0 ? 1 : -1;
+
+  ctx.save();
+  ctx.translate(sx + a.w / 2, sy + a.h / 2 + bob);
+  ctx.scale(face, 1);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(0, 9, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = '#f7f7f2'; ctx.fillRect(-7, -4, 12, 10);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(-5, -6, 10, 4);
+  ctx.fillStyle = '#e8e8df'; ctx.fillRect(-7, 4, 12, 2);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(2, -10, 8, 8);
+  ctx.fillStyle = '#222'; ctx.fillRect(7, -8, 2, 2);
+  ctx.fillStyle = '#f2b233'; ctx.fillRect(10, -6, 4, 3);
+  ctx.fillStyle = '#d92323'; ctx.fillRect(4, -13, 2, 3); ctx.fillRect(7, -14, 2, 4);
+  ctx.fillStyle = '#d99022'; ctx.fillRect(-3, 6, 2, 5); ctx.fillRect(3, 6, 2, 5);
+
+  ctx.restore();
+}
+
+function drawParrot(a) {
+  const sx = a.x - drawCamX;
+  const sy = a.y - drawCamY;
+  const bob = Math.sin(frameCount * 0.16 + a.x * 0.04) * 1.4;
+  const wing = Math.sin(a.flap) * 3;
+  const face = a.dir >= 0 ? 1 : -1;
+  const bodyColors = ['#e63946', '#2ecc71', '#3498db'];
+  const wingColors = ['#3498db', '#f1c40f', '#e84393'];
+
+  ctx.save();
+  ctx.translate(sx + a.w / 2, sy + a.h / 2 + bob);
+  ctx.scale(face, 1);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.14)';
+  ctx.beginPath(); ctx.ellipse(0, 10, 7, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = bodyColors[a.colorSeed % bodyColors.length];
+  ctx.fillRect(-5, -5, 10, 12);
+  ctx.fillStyle = wingColors[a.colorSeed % wingColors.length];
+  ctx.fillRect(-8, -2 + wing, 5, 9);
+  ctx.fillStyle = '#ffd166';
+  ctx.fillRect(4, -10, 7, 7);
+  ctx.fillStyle = '#222';
+  ctx.fillRect(8, -8, 2, 2);
+  ctx.fillStyle = '#ff9f1c';
+  ctx.fillRect(11, -6, 4, 3);
+  ctx.fillStyle = '#2d3436';
+  ctx.fillRect(-3, 7, 2, 5); ctx.fillRect(3, 7, 2, 5);
+
+  ctx.restore();
+}
+
+function drawLizard(a) {
+  const sx = a.x - drawCamX;
+  const sy = a.y - drawCamY;
+  const wiggle = Math.sin(frameCount * 0.35 + a.x * 0.08) * 2;
+  const face = a.dir >= 0 ? 1 : -1;
+
+  ctx.save();
+  ctx.translate(sx + a.w / 2, sy + a.h / 2);
+  ctx.scale(face, 1);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(0, 7, 10, 2, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = '#44aa55';
+  ctx.fillRect(-8, -2, 13, 6);
+  ctx.fillStyle = '#66cc66';
+  ctx.fillRect(-5, -4, 9, 3);
+  ctx.fillStyle = '#55bb44';
+  ctx.fillRect(4, -3, 6, 5);
+  ctx.fillStyle = '#2f7d32';
+  ctx.fillRect(-13, 0 + Math.round(wiggle), 6, 3); // Schwanz
+  ctx.fillStyle = '#111';
+  ctx.fillRect(8, -2, 2, 2);
+  ctx.fillStyle = '#2f7d32';
+  ctx.fillRect(-5, 4, 3, 2); ctx.fillRect(3, 4, 3, 2);
+
+  ctx.restore();
+}
+
+function drawAnimals() {
+  for (const a of animals) {
+    if (a.type === 'chicken') drawChicken(a);
+    else if (a.type === 'parrot') drawParrot(a);
+    else if (a.type === 'lizard') drawLizard(a);
+  }
+  drawPiranhas();
+}
+
+// =========================================================
+// PIRANHA PFLANZEN
+// =========================================================
+function spawnPiranhaAt(wx, wy) {
+  // Checkt: Block darunter muss Grass/Dirt/Sand sein, darüber Luft
+  if (getBlock(wx, wy) !== BLOCKS.AIR) return;
+  const below = getBlock(wx, wy + 1);
+  if (below !== BLOCKS.GRASS && below !== BLOCKS.DIRT && below !== BLOCKS.SAND) return;
+  // Nicht zu dicht beieinander
+  for (const p of piranhas) if (Math.abs(p.wx - wx) < 8) return;
+  piranhas.push({
+    wx, wy,
+    phase: Math.random() * Math.PI * 2, // Versetzt animiert
+    biteTimer: 0,
+    isBiting: false,
+    alive: true
+  });
+}
+
+function trySpawnPiranhasNearPlayer() {
+  // Selten neue Piranhas spawnen im sichtbaren Bereich
+  if (Math.random() > 0.003) return;
+  const startX = Math.floor(camX / TILE) - 2;
+  const endX = startX + COLS + 4;
+  const wx = startX + Math.floor(Math.random() * (endX - startX));
+  // Oberfläche suchen
+  for (let wy = 2; wy < WORLD_H - 2; wy++) {
+    if (getBlock(wx, wy) === BLOCKS.AIR && (getBlock(wx, wy + 1) === BLOCKS.GRASS || getBlock(wx, wy + 1) === BLOCKS.DIRT)) {
+      spawnPiranhaAt(wx, wy);
+      break;
+    }
+  }
+}
+
+function updatePiranhas(dt) {
+  if (damageCooldown > 0) damageCooldown = Math.max(0, damageCooldown - dt);
+  trySpawnPiranhasNearPlayer();
+
+  const px = player.x + player.w / 2;
+  const py = player.y + player.h / 2;
+
+  for (let i = piranhas.length - 1; i >= 0; i--) {
+    const p = piranhas[i];
+    p.phase += 0.04 * dt;
+    if (p.biteTimer > 0) p.biteTimer -= dt;
+    if (p.biteTimer <= 0) p.isBiting = false;
+
+    // Spieler-Kollision (AABB)
+    const pirX = p.wx * TILE + TILE / 2;
+    const pirTopY = p.wy * TILE - 6 + (p.isBiting ? 4 : 0); // Kopf oben
+    const pirBotY = (p.wy + 1) * TILE;
+
+    const playerLeft = player.x + 2;
+    const playerRight = player.x + player.w - 2;
+    const playerTop = player.y;
+    const playerBot = player.y + player.h;
+
+    const hit = playerRight > pirX - 9 && playerLeft < pirX + 9 && playerBot > pirTopY && playerTop < pirBotY;
+    if (hit && damageCooldown <= 0) {
+      p.isBiting = true;
+      p.biteTimer = 20;
+      playSound('bite');
+      takeDamage(2); // 1 Herz Schaden
+    }
+
+    // Piranha entfernen wenn Block darunter weg ist
+    const below = getBlock(p.wx, p.wy + 1);
+    if (below === BLOCKS.AIR || below === BLOCKS.WATER) {
+      piranhas.splice(i, 1);
+    }
+  }
+}
+
+function drawPiranhas() {
+  for (const p of piranhas) {
+    const sx = p.wx * TILE - drawCamX;
+    const sy = p.wy * TILE - drawCamY;
+    if (sx + TILE < -30 || sx > 1310 || sy + TILE < -30 || sy > 750) continue;
+
+    const bob = Math.sin(p.phase * 1.5) * 2; // leichtes Auf-und-Ab
+    const mouthOpen = p.isBiting ? 0.8 : (Math.abs(Math.sin(p.phase)) * 0.5);
+
+    ctx.save();
+    ctx.translate(sx + TILE / 2, sy + TILE / 2 + bob);
+
+    // Stiel (grün)
+    ctx.fillStyle = '#2d7d1e';
+    ctx.fillRect(-3, 4, 6, 12);
+    // Blätter
+    ctx.fillStyle = '#3a9e28';
+    ctx.beginPath(); ctx.ellipse(-8, 8, 8, 4, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(8, 6, 8, 4, 0.4, 0, Math.PI * 2); ctx.fill();
+
+    // Kopf (Piranha-Blüte)
+    ctx.fillStyle = p.isBiting ? '#ff2222' : '#e83333';
+    ctx.beginPath(); ctx.ellipse(0, -4, 9, 10, 0, 0, Math.PI * 2); ctx.fill();
+
+    // Punkte
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath(); ctx.arc(-3, -6, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4, -2, 1.5, 0, Math.PI * 2); ctx.fill();
+
+    // Maul
+    const mouthH = mouthOpen * 7;
+    ctx.fillStyle = '#1a0000';
+    ctx.beginPath();
+    ctx.ellipse(0, -2, 7, mouthH, 0, 0, Math.PI * 2); ctx.fill();
+
+    // Zähne
+    if (mouthOpen > 0.2) {
+      ctx.fillStyle = '#fff';
+      for (let t = -2; t <= 2; t++) {
+        ctx.beginPath(); ctx.moveTo(t * 2.5, -2 - mouthH * 0.3);
+        ctx.lineTo(t * 2.5 - 1.2, -2 + mouthH * 0.5);
+        ctx.lineTo(t * 2.5 + 1.2, -2 + mouthH * 0.5); ctx.fill();
+      }
+    }
+
+    // Augen
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-4, -9, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4, -9, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(-3.5, -9, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4.5, -9, 1.5, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function drawOtherPlayers() {
+  const now = Date.now();
+  for (let id in otherPlayers) {
+    let p = otherPlayers[id];
+    if (p.dim !== currentDim) continue; 
+    if (now - p.ts > 5000) continue; 
+
+    const px = p.x - drawCamX + player.w / 2;
+    const py = p.y - drawCamY + player.h; 
+
+    ctx.save();
+    ctx.translate(px, py);
+    const drawX = -player.w / 2;
+    const drawY = -player.h;
+
+    ctx.fillStyle = p.color || '#ff5555'; ctx.fillRect(drawX, drawY, player.w, player.h * 0.45); 
+    ctx.fillStyle = '#4477cc'; ctx.fillRect(drawX, drawY + player.h * 0.45, player.w, player.h * 0.55); 
+    
+    ctx.fillStyle = 'white';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText("Spieler", 0, drawY - 8);
+    ctx.restore();
+  }
+}
+
+function drawPlayer() {
+  const px = player.x - drawCamX + player.w / 2;
+  const py = player.y - drawCamY + player.h; 
+
+  ctx.save();
+  ctx.translate(px, py);
+  
+  player.scaleX += (1 - player.scaleX) * 0.15;
+  player.scaleY += (1 - player.scaleY) * 0.15;
+  ctx.scale(player.scaleX, player.scaleY);
+  
+  player.tilt += (player.vx * 0.04 - player.tilt) * 0.2;
+  ctx.rotate(player.tilt);
+
+  const drawX = -player.w / 2;
+  const drawY = -player.h;
+
+  ctx.fillStyle = player.color; ctx.fillRect(drawX, drawY, player.w, player.h * 0.45); 
+  ctx.fillStyle = '#4477cc'; ctx.fillRect(drawX, drawY + player.h * 0.45, player.w, player.h * 0.55); 
+  ctx.fillStyle = '#1e3799'; ctx.fillRect(drawX, drawY, player.w, 4);
+  
+  if (player.onGround && Math.abs(player.vx) > 0.5) {
+    const legSwing = Math.sin(frameCount * 0.4) * 5;
+    ctx.fillStyle = '#335588';
+    ctx.fillRect(drawX, drawY + player.h * 0.65 + legSwing, 5, player.h * 0.35 - legSwing);
+    ctx.fillRect(drawX + 10, drawY + player.h * 0.65 - legSwing, 5, player.h * 0.35 + legSwing);
+  } else {
+    ctx.fillStyle = '#335588';
+    ctx.fillRect(drawX, drawY + player.h * 0.65, 5, player.h * 0.35);
+    ctx.fillRect(drawX + 10, drawY + player.h * 0.65, 5, player.h * 0.35);
+  }
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; 
+    p.life--;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    
+    if (p.type === 'ring') {
+       ctx.globalAlpha = p.life / p.maxLife;
+       ctx.strokeStyle = `rgba(255, 255, 255, ${p.life / p.maxLife})`;
+       ctx.lineWidth = 3; ctx.beginPath();
+       const r = (1 - p.life / p.maxLife) * TILE * 1.2;
+       ctx.arc(p.x - drawCamX, p.y - drawCamY, r, 0, Math.PI * 2);
+       ctx.stroke(); ctx.globalAlpha = 1;
+    } 
+    else if (p.type === 'dust') {
+       p.size += 0.15; p.vx *= 0.9; p.vy *= 0.9;
+       ctx.globalAlpha = p.life / p.maxLife; ctx.fillStyle = p.color; 
+       ctx.beginPath(); ctx.arc(p.x - drawCamX, p.y - drawCamY, p.size, 0, Math.PI * 2); ctx.fill();
+       ctx.globalAlpha = 1;
+    }
+    else if (p.type === 'spark') {
+       p.vy += 0.15; p.vx *= 0.96;
+       ctx.globalAlpha = p.life / p.maxLife;
+       ctx.fillStyle = p.color;
+       ctx.fillRect(p.x - drawCamX, p.y - drawCamY, p.size, p.size);
+       ctx.globalAlpha = 0.35 * (p.life / p.maxLife);
+       ctx.fillRect(p.x - drawCamX - p.size, p.y - drawCamY - p.size, p.size * 3, p.size * 3);
+       ctx.globalAlpha = 1;
+    } 
+    else {
+       p.vy += 0.2; 
+       ctx.globalAlpha = p.life / p.maxLife; ctx.fillStyle = p.color; ctx.fillRect(p.x - drawCamX, p.y - drawCamY, p.size, p.size);
+       ctx.globalAlpha = 1;
+    }
+  }
+}
+
+function drawFloatingTexts() {
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    let ft = floatingTexts[i];
+    ft.y += ft.vy; ft.life--;
+    if (ft.life <= 0) { floatingTexts.splice(i, 1); continue; }
+    
+    ctx.globalAlpha = Math.max(0, ft.life / ft.maxLife);
+    ctx.fillStyle = ft.color; ctx.font = "bold 13px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center"; ctx.strokeStyle = "rgba(0,0,0,0.8)"; ctx.lineWidth = 2;
+    ctx.strokeText(ft.text, ft.x - drawCamX, ft.y - drawCamY);
+    ctx.fillText(ft.text, ft.x - drawCamX, ft.y - drawCamY);
+    ctx.globalAlpha = 1.0;
+  }
+}
+
+function spawnBreakParticles(bx, by, btype) {
+  let cols = blockColors[btype] || ['#888'];
+  if (btype === BLOCKS.RAINBOW_ORE) {
+    const hue = (frameCount * 5 + bx * 15 + by * 15) % 360;
+    cols = [`hsl(${hue}, 100%, 60%)`];
+  }
+  for (let i = 0; i < 10; i++) {
+    particles.push({
+      x: bx * TILE + Math.random() * TILE, y: by * TILE + Math.random() * TILE,
+      vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 5 - 2,
+      color: cols[Math.floor(Math.random() * cols.length)],
+      size: 3 + Math.random() * 5, life: 25 + Math.random() * 20, maxLife: 45
+    });
+  }
+}
+
+function drawHover() {
+  if (mouseScreenX < 0 || mouseScreenY < 0) return;
+  
+  const { wx, wy } = getMouseWorldCoords();
+  const sx = wx * TILE - drawCamX;
+  const sy = wy * TILE - drawCamY;
+  const inRange = isInRange(wx, wy);
+  
+  const pulse = Math.sin(frameCount * 0.15) * 0.1 + 0.2;
+  const boxScale = Math.sin(frameCount * 0.15) * 1.5;
+
+  ctx.fillStyle = inRange ? `rgba(255, 255, 255, ${pulse})` : `rgba(255, 0, 0, ${pulse})`;
+  ctx.fillRect(sx, sy, TILE, TILE);
+  ctx.strokeStyle = inRange ? '#ffffff' : '#ff0000';
+  ctx.lineWidth = 2.5; 
+  ctx.strokeRect(sx - boxScale, sy - boxScale, TILE + boxScale*2, TILE + boxScale*2);
+}
+
+function drawHealth() {
+  const hel = document.getElementById('health'); 
+  const maxHearts = 10;
+  const filledHearts = Math.floor(player.health / 2); // 20hp = 10 Herzen
+  const crackedHeart = player.health % 2 === 1 ? filledHearts : -1; // halbes Herz = gerissenes
+
+  // Herzen neu aufbauen, aber existierende nur updaten wenn nötig
+  const existing = hel.querySelectorAll('.heart');
+  for (let i = 0; i < maxHearts; i++) {
+    let h = existing[i];
+    if (!h) { h = document.createElement('span'); h.className = 'heart'; hel.appendChild(h); }
+    if (i < filledHearts) {
+      h.className = 'heart'; h.textContent = '♥';
+    } else if (i === crackedHeart) {
+      h.className = 'heart cracked'; h.textContent = '❤️‍🩹';
+    } else {
+      h.className = 'heart empty'; h.textContent = '♥';
+    }
+  }
+}
+
+let damageCooldown = 0; // Verhindert sofortigen Mehrfach-Schaden
+
+function takeDamage(amount) {
+  if (damageCooldown > 0) return;
+  damageCooldown = 80; // ~1.3 Sekunden Unverwundbarkeit
+
+  const hel = document.getElementById('health');
+  const hearts = hel.querySelectorAll('.heart');
+  const filledHearts = Math.floor(player.health / 2);
+
+  // Herz-Animation: das zuletzt "volle" Herz verliert zuerst
+  const targetIdx = filledHearts - 1;
+  if (hearts[targetIdx] && hearts[targetIdx].className.includes('heart') && !hearts[targetIdx].className.includes('empty')) {
+    hearts[targetIdx].classList.add('losing');
+    setTimeout(() => { 
+      player.health = Math.max(0, player.health - amount);
+      drawHealth();
+      if (player.health <= 0) {
+        showNotification("💀 Du bist gestorben! Neustarten...");
+        setTimeout(() => { player.health = 20; player.x = initialSpawnX * TILE; player.y = (startY - 2) * TILE; player.vy = 0; drawHealth(); }, 1500);
+      }
+    }, 350);
+  } else {
+    player.health = Math.max(0, player.health - amount);
+    drawHealth();
+  }
+
+  screenShake = Math.max(screenShake, 4);
+  playSound('hurt');
+}
+
+function drawHotbar() {
+  const hb = document.getElementById('hotbar'); hb.innerHTML = '';
+  hb.oncontextmenu = (e) => e.preventDefault();
+
+  inventory.forEach((item, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'slot' + (i === selectedSlot ? ' selected' : '');
+    const mini = document.createElement('canvas'); mini.width = 36; mini.height = 36;
+    const mc = mini.getContext('2d');
+    const cols = blockColors[item.block];
+    
+    if (item.block === BLOCKS.ICE) {
+       mc.fillStyle = 'rgba(150, 200, 255, 0.8)'; mc.fillRect(2,2,32,32);
+       mc.strokeStyle = 'rgba(255, 255, 255, 0.6)'; mc.strokeRect(2,2,32,32);
+    } else if (item.block === BLOCKS.RAINBOW_ORE) {
+       const hue = (frameCount * 5) % 360;
+       mc.fillStyle = cols[0]; mc.fillRect(2,2,32,32); 
+       mc.fillStyle = `hsl(${hue}, 100%, 60%)`;
+       mc.fillRect(8,8,6,6); mc.fillRect(20,18,6,6); mc.fillRect(8,20,6,6);
+    } else if (item.block === BLOCKS.DIAMOND_DYNAMITE) {
+       mc.fillStyle = '#00ffff'; mc.fillRect(2,2,32,32); 
+       mc.fillStyle = '#ffffff'; mc.fillRect(8,2,4,32); mc.fillRect(24,2,4,32);
+       mc.beginPath(); mc.moveTo(18, 12); mc.lineTo(24, 18); mc.lineTo(18, 24); mc.lineTo(12, 18); mc.fill();
+    } else if (cols) {
+      mc.fillStyle = cols[0]; mc.fillRect(2,2,32,32); mc.fillStyle = cols[2]; mc.fillRect(2,2,32,4);
+      mc.fillStyle = cols[3]; mc.fillRect(30,2,4,32); mc.fillStyle = cols[1]; mc.fillRect(2,30,32,4);
+      mc.fillStyle = cols[1]; mc.fillRect(2,2,4,32);
+    } else if (item.block === BLOCKS.FLOWER) { mc.fillStyle = '#ff3333'; mc.fillRect(10,10,16,16); 
+    } else if (item.block === BLOCKS.LIGHTER) {
+      mc.fillStyle = '#888'; mc.fillRect(12, 16, 12, 14); mc.fillStyle = '#ccc'; mc.fillRect(12, 10, 12, 6);
+      mc.fillStyle = '#ff3333'; mc.fillRect(18, 12, 4, 3);
+    }
+    slot.appendChild(mini);
+    const lbl = document.createElement('div'); lbl.textContent = item.count;
+    lbl.style.fontSize = '12px'; lbl.style.fontWeight = 'bold'; lbl.style.color = '#fff';
+    lbl.style.position = 'absolute'; lbl.style.bottom = '2px'; lbl.style.right = '5px';
+    lbl.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)'; slot.appendChild(lbl);
+
+    // Tooltip: Hover (Desktop) und Touch (Handy)
+    const name = blockNames[item.block] || 'Block';
+    slot.addEventListener('mouseenter', () => showBlockTooltip(name));
+    slot.addEventListener('mouseleave', () => hideBlockTooltip());
+    slot.addEventListener('touchstart', (e) => { e.stopPropagation(); showBlockTooltip(name); }, { passive: true });
+    slot.addEventListener('touchend', () => setTimeout(hideBlockTooltip, 1500), { passive: true });
+
+    slot.onclick = () => { selectedSlot = i; drawHotbar(); showBlockTooltipTimed(name, 2000); };
+    hb.appendChild(slot);
+  });
+}
+
+let tooltipTimeout = null;
+function showBlockTooltip(name) {
+  const el = document.getElementById('block-tooltip');
+  if (!el) return;
+  clearTimeout(tooltipTimeout);
+  el.textContent = name;
+  el.classList.add('visible');
+}
+function hideBlockTooltip() {
+  const el = document.getElementById('block-tooltip');
+  if (el) el.classList.remove('visible');
+}
+function showBlockTooltipTimed(name, ms) {
+  showBlockTooltip(name);
+  tooltipTimeout = setTimeout(hideBlockTooltip, ms);
+}
+
+function breakSingleBlock(wx, wy, isSuper) {
+  if (!isInRange(wx, wy)) return; 
+  const b = getBlock(wx, wy);
+  if (b !== BLOCKS.AIR && b !== BLOCKS.BEDROCK && b !== BLOCKS.PORTAL) {
+    
+    playBlockSound(b); 
+    
+    screenShake = isSuper ? 2 : 6;
+    spawnBreakParticles(wx, wy, b);
+    if ([BLOCKS.COAL_ORE, BLOCKS.IRON_ORE, BLOCKS.GOLD_ORE, BLOCKS.DIAMOND_ORE, BLOCKS.RAINBOW_ORE].includes(b)) {
+      const oreColor = b === BLOCKS.RAINBOW_ORE ? `hsl(${(frameCount * 7) % 360}, 100%, 60%)` : (blockColors[b]?.[3] || '#ffffff');
+      spawnJuiceBurst(wx * TILE + TILE / 2, wy * TILE + TILE / 2, oreColor, b === BLOCKS.DIAMOND_ORE || b === BLOCKS.RAINBOW_ORE ? 22 : 12, 7);
+      screenShake = Math.max(screenShake, b === BLOCKS.RAINBOW_ORE ? 12 : 8);
+    }
+    particles.push({
+      x: wx * TILE + TILE/2, y: wy * TILE + TILE/2, vx: 0, vy: 0, color: '', size: 0, life: 12, maxLife: 12, type: 'ring'
+    });
+    
+    let dropCount = yieldMultiplier;
+    floatingTexts.push({
+       x: wx * TILE + TILE/2, y: wy * TILE, text: "+" + dropCount + " " + (blockNames[b] || ""), color: b === BLOCKS.RAINBOW_ORE ? `hsl(${(frameCount*5)%360}, 100%, 60%)` : "#4facfe", life: 40, maxLife: 40, vy: -1
+    });
+
+    setBlockAndBroadcast(wx, wy, BLOCKS.AIR);
+    let invItem = inventory.find(item => item.block === b);
+    if (invItem) invItem.count += dropCount; else {
+      inventory.push({ block: b, count: dropCount }); 
+      if(!isSuper || Math.random() < 0.2) showNotification("🎉 " + (blockNames[b] || "Block"));
+    }
+  }
+}
+
+function explodeDynamite(wx, wy) {
+  screenShake = 30; playSound('explode');
+  for(let i=0; i<60; i++) {
+    particles.push({
+      x: wx * TILE + Math.random() * TILE, y: wy * TILE + Math.random() * TILE,
+      vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15,
+      color: Math.random() < 0.5 ? '#00ffff' : '#ffffff',
+      size: 4 + Math.random() * 8, life: 30 + Math.random() * 20, maxLife: 50
+    });
+  }
+
+  const smallRadius = 3; const largeRadius = 7; 
+  for(let dx = -largeRadius; dx <= largeRadius; dx++) {
+    for(let dy = -largeRadius; dy <= largeRadius; dy++) {
+      let dist = Math.sqrt(dx*dx + dy*dy);
+      let cx = wx + dx, cy = wy + dy;
+      let b = getBlock(cx, cy);
+      if (b === BLOCKS.BEDROCK || b === BLOCKS.PORTAL) continue;
+      
+      if (dist <= smallRadius) setBlockAndBroadcast(cx, cy, BLOCKS.AIR);
+      else if (dist <= largeRadius) {
+        if (b !== BLOCKS.AIR) setBlockAndBroadcast(cx, cy, BLOCKS.DIAMOND_ORE);
+      }
+    }
+  }
+}
+
+function executeMine(wx, wy) {
+  if (hasSuperPickaxe) {
+    for(let dx=-1; dx<=1; dx++) {
+      for(let dy=-1; dy<=1; dy++) breakSingleBlock(wx+dx, wy+dy, true);
+    }
+  } else breakSingleBlock(wx, wy, false);
+  drawHotbar(); updateShopButtons();
+}
+
+function executePlace(wx, wy) {
+  if (inventory.length === 0 || !inventory[selectedSlot]) return;
+  if (!isInRange(wx, wy)) return; 
+  const b = getBlock(wx, wy); const item = inventory[selectedSlot];
+
+  if (item.block === BLOCKS.LIGHTER) {
+    if (b === BLOCKS.DIAMOND_DYNAMITE) {
+      if (!activeDynamites.some(dyn => dyn.wx === wx && dyn.wy === wy)) {
+         activeDynamites.push({ wx, wy, timeLeft: 180 }); playSound('place'); 
+      }
+      return;
+    }
+    if ([BLOCKS.GRASS, BLOCKS.WOOD, BLOCKS.LEAVES, BLOCKS.LOG, BLOCKS.PLANKS, BLOCKS.BG_PLANKS].includes(b)) {
+      if (!burningBlocks.some(brn => brn.wx === wx && brn.wy === wy)) burningBlocks.push({ wx, wy, timeLeft: 3000 }); 
+    } 
+    return; 
+  }
+
+  if (b === BLOCKS.AIR || b === BLOCKS.WATER || b === BLOCKS.BG_PLANKS || b === BLOCKS.FLOWER || b === BLOCKS.PORTAL) {
+    if (item.count > 0) {
+      const px2 = Math.floor(player.x / TILE), py2 = Math.floor(player.y / TILE);
+      if (!(wx === px2 && (wy === py2 || wy === py2 + 1))) {
+        setBlockAndBroadcast(wx, wy, item.block); 
+        item.count--;
+        
+        playSound('place'); screenShake = 2; 
+        spawnDustBurst(wx * TILE + TILE/2, wy * TILE + TILE);
+        particles.push({
+          x: wx * TILE + TILE/2, y: wy * TILE + TILE/2, vx: 0, vy: 0, color: '', size: 0, life: 10, maxLife: 10, type: 'ring'
+        });
+        addJuiceText(wx * TILE + TILE/2, wy * TILE, 'plop', '#ffffff');
+        spawnJuiceBurst(wx * TILE + TILE/2, wy * TILE + TILE/2, '#ffffff', 6, 3);
+
+        checkPortal(wx, wy);
+
+        if (item.count <= 0) { inventory.splice(selectedSlot, 1); selectedSlot = Math.max(0, selectedSlot - 1); }
+        drawHotbar(); updateShopButtons();
+      }
+    }
+  }
+}
+
+canvas.addEventListener('click', (e) => { e.preventDefault(); updateMouseScreenPos(e); const { wx, wy } = getMouseWorldCoords(); executeMine(wx, wy); });
+canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); updateMouseScreenPos(e); const { wx, wy } = getMouseWorldCoords(); executePlace(wx, wy); });
+
+const bindTouch = (id, key) => {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); keys[key] = true; }, {passive: false});
+  el.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); keys[key] = false; }, {passive: false});
+};
+bindTouch('tc-left', 'a'); bindTouch('tc-right', 'd'); bindTouch('tc-jump', ' ');
+
+document.getElementById('tc-mine').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); const { wx, wy } = getMouseWorldCoords(); executeMine(wx, wy); }, {passive: false});
+document.getElementById('tc-place').addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); const { wx, wy } = getMouseWorldCoords(); executePlace(wx, wy); }, {passive: false});
+
+document.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  const n = parseInt(e.key);
+  if (n >= 1 && n <= 9) { if (n - 1 < inventory.length) { selectedSlot = n - 1; drawHotbar(); } }
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()) || ['w','a','s','d'].includes(e.key.toLowerCase())) e.preventDefault();
+});
+document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+function updateFire(dt) {
+  for (let i = burningBlocks.length - 1; i >= 0; i--) {
+    const b = burningBlocks[i]; b.timeLeft -= dt * 16.67; 
+    if (Math.random() < 0.04) {
+      const neighbors = [ {x: b.wx + 1, y: b.wy}, {x: b.wx - 1, y: b.wy}, {x: b.wx, y: b.wy + 1}, {x: b.wx, y: b.wy - 1} ];
+      const target = neighbors[Math.floor(Math.random() * neighbors.length)];
+      const targetBlock = getBlock(target.x, target.y);
+      if ([BLOCKS.GRASS, BLOCKS.WOOD, BLOCKS.LEAVES, BLOCKS.LOG, BLOCKS.PLANKS, BLOCKS.BG_PLANKS].includes(targetBlock)) {
+        if (!burningBlocks.some(brn => brn.wx === target.x && brn.wy === target.y)) burningBlocks.push({ wx: target.x, wy: target.y, timeLeft: 3000 }); 
+      }
+    }
+    if (Math.random() < 0.5) {
+       particles.push({
+         x: b.wx * TILE + Math.random() * TILE, y: b.wy * TILE + Math.random() * TILE,
+         vx: (Math.random() - 0.5) * 1.5, vy: -Math.random() * 2 - 1,
+         color: Math.random() < 0.4 ? '#444444' : (Math.random() < 0.5 ? '#ff4400' : '#ffaa00'),
+         size: 3 + Math.random() * 4, life: 20 + Math.random() * 20, maxLife: 40
+       });
+    }
+    if (b.timeLeft <= 0) { setBlockAndBroadcast(b.wx, b.wy, BLOCKS.AIR); burningBlocks.splice(i, 1); }
+  }
+}
+
+function doTeleport() {
+  teleportCooldown = 150; 
+  currentDim = currentDim === "OVERWORLD" ? "GOLD" : "OVERWORLD";
+  showNotification(currentDim === "GOLD" ? "✨ Willkommen in der Gold Dimension! ✨" : "🌍 Zurück in der normalen Welt!");
+  playSound('portal'); screenShake = 20;
+  particles.length = 0; floatingTexts.length = 0; burningBlocks.length = 0; activeDynamites.length = 0; 
+
+  let pTileX = Math.floor(player.x / TILE + 0.5);
+  let newSy = 10;
+  for(let y = 0; y < WORLD_H; y++) {
+      let b = getBlock(pTileX, y);
+      if(b !== BLOCKS.AIR && b !== BLOCKS.PORTAL) { newSy = y; break; }
+  }
+  player.y = (newSy - 3) * TILE; player.vy = 0;
+  camX = player.x - (COLS >> 1) * TILE; camY = player.y - (ROWS >> 1) * TILE; drawCamX = camX; drawCamY = camY;
+
+  if (getBlock(pTileX, newSy - 2) !== BLOCKS.PORTAL) {
+      setBlockAndBroadcast(pTileX, newSy - 2, BLOCKS.PORTAL);
+      setBlockAndBroadcast(pTileX - 1, newSy - 2, BLOCKS.PORTAL);
+      setBlockAndBroadcast(pTileX + 1, newSy - 2, BLOCKS.PORTAL);
+      setBlockAndBroadcast(pTileX, newSy - 3, BLOCKS.PORTAL);
+      setBlockAndBroadcast(pTileX, newSy - 1, BLOCKS.PORTAL);
+  }
+}
+
+function updateAndDrawIntro(ctx, dt) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${introAlpha})`; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (introPhase === "FALLING") {
+        for (let x = 0; x < INTRO_COLS; x++) {
+            if (introGrid[x].length < INTRO_ROWS && Math.random() < 0.4) {
+                let type = Math.floor(Math.random() * 14) + 1; 
+                introBlocks.push({ x: x, y: -1, targetY: INTRO_ROWS - 1 - introGrid[x].length, type: type, speed: 0.4 + Math.random() * 0.4, settled: false });
+                introGrid[x].push(type); introFillCount++;
+            }
+        }
+        let allSettled = (introFillCount >= TOTAL_INTRO_BLOCKS);
+        for (let b of introBlocks) {
+            if (b.y < b.targetY) {
+                b.y += b.speed * dt; allSettled = false;
+                if (b.y >= b.targetY) { b.y = b.targetY; if (!b.settled) { b.settled = true; playIntroSettleSound(b.x); } }
+            }
+        }
+        if (allSettled) introPhase = "FADING";
+    } else if (introPhase === "FADING") {
+        introAlpha -= 0.01 * dt; 
+        if (introAlpha <= 0) gameState = "PLAYING";
+    }
+
+    ctx.globalAlpha = introAlpha;
+    for (let b of introBlocks) {
+        let colors = blockColors[b.type] || ['#888','#777','#999','#aaa'];
+        ctx.fillStyle = colors[0]; ctx.fillRect(b.x * 20, b.y * 20, 20, 20);
+        ctx.fillStyle = colors[1]; ctx.fillRect(b.x * 20, b.y * 20, 10, 10);
+        ctx.fillStyle = colors[2]; ctx.fillRect(b.x * 20 + 10, b.y * 20 + 10, 10, 10);
+    }
+    ctx.globalAlpha = 1.0;
+}
+
+let prevTime = performance.now();
+let lastPosSync = 0;
+
+function gameLoop(now) {
+  const dt = Math.min((now - prevTime) / 16.67, 3);
+  prevTime = now; frameCount++;
+
+
+// =========================================================
+// 09 - 09-game-loop.js
+// =========================================================
+
+  if (gameState === "INTRO") { updateAndDrawIntro(ctx, dt); requestAnimationFrame(gameLoop); return; }
+
+  if (dynamiteTimer > 0) {
+      dynamiteTimer -= (dt * 16.67) / 1000;
+      if (dynamiteTimer <= 0) {
+          dynamiteTimer = 180;
+          let invItem = inventory.find(i => i.block === BLOCKS.DIAMOND_DYNAMITE);
+          if (invItem) invItem.count++; else inventory.push({ block: BLOCKS.DIAMOND_DYNAMITE, count: 1 });
+          showNotification("💎 Diamant-Dynamit erhalten!"); playSound('buy'); drawHotbar();
+      }
+      let m = Math.floor(dynamiteTimer / 60); let s = Math.floor(dynamiteTimer % 60);
+      document.getElementById('dyn-time').textContent = `0${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+
+  for (let i = activeDynamites.length - 1; i >= 0; i--) {
+      let dyn = activeDynamites[i];
+      if (getBlock(dyn.wx, dyn.wy) !== BLOCKS.DIAMOND_DYNAMITE) { activeDynamites.splice(i, 1); continue; }
+      dyn.timeLeft -= dt;
+      if (Math.random() < 0.2) {
+          particles.push({
+             x: dyn.wx * TILE + TILE/2 + (Math.random()-0.5)*10, y: dyn.wy * TILE,
+             vx: (Math.random() - 0.5), vy: -1 - Math.random() * 2, color: 'rgba(200, 200, 200, 0.7)',
+             size: 2 + Math.random() * 3, life: 10 + Math.random() * 10, maxLife: 20, type: 'dust'
+          });
+      }
+      if (dyn.timeLeft <= 0) { explodeDynamite(dyn.wx, dyn.wy); activeDynamites.splice(i, 1); }
+  }
+
+  updatePlayer(dt); updatePhysics(); updateFire(dt); updateAnimals(dt); updatePiranhas(dt);
+
+  if (teleportCooldown > 0) teleportCooldown--;
+  let pxCenter = Math.floor(player.x / TILE + 0.5); let pyCenter = Math.floor(player.y / TILE + 1.0);
+  if (getBlock(pxCenter, pyCenter) === BLOCKS.PORTAL && teleportCooldown <= 0) doTeleport();
+  
+  drawCamX = camX; drawCamY = camY;
+  if (screenShake > 0) {
+    drawCamX += (Math.random() - 0.5) * screenShake; drawCamY += (Math.random() - 0.5) * screenShake;
+    screenShake *= 0.85; if (screenShake < 0.5) screenShake = 0;
+  }
+
+  if (isMultiplayerActive && userId && db && (now - lastPosSync > 100)) {
+      lastPosSync = now;
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'voxeria_players', userId), {
+          x: player.x, y: player.y, dim: currentDim, color: player.color, ts: now
+      }).catch(e => {});
+  }
+
+  drawSky(); drawWorld(); drawAnimals(); drawOtherPlayers(); drawParticles(); drawPlayer(); drawFloatingTexts(); drawHover(); 
+  
+  const posInfo = document.getElementById('pos-info');
+  if (posInfo) {
+    const playerCx = Math.floor(player.x / (CHUNK_W * TILE));
+    const biome = currentDim === "GOLD" ? "GOLD DIMENSION" : getBiome(playerCx);
+    posInfo.textContent = `X: ${Math.floor(player.x / TILE)} Y: ${Math.floor(player.y / TILE)} | Biome: ${biome}`;
+  }
+  
+  if (inventory.some(i => i.block === BLOCKS.RAINBOW_ORE || i.block === BLOCKS.DIAMOND_DYNAMITE || i.block === BLOCKS.GOLD_BRICK)) drawHotbar();
+  
+  requestAnimationFrame(gameLoop);
+}
+
+// Alle window-Funktionen hier setzen, NACHDEM alle Funktionen definiert wurden
+window.applySeedFromUI = applySeedFromUI;
+window.toggleShop = toggleShop;
+window.buyUpgrade = buyUpgrade;
+window.toggleFullscreenMode = toggleFullscreenMode;
+
+initFirebase(); drawHealth(); drawHotbar(); updateShopButtons(); requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
