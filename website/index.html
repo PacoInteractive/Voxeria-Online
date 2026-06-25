@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxeria — Seeds &amp; Leaderboard</title>
+<meta name="description" content="Alles zu Voxeria: Spielinfos, der wöchentliche Welt-Seed zum Kopieren und das tägliche Schatzsuche-Leaderboard.">
+<style>
+  :root{
+    --bg:#0a0e1a; --bg2:#0d1224; --card:#121831; --card2:#161d3a;
+    --accent:#4facfe; --accent2:#00f2fe; --gold:#ffd200; --gold2:#ff9500;
+    --text:#e6e9f5; --muted:#8a90b3; --border:rgba(79,172,254,0.25);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; color:var(--text);
+    background: radial-gradient(circle at 20% 0%, #14224a 0%, var(--bg) 55%);
+    min-height:100vh;
+  }
+  a{color:var(--accent2);}
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 28px; position:sticky; top:0; z-index:10;
+    background:rgba(10,14,26,0.85); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+  }
+  .logo{font-size:22px; font-weight:900; letter-spacing:1px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  nav a{margin-left:20px; text-decoration:none; color:var(--muted); font-weight:600; font-size:14px;}
+  nav a:hover{color:var(--text);}
+  .wrap{max-width:980px; margin:0 auto; padding:0 20px;}
+  .hero{text-align:center; padding:70px 20px 40px;}
+  .hero h1{font-size:42px; margin:0 0 12px; font-weight:900;}
+  .hero p{color:var(--muted); font-size:17px; max-width:620px; margin:0 auto;}
+  section{padding:50px 0;}
+  h2{font-size:26px; margin:0 0 6px; display:flex; align-items:center; gap:10px;}
+  .sub{color:var(--muted); margin:0 0 26px; font-size:14px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px;}
+  .feat{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:18px; transition:transform .15s, box-shadow .15s;
+  }
+  .feat:hover{transform:translateY(-3px); box-shadow:0 8px 24px rgba(79,172,254,0.15);}
+  .feat .ic{font-size:26px; margin-bottom:8px;}
+  .feat h3{margin:0 0 6px; font-size:16px;}
+  .feat p{margin:0; color:var(--muted); font-size:13px; line-height:1.5;}
+
+  .card{
+    background:linear-gradient(160deg,var(--card2),var(--card));
+    border:1px solid var(--border); border-radius:18px; padding:26px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  }
+  .seed-row{display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-top:16px;}
+  .seed-box{
+    flex:1; min-width:220px; background:#070a16; border:1px solid var(--border);
+    border-radius:10px; padding:14px 16px; font-family:'Consolas',monospace;
+    font-size:20px; font-weight:700; letter-spacing:1px; color:var(--accent2);
+    display:flex; align-items:center; word-break:break-all;
+  }
+  .copy-btn{
+    border:none; border-radius:10px; padding:0 22px; font-weight:800; font-size:14px;
+    cursor:pointer; background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#001020; transition:filter .15s, transform .15s;
+  }
+  .copy-btn:hover{filter:brightness(1.12); transform:scale(1.03);}
+  .copy-btn.copied{background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff;}
+  .meta-row{display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; font-size:13px; color:var(--muted);}
+  .meta-row b{color:var(--text);}
+  .howto{margin-top:18px; padding-top:18px; border-top:1px solid var(--border); font-size:13px; color:var(--muted);}
+  .howto ol{margin:8px 0 0; padding-left:20px; line-height:1.7;}
+  .howto b{color:var(--text);}
+
+  .daily-card .seed-box{color:var(--gold);}
+  .daily-card .copy-btn{background:linear-gradient(135deg,var(--gold2),var(--gold)); color:#241800;}
+
+  #lb-table{width:100%; border-collapse:collapse; margin-top:16px; font-size:14px;}
+  #lb-table th{text-align:left; color:var(--muted); font-weight:700; font-size:12px;
+    text-transform:uppercase; letter-spacing:.5px; padding:8px 10px; border-bottom:1px solid var(--border);}
+  #lb-table td{padding:9px 10px; border-bottom:1px solid rgba(255,255,255,0.05);}
+  #lb-table tr:hover td{background:rgba(79,172,254,0.06);}
+  .rk{font-weight:800; width:36px;}
+  .rk.g{color:#FFD700;} .rk.s{color:#C0C0C0;} .rk.b{color:#cd7f32;}
+  .lb-status{font-size:13px; color:var(--muted); margin-top:14px; display:flex; align-items:center; gap:8px;}
+  .dot{width:8px; height:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 8px #22c55e;}
+  .dot.off{background:#ef4444; box-shadow:0 0 8px #ef4444;}
+  .refresh-btn{
+    margin-left:auto; background:none; border:1px solid var(--border); color:var(--muted);
+    border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer;
+  }
+  .refresh-btn:hover{color:var(--text); border-color:var(--accent);}
+  .head-flex{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+  .countdown{font-family:monospace; font-weight:700; color:var(--text);}
+  footer{text-align:center; padding:40px 20px; color:var(--muted); font-size:12px; border-top:1px solid var(--border);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">VOXERIA</div>
+  <nav>
+    <a href="#about">Über das Spiel</a>
+    <a href="#weekly">Wöchentlicher Seed</a>
+    <a href="#daily">Tägliche Schatzsuche</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <h1>VOXERIA</h1>
+  <p>Ein 2D-Sandbox-Survival-Abenteuer: Welten erkunden, abbauen, bauen und gemeinsam mit anderen Spielern überleben — voller Biome, Dimensionen und versteckter Schätze.</p>
+</div>
+
+<div class="wrap">
+
+  <section id="about">
+    <h2>🎮 Über das Spiel</h2>
+    <p class="sub">Was dich in Voxeria erwartet.</p>
+    <div class="grid">
+      <div class="feat"><div class="ic">🌍</div><h3>Vielfältige Biome</h3><p>Wald, Wüste, Schnee, Dschungel, Vulkan, Ozean und das mystische Void — jede Welt sieht anders aus.</p></div>
+      <div class="feat"><div class="ic">⛏️</div><h3>Bauen &amp; Abbauen</h3><p>Blöcke abbauen, Ressourcen sammeln und eigene Bauwerke errichten.</p></div>
+      <div class="feat"><div class="ic">🌋</div><h3>Dimensionen</h3><p>Reise zwischen Overworld, Lava-Dimension und mehr — mit eigenen Gefahren und Beute.</p></div>
+      <div class="feat"><div class="ic">🏯</div><h3>Dungeons &amp; Schreine</h3><p>Versteckte Ruinen, Türme, Verzauberer-Schreine und Dungeons mit seltenen Erzen warten darauf, entdeckt zu werden.</p></div>
+      <div class="feat"><div class="ic">👥</div><h3>Multiplayer &amp; Chat</h3><p>Spiele mit anderen in derselben Welt und chatte (ab 13 Jahren, mit Filter).</p></div>
+      <div class="feat"><div class="ic">📜</div><h3>Quests &amp; Erfolge</h3><p>Erfülle Herausforderungen und schalte Erfolge frei, während du die Welt erkundest.</p></div>
+      <div class="feat"><div class="ic">🛒</div><h3>Shop &amp; Upgrades</h3><p>Verbessere deine Ausrüstung und schalte nützliche Fähigkeiten frei.</p></div>
+      <div class="feat"><div class="ic">🏆</div><h3>Tägliche Schatzsuche</h3><p>Jeden Tag ein neuer versteckter Schatz — wer ihn am schnellsten findet, klettert im Ranking.</p></div>
+    </div>
+  </section>
+
+  <section id="weekly">
+    <h2>🌱 Wöchentlicher Welt-Seed</h2>
+    <p class="sub">Jede Woche gibt es einen neuen, für alle gleichen Community-Seed — perfekt, um dieselbe Welt wie andere Spieler zu erleben.</p>
+    <div class="card">
+      <div class="seed-row">
+        <div class="seed-box" id="weekly-seed">WEEKLY-…</div>
+        <button class="copy-btn" id="weekly-copy-btn">📋 Kopieren</button>
+      </div>
+      <div class="meta-row">
+        <span>Aktuelle Woche: <b id="weekly-label">—</b></span>
+        <span>Erneuert in: <b class="countdown" id="weekly-countdown">—</b></span>
+      </div>
+      <div class="howto">
+        <b>So benutzt du den Seed im Spiel:</b>
+        <ol>
+          <li>Seed oben kopieren.</li>
+          <li>Voxeria öffnen.</li>
+          <li>Den Seed in das Feld <b>„Seed“</b> oben im Spiel einfügen.</li>
+          <li>Auf <b>„New World“</b> klicken — fertig, du spielst die Welt der Woche!</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section id="daily">
+    <h2>📅 Tägliche Schatzsuche</h2>
+    <p class="sub">Jeden Tag versteckt sich ein neuer Schatz in der Welt. Im Spiel einfach auf den <b>📅 Daily</b>-Button klicken, oder den heutigen Seed unten von Hand kopieren.</p>
+    <div class="card daily-card">
+      <div class="seed-row">
+        <div class="seed-box" id="daily-seed">DAILY-…</div>
+        <button class="copy-btn" id="daily-copy-btn">📋 Kopieren</button>
+      </div>
+      <div class="meta-row">
+        <span>Heute: <b id="daily-label">—</b></span>
+        <span>Nächste Schatzsuche in: <b class="countdown" id="daily-countdown">—</b></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
+      <div class="head-flex">
+        <h2 style="margin:0;">🏆 Tagesrangliste</h2>
+        <button class="refresh-btn" id="lb-refresh-btn">⟳ Aktualisieren</button>
+      </div>
+      <table id="lb-table">
+        <thead><tr><th>#</th><th>Name</th><th>Zeit</th></tr></thead>
+        <tbody id="lb-body">
+          <tr><td colspan="3" style="color:var(--muted);text-align:center;padding:24px;">Lade Rangliste…</td></tr>
+        </tbody>
+      </table>
+      <div class="lb-status"><span class="dot off" id="lb-dot"></span><span id="lb-status-text">Verbinde…</span></div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  VOXERIA — Diese Seite zeigt nur öffentliche Spieldaten (Seeds &amp; Bestenliste). Keine Anmeldung, keine personenbezogenen Daten.
+</footer>
+
+<script type="module">
+// ===========================================================
+// Gleicher Seed-/Datums-Algorithmus wie im Spiel, damit die
+// Seeds hier 1:1 mit dem in-game "Seed"-Feld kompatibel sind.
+// ===========================================================
+function getDailySeedString(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `DAILY-${y}-${m}-${day}`;
+}
+
+function getISOWeekInfo(d = new Date()) {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dayNum = (date.getDay() + 6) % 7; // Montag = 0
+  date.setDate(date.getDate() - dayNum + 3); // Donnerstag derselben Woche
+  const firstThursday = new Date(date.getFullYear(), 0, 4);
+  const firstDayNum = (firstThursday.getDay() + 6) % 7;
+  firstThursday.setDate(firstThursday.getDate() - firstDayNum + 3);
+  const week = 1 + Math.round((date - firstThursday) / (7 * 86400000));
+  return { year: date.getFullYear(), week };
+}
+
+function nextMondayMidnight(d = new Date()) {
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dayNum = (next.getDay() + 6) % 7;
+  next.setDate(next.getDate() + (7 - dayNum));
+  return next;
+}
+
+function nextMidnight(d = new Date()) {
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+  return next;
+}
+
+function fmtCountdown(ms) {
+  if (ms < 0) ms = 0;
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function setupCopyButton(btnId, sourceId) {
+  const btn = document.getElementById(btnId);
+  btn.addEventListener('click', async () => {
+    const text = document.getElementById(sourceId).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    btn.classList.add('copied');
+    const old = btn.textContent;
+    btn.textContent = '✅ Kopiert!';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = old; }, 1600);
+  });
+}
+
+function refreshSeedDisplays() {
+  const now = new Date();
+
+  const { year, week } = getISOWeekInfo(now);
+  const weeklySeed = `WEEKLY-${year}-W${String(week).padStart(2, '0')}`;
+  document.getElementById('weekly-seed').textContent = weeklySeed;
+  document.getElementById('weekly-label').textContent = `${year}, Woche ${week}`;
+  document.getElementById('weekly-countdown').textContent = fmtCountdown(nextMondayMidnight(now) - now);
+
+  const dailySeed = getDailySeedString(now);
+  document.getElementById('daily-seed').textContent = dailySeed;
+  document.getElementById('daily-label').textContent = now.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  document.getElementById('daily-countdown').textContent = fmtCountdown(nextMidnight(now) - now);
+
+  return dailySeed;
+}
+
+setupCopyButton('weekly-copy-btn', 'weekly-seed');
+setupCopyButton('daily-copy-btn', 'daily-seed');
+
+let _lastDailySeed = refreshSeedDisplays();
+setInterval(() => {
+  const seedNow = refreshSeedDisplays();
+  if (seedNow !== _lastDailySeed) {
+    _lastDailySeed = seedNow;
+    loadLeaderboard(); // neuer Tag -> Rangliste neu laden
+  }
+}, 1000);
+
+// ===========================================================
+// Live-Bestenliste der täglichen Schatzsuche (selbe Firebase-
+// Datenbank wie das Spiel, nur lesend).
+// ===========================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAZzGkkqTyRxbJDehI-gtsNjf6IcgAPZoY",
+  authDomain: "voxeria-1e357.firebaseapp.com",
+  projectId: "voxeria-1e357",
+  storageBucket: "voxeria-1e357.firebasestorage.app",
+  messagingSenderId: "361199903585",
+  appId: "1:361199903585:web:50c05d50e9eae3b1c25b20"
+};
+const APP_ID = firebaseConfig.projectId;
+
+const lbDot = document.getElementById('lb-dot');
+const lbStatusText = document.getElementById('lb-status-text');
+const lbBody = document.getElementById('lb-body');
+
+function setStatus(online, text) {
+  lbDot.classList.toggle('off', !online);
+  lbStatusText.textContent = text;
+}
+
+function fmtTime(s) {
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+let db = null;
+let getDocs, query, where, orderBy, limitQuery, collection;
+
+async function initFirebaseReadOnly() {
+  try {
+    const appMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+    const [authMod, storeMod] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"),
+      import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")
+    ]);
+    ({ collection, getDocs, query, where, orderBy, limit: limitQuery } = storeMod);
+    const app = appMod.initializeApp(firebaseConfig);
+    const auth = authMod.getAuth(app);
+    db = storeMod.getFirestore(app);
+    await authMod.signInAnonymously(auth);
+    setStatus(true, 'Verbunden mit Voxeria-Datenbank');
+    return true;
+  } catch (e) {
+    console.error('Firebase init error:', e);
+    setStatus(false, 'Konnte nicht verbinden (evtl. Domain nicht freigegeben)');
+    return false;
+  }
+}
+
+async function loadLeaderboard() {
+  if (!db) return;
+  lbBody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:24px;">Lade Rangliste…</td></tr>';
+  const dateStr = getDailySeedString();
+  try {
+    const colRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'voxeria_daily_lb');
+    const snap = await getDocs(query(colRef, where('date', '==', dateStr), orderBy('time', 'asc'), limitQuery(20)));
+    if (snap.empty) {
+      lbBody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:24px;">Heute noch keine Einträge — sei der/die Erste! 🏆</td></tr>';
+      setStatus(true, 'Aktualisiert um ' + new Date().toLocaleTimeString());
+      return;
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    let html = '';
+    let rank = 0;
+    snap.forEach(d => {
+      rank++;
+      const r = d.data();
+      const cls = rank === 1 ? 'g' : rank === 2 ? 's' : rank === 3 ? 'b' : '';
+      const rkStr = rank <= 3 ? medals[rank - 1] : rank;
+      html += `<tr><td class="rk ${cls}">${rkStr}</td><td>${escHtml(r.name || 'Player')}</td><td>${fmtTime(r.time)}</td></tr>`;
+    });
+    lbBody.innerHTML = html;
+    setStatus(true, 'Aktualisiert um ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    console.error('Leaderboard load error:', e);
+    lbBody.innerHTML = '<tr><td colspan="3" style="color:#ff6b6b;text-align:center;padding:24px;">Rangliste konnte nicht geladen werden.</td></tr>';
+    setStatus(false, 'Fehler beim Laden');
+  }
+}
+
+document.getElementById('lb-refresh-btn').addEventListener('click', loadLeaderboard);
+
+(async () => {
+  const ok = await initFirebaseReadOnly();
+  if (ok) await loadLeaderboard();
+})();
+
+// Rangliste zusätzlich alle 60s automatisch neu laden (z.B. neue Einträge anderer Spieler)
+setInterval(() => { if (db) loadLeaderboard(); }, 60000);
+</script>
+
+</body>
+</html>
