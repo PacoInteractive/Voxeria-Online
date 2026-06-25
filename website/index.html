@@ -193,6 +193,78 @@
     section{padding:46px 0;}
     .card{padding:20px;}
   }
+
+  /* ---------- Juice: aurora background (confined to hero) ---------- */
+  .hero{overflow:hidden;}
+  .aurora{position:absolute; inset:-20% -10%; z-index:0; pointer-events:none;}
+  .aurora span{position:absolute; border-radius:50%; filter:blur(70px); opacity:.4; animation:drift ease-in-out infinite;}
+  .aurora span:nth-child(1){width:360px; height:360px; background:var(--violet); top:-60px; left:6%; animation-duration:24s;}
+  .aurora span:nth-child(2){width:320px; height:320px; background:var(--accent); top:0; right:8%; animation-duration:28s; animation-delay:-8s;}
+  .aurora span:nth-child(3){width:280px; height:280px; background:#22c55e; opacity:.22; bottom:-40px; left:38%; animation-duration:32s; animation-delay:-14s;}
+  @keyframes drift{
+    0%,100%{transform:translate(0,0) scale(1);}
+    33%{transform:translate(36px,26px) scale(1.1);}
+    66%{transform:translate(-26px,18px) scale(0.94);}
+  }
+  .hero-inner{position:relative; z-index:1;}
+  .hero h1{animation:shimmer 6s linear infinite; background-size:200% auto;}
+  @keyframes shimmer{
+    0%{background-position:0% 50%;}
+    100%{background-position:200% 50%;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .aurora span, .hero h1{animation:none !important;}
+  }
+
+  /* ---------- Juice: scroll reveal ---------- */
+  .reveal{opacity:0; transform:translateY(18px); transition:opacity .6s ease, transform .6s ease;}
+  .reveal.in-view{opacity:1; transform:translateY(0);}
+
+  /* ---------- Juice: tilt cards ---------- */
+  .feat{will-change:transform; transform:perspective(600px); }
+
+  /* ---------- Juice: seed box glow pulse ---------- */
+  .seed-box{position:relative; overflow:hidden;}
+  .seed-box::after{
+    content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    box-shadow:0 0 0 1px rgba(0,242,254,0.0) inset; animation:seedglow 2.6s ease-in-out infinite;
+  }
+  @keyframes seedglow{
+    0%,100%{box-shadow:0 0 14px -4px rgba(0,242,254,0.0) inset, 0 0 0 rgba(0,242,254,0);}
+    50%{box-shadow:0 0 22px -2px rgba(0,242,254,0.35) inset, 0 0 18px rgba(0,242,254,0.12);}
+  }
+  .daily-card .seed-box::after{animation-name:seedglowgold;}
+  @keyframes seedglowgold{
+    0%,100%{box-shadow:0 0 14px -4px rgba(255,210,0,0.0) inset, 0 0 0 rgba(255,210,0,0);}
+    50%{box-shadow:0 0 22px -2px rgba(255,210,0,0.35) inset, 0 0 18px rgba(255,210,0,0.12);}
+  }
+
+  /* ---------- Juice: button ripple ---------- */
+  .btn{position:relative; overflow:hidden;}
+  .ripple{
+    position:absolute; border-radius:50%; background:rgba(255,255,255,0.55);
+    transform:scale(0); animation:rippleAnim .55s ease-out forwards; pointer-events:none;
+  }
+  @keyframes rippleAnim{ to{ transform:scale(2.6); opacity:0; } }
+
+  /* ---------- Juice: confetti ---------- */
+  .confetti-piece{
+    position:fixed; top:0; left:0; width:7px; height:11px; z-index:200; pointer-events:none;
+    border-radius:1px; will-change:transform, opacity;
+  }
+
+  /* ---------- Juice: nav scroll-spy underline ---------- */
+  nav a{position:relative;}
+  nav a::after{
+    content:''; position:absolute; left:14px; right:14px; bottom:3px; height:2px; border-radius:2px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2)); transform:scaleX(0); transition:transform .25s ease;
+  }
+  nav a.active{color:var(--text);}
+  nav a.active::after{transform:scaleX(1);}
+
+  /* ---------- Juice: copied pop ---------- */
+  @keyframes pop{ 0%{transform:scale(1);} 40%{transform:scale(1.06);} 100%{transform:scale(1);} }
+  .pop{animation:pop .3s ease;}
 </style>
 </head>
 <body>
@@ -211,43 +283,46 @@
 </header>
 
 <div class="hero">
-  <div class="badge"><span class="pulse"></span> Live-Daten direkt aus dem Spiel</div>
-  <h1>VOXERIA</h1>
-  <p>Ein 2D-Sandbox-Survival-Abenteuer: Welten erkunden, abbauen, bauen und gemeinsam mit anderen Spielern überleben — voller Biome, Dimensionen und versteckter Schätze.</p>
-  <div class="hero-stats">
-    <div class="hstat"><div class="n">7+</div><div class="l">Biome &amp; Dimensionen</div></div>
-    <div class="hstat"><div class="n">1×</div><div class="l">Neuer Seed pro Woche</div></div>
-    <div class="hstat"><div class="n">24h</div><div class="l">Neue Schatzsuche</div></div>
+  <div class="aurora"><span></span><span></span><span></span></div>
+  <div class="hero-inner">
+    <div class="badge"><span class="pulse"></span> Live-Daten direkt aus dem Spiel</div>
+    <h1>VOXERIA</h1>
+    <p>Ein 2D-Sandbox-Survival-Abenteuer: Welten erkunden, abbauen, bauen und gemeinsam mit anderen Spielern überleben — voller Biome, Dimensionen und versteckter Schätze.</p>
+    <div class="hero-stats">
+      <div class="hstat"><div class="n" data-count="7" data-suffix="+">0</div><div class="l">Biome &amp; Dimensionen</div></div>
+      <div class="hstat"><div class="n" data-count="1" data-suffix="×">0</div><div class="l">Neuer Seed pro Woche</div></div>
+      <div class="hstat"><div class="n" data-count="24" data-suffix="h">0</div><div class="l">Neue Schatzsuche</div></div>
+    </div>
   </div>
 </div>
 
 <div class="wrap">
 
   <section id="about">
-    <div class="sec-head">
+    <div class="sec-head reveal">
       <p class="kicker">Das Spiel</p>
       <h2>Was dich in Voxeria erwartet</h2>
       <p class="sub">Eine handgemachte Pixel-Welt voller Geheimnisse — allein oder mit Freunden.</p>
     </div>
     <div class="grid">
-      <div class="feat"><div class="ic">🌍</div><h3>Vielfältige Biome</h3><p>Wald, Wüste, Schnee, Dschungel, Vulkan, Ozean und das mystische Void — jede Welt sieht anders aus.</p></div>
-      <div class="feat"><div class="ic">⛏️</div><h3>Bauen &amp; Abbauen</h3><p>Blöcke abbauen, Ressourcen sammeln und eigene Bauwerke errichten.</p></div>
-      <div class="feat"><div class="ic">🌋</div><h3>Dimensionen</h3><p>Reise zwischen Overworld, Lava-Dimension und mehr — mit eigenen Gefahren und Beute.</p></div>
-      <div class="feat"><div class="ic">🏯</div><h3>Dungeons &amp; Schreine</h3><p>Versteckte Ruinen, Türme, Verzauberer-Schreine und Dungeons mit seltenen Erzen warten darauf, entdeckt zu werden.</p></div>
-      <div class="feat"><div class="ic">👥</div><h3>Multiplayer &amp; Chat</h3><p>Spiele mit anderen in derselben Welt und chatte (ab 13 Jahren, mit Filter).</p></div>
-      <div class="feat"><div class="ic">📜</div><h3>Quests &amp; Erfolge</h3><p>Erfülle Herausforderungen und schalte Erfolge frei, während du die Welt erkundest.</p></div>
-      <div class="feat"><div class="ic">🛒</div><h3>Shop &amp; Upgrades</h3><p>Verbessere deine Ausrüstung und schalte nützliche Fähigkeiten frei.</p></div>
-      <div class="feat"><div class="ic">🏆</div><h3>Tägliche Schatzsuche</h3><p>Jeden Tag ein neuer versteckter Schatz — wer ihn am schnellsten findet, klettert im Ranking.</p></div>
+      <div class="feat reveal"><div class="ic">🌍</div><h3>Vielfältige Biome</h3><p>Wald, Wüste, Schnee, Dschungel, Vulkan, Ozean und das mystische Void — jede Welt sieht anders aus.</p></div>
+      <div class="feat reveal"><div class="ic">⛏️</div><h3>Bauen &amp; Abbauen</h3><p>Blöcke abbauen, Ressourcen sammeln und eigene Bauwerke errichten.</p></div>
+      <div class="feat reveal"><div class="ic">🌋</div><h3>Dimensionen</h3><p>Reise zwischen Overworld, Lava-Dimension und mehr — mit eigenen Gefahren und Beute.</p></div>
+      <div class="feat reveal"><div class="ic">🏯</div><h3>Dungeons &amp; Schreine</h3><p>Versteckte Ruinen, Türme, Verzauberer-Schreine und Dungeons mit seltenen Erzen warten darauf, entdeckt zu werden.</p></div>
+      <div class="feat reveal"><div class="ic">👥</div><h3>Multiplayer &amp; Chat</h3><p>Spiele mit anderen in derselben Welt und chatte (ab 13 Jahren, mit Filter).</p></div>
+      <div class="feat reveal"><div class="ic">📜</div><h3>Quests &amp; Erfolge</h3><p>Erfülle Herausforderungen und schalte Erfolge frei, während du die Welt erkundest.</p></div>
+      <div class="feat reveal"><div class="ic">🛒</div><h3>Shop &amp; Upgrades</h3><p>Verbessere deine Ausrüstung und schalte nützliche Fähigkeiten frei.</p></div>
+      <div class="feat reveal"><div class="ic">🏆</div><h3>Tägliche Schatzsuche</h3><p>Jeden Tag ein neuer versteckter Schatz — wer ihn am schnellsten findet, klettert im Ranking.</p></div>
     </div>
   </section>
 
   <section id="weekly">
-    <div class="sec-head">
+    <div class="sec-head reveal">
       <p class="kicker">Welt-Seed der Woche</p>
       <h2>🌱 Wöchentlicher Welt-Seed</h2>
       <p class="sub">Jede Woche gibt es einen neuen, für alle gleichen Seed — perfekt, um dieselbe Welt wie alle anderen Spieler zu erleben.</p>
     </div>
-    <div class="card">
+    <div class="card reveal">
       <div class="seed-row">
         <div class="seed-box mono" id="weekly-seed">WEEKLY-…</div>
         <button class="btn btn-primary" id="weekly-copy-btn">📋 Kopieren</button>
@@ -269,13 +344,13 @@
   </section>
 
   <section id="community">
-    <div class="sec-head">
+    <div class="sec-head reveal">
       <p class="kicker">Von Spielern für Spieler</p>
       <h2>🌐 Community-Seeds</h2>
       <p class="sub">Im Spiel kannst du über <b style="color:var(--text)">„🌱 Community Seeds“</b> deine eigene Welt mit einem Namen teilen. Alle geteilten Seeds erscheinen live hier — und umgekehrt: was du hier teilst, taucht sofort auch im Spiel auf.</p>
     </div>
 
-    <div class="card">
+    <div class="card reveal">
       <h3 style="margin:0 0 4px; font-size:16px;">📤 Eigenen Seed teilen</h3>
       <p class="sub" style="font-size:13.5px;">Trage den Seed deiner aktuellen Welt und einen kurzen Namen ein.</p>
       <div class="share-form">
@@ -285,7 +360,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card reveal">
       <div class="head-flex">
         <h3 style="margin:0; font-size:16px;">Geteilte Welten</h3>
         <button class="btn btn-ghost" id="cs-refresh-btn">⟳ Aktualisieren</button>
@@ -298,12 +373,12 @@
   </section>
 
   <section id="daily">
-    <div class="sec-head">
+    <div class="sec-head reveal">
       <p class="kicker">Tagesevent</p>
       <h2>📅 Tägliche Schatzsuche</h2>
       <p class="sub">Jeden Tag versteckt sich ein neuer Schatz in der Welt. Im Spiel einfach auf den <b style="color:var(--text)">📅 Daily</b>-Button klicken, oder den heutigen Seed unten von Hand kopieren.</p>
     </div>
-    <div class="card daily-card">
+    <div class="card daily-card reveal">
       <div class="seed-row">
         <div class="seed-box mono" id="daily-seed">DAILY-…</div>
         <button class="btn btn-gold" id="daily-copy-btn">📋 Kopieren</button>
@@ -314,7 +389,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card reveal">
       <div class="head-flex">
         <h3 style="margin:0; font-size:16px;">🏆 Tagesrangliste</h3>
         <button class="btn btn-ghost" id="lb-refresh-btn">⟳ Aktualisieren</button>
@@ -644,6 +719,139 @@ document.getElementById('cs-share-btn').addEventListener('click', async () => {
     subscribeCommunitySeeds();
   }
 })();
+
+// ===========================================================
+// Juice: Micro-Interaktionen
+// ===========================================================
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- Scroll reveal ----------
+if (reduceMotion) {
+  document.querySelectorAll('.reveal').forEach(el => el.classList.add('in-view'));
+} else {
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+}
+
+// ---------- Button ripple ----------
+document.addEventListener('click', (e) => {
+  if (reduceMotion) return;
+  const btn = e.target.closest('.btn');
+  if (!btn) return;
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 1.4;
+  const ripple = document.createElement('span');
+  ripple.className = 'ripple';
+  ripple.style.width = ripple.style.height = size + 'px';
+  ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+  ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+  btn.appendChild(ripple);
+  ripple.addEventListener('animationend', () => ripple.remove());
+});
+
+// ---------- Confetti burst ----------
+function confettiBurst(originEl) {
+  if (reduceMotion) return;
+  const colors = ['#4facfe', '#00f2fe', '#8b6bff', '#ffd200', '#22c55e'];
+  const rect = originEl ? originEl.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const count = 18;
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.background = colors[i % colors.length];
+    piece.style.left = cx + 'px';
+    piece.style.top = cy + 'px';
+    document.body.appendChild(piece);
+    const angle = (Math.random() * Math.PI) - Math.PI / 2 - Math.PI / 4;
+    const dist = 70 + Math.random() * 110;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist - 40;
+    const rot = (Math.random() * 540) - 270;
+    const duration = 700 + Math.random() * 500;
+    const anim = piece.animate([
+      { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+      { transform: `translate(${dx}px, ${dy + 90}px) rotate(${rot}deg)`, opacity: 0 }
+    ], { duration, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    anim.onfinish = () => piece.remove();
+  }
+}
+
+// Hook confetti into existing copy/share success points.
+['weekly-copy-btn', 'daily-copy-btn'].forEach(id => {
+  const btn = document.getElementById(id);
+  btn.addEventListener('click', () => confettiBurst(btn));
+});
+csList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.cs-copy');
+  if (btn) confettiBurst(btn);
+});
+
+// ---------- Feat card tilt ----------
+if (!reduceMotion) {
+  document.querySelectorAll('.feat').forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const px = (e.clientX - rect.left) / rect.width - 0.5;
+      const py = (e.clientY - rect.top) / rect.height - 0.5;
+      card.style.transform = `perspective(600px) rotateX(${(-py * 8).toFixed(2)}deg) rotateY(${(px * 8).toFixed(2)}deg) translateY(-4px)`;
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = 'perspective(600px)';
+    });
+  });
+}
+
+// ---------- Nav scroll-spy ----------
+const navLinks = Array.from(document.querySelectorAll('nav a[href^="#"]'));
+const navSections = navLinks.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+if (navSections.length) {
+  const spyObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = '#' + entry.target.id;
+        navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === id));
+      }
+    });
+  }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 });
+  navSections.forEach(sec => spyObserver.observe(sec));
+}
+
+// ---------- Hero stat count-up ----------
+function animateCountUp(el) {
+  const target = parseInt(el.dataset.count, 10) || 0;
+  const suffix = el.dataset.suffix || '';
+  if (reduceMotion) { el.textContent = target + suffix; return; }
+  const duration = 1100;
+  const start = performance.now();
+  function tick(now) {
+    const p = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased) + suffix;
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+const heroStats = document.querySelectorAll('.hstat .n[data-count]');
+if (heroStats.length) {
+  const statsObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        animateCountUp(entry.target);
+        statsObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.4 });
+  heroStats.forEach(el => statsObserver.observe(el));
+}
 </script>
 
 </body>
