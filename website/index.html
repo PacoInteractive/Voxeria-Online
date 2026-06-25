@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxeria — Seeds, Community-Welten &amp; Leaderboard</title>
-<meta name="description" content="Alles zu Voxeria: Spielinfos, der wöchentliche Welt-Seed zum Kopieren, von der Community geteilte Seeds und das tägliche Schatzsuche-Leaderboard.">
+<title>Voxeria — Seeds, Community Worlds &amp; Leaderboard</title>
+<meta name="description" content="Everything about Voxeria: game info, the weekly world seed to copy, community-shared seeds and the daily treasure hunt leaderboard.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -37,6 +37,7 @@
     padding:16px 32px; position:sticky; top:0; z-index:50;
     background:rgba(7,9,18,0.78); backdrop-filter:blur(14px) saturate(140%);
     border-bottom:1px solid var(--border);
+    gap:16px; flex-wrap:wrap;
   }
   .brand{display:flex; align-items:center; gap:10px;}
   .brand-mark{
@@ -44,12 +45,19 @@
     font-size:17px; background:linear-gradient(135deg,var(--violet),var(--accent)); box-shadow:0 4px 16px rgba(79,172,254,0.35);
   }
   .logo{font-size:18px; font-weight:800; letter-spacing:0.5px;}
+  .header-right{display:flex; align-items:center; gap:6px;}
   nav{display:flex; gap:6px;}
   nav a{
     padding:8px 14px; border-radius:9px; color:var(--muted); font-weight:600; font-size:13.5px;
     transition:color .15s, background .15s;
   }
   nav a:hover{color:var(--text); background:rgba(255,255,255,0.05);}
+  .cg-link{
+    display:inline-flex; align-items:center; gap:7px; padding:8px 16px; border-radius:9px;
+    background:linear-gradient(135deg,#7b2ff7,#f107a3); color:#fff !important; font-weight:700; font-size:13px;
+    box-shadow:0 4px 14px rgba(123,47,247,0.35); transition:transform .15s, filter .15s;
+  }
+  .cg-link:hover{transform:translateY(-1px); filter:brightness(1.1);}
 
   .wrap{max-width:1040px; margin:0 auto; padding:0 24px;}
 
@@ -174,6 +182,7 @@
   /* ---------- Footer ---------- */
   footer{text-align:center; padding:48px 24px 36px; color:var(--muted-dim); font-size:12.5px; border-top:1px solid var(--border);}
   footer .fbrand{font-weight:800; color:var(--muted); letter-spacing:1px; margin-bottom:6px;}
+  footer .cg-link{margin-top:14px; display:inline-flex;}
 
   /* ---------- Toast ---------- */
   #toast-wrap{position:fixed; bottom:22px; right:22px; display:flex; flex-direction:column; gap:10px; z-index:100;}
@@ -274,24 +283,27 @@
     <div class="brand-mark">🟪</div>
     <div class="logo">VOXERIA</div>
   </div>
-  <nav>
-    <a href="#about">Über das Spiel</a>
-    <a href="#weekly">Wochen-Seed</a>
-    <a href="#community">Community-Seeds</a>
-    <a href="#daily">Schatzsuche</a>
-  </nav>
+  <div class="header-right">
+    <nav>
+      <a href="#about">About</a>
+      <a href="#weekly">Weekly Seed</a>
+      <a href="#community">Community Seeds</a>
+      <a href="#daily">Treasure Hunt</a>
+    </nav>
+    <a class="cg-link" href="https://www.crazygames.com/" target="_blank" rel="noopener">🎮 Back to CrazyGames</a>
+  </div>
 </header>
 
 <div class="hero">
   <div class="aurora"><span></span><span></span><span></span></div>
   <div class="hero-inner">
-    <div class="badge"><span class="pulse"></span> Live-Daten direkt aus dem Spiel</div>
+    <div class="badge"><span class="pulse"></span> Live data straight from the game</div>
     <h1>VOXERIA</h1>
-    <p>Ein 2D-Sandbox-Survival-Abenteuer: Welten erkunden, abbauen, bauen und gemeinsam mit anderen Spielern überleben — voller Biome, Dimensionen und versteckter Schätze.</p>
+    <p>A 2D sandbox survival adventure: explore worlds, mine, build, and survive together with other players — full of biomes, dimensions and hidden treasures.</p>
     <div class="hero-stats">
-      <div class="hstat"><div class="n" data-count="7" data-suffix="+">0</div><div class="l">Biome &amp; Dimensionen</div></div>
-      <div class="hstat"><div class="n" data-count="1" data-suffix="×">0</div><div class="l">Neuer Seed pro Woche</div></div>
-      <div class="hstat"><div class="n" data-count="24" data-suffix="h">0</div><div class="l">Neue Schatzsuche</div></div>
+      <div class="hstat"><div class="n" data-count="7" data-suffix="+">0</div><div class="l">Biomes &amp; dimensions</div></div>
+      <div class="hstat"><div class="n" data-count="1" data-suffix="×">0</div><div class="l">New seed per week</div></div>
+      <div class="hstat"><div class="n" data-count="24" data-suffix="h">0</div><div class="l">New treasure hunt</div></div>
     </div>
   </div>
 </div>
@@ -300,44 +312,44 @@
 
   <section id="about">
     <div class="sec-head reveal">
-      <p class="kicker">Das Spiel</p>
-      <h2>Was dich in Voxeria erwartet</h2>
-      <p class="sub">Eine handgemachte Pixel-Welt voller Geheimnisse — allein oder mit Freunden.</p>
+      <p class="kicker">The game</p>
+      <h2>What awaits you in Voxeria</h2>
+      <p class="sub">A handcrafted pixel world full of secrets — solo or with friends.</p>
     </div>
     <div class="grid">
-      <div class="feat reveal"><div class="ic">🌍</div><h3>Vielfältige Biome</h3><p>Wald, Wüste, Schnee, Dschungel, Vulkan, Ozean und das mystische Void — jede Welt sieht anders aus.</p></div>
-      <div class="feat reveal"><div class="ic">⛏️</div><h3>Bauen &amp; Abbauen</h3><p>Blöcke abbauen, Ressourcen sammeln und eigene Bauwerke errichten.</p></div>
-      <div class="feat reveal"><div class="ic">🌋</div><h3>Dimensionen</h3><p>Reise zwischen Overworld, Lava-Dimension und mehr — mit eigenen Gefahren und Beute.</p></div>
-      <div class="feat reveal"><div class="ic">🏯</div><h3>Dungeons &amp; Schreine</h3><p>Versteckte Ruinen, Türme, Verzauberer-Schreine und Dungeons mit seltenen Erzen warten darauf, entdeckt zu werden.</p></div>
-      <div class="feat reveal"><div class="ic">👥</div><h3>Multiplayer &amp; Chat</h3><p>Spiele mit anderen in derselben Welt und chatte (ab 13 Jahren, mit Filter).</p></div>
-      <div class="feat reveal"><div class="ic">📜</div><h3>Quests &amp; Erfolge</h3><p>Erfülle Herausforderungen und schalte Erfolge frei, während du die Welt erkundest.</p></div>
-      <div class="feat reveal"><div class="ic">🛒</div><h3>Shop &amp; Upgrades</h3><p>Verbessere deine Ausrüstung und schalte nützliche Fähigkeiten frei.</p></div>
-      <div class="feat reveal"><div class="ic">🏆</div><h3>Tägliche Schatzsuche</h3><p>Jeden Tag ein neuer versteckter Schatz — wer ihn am schnellsten findet, klettert im Ranking.</p></div>
+      <div class="feat reveal"><div class="ic">🌍</div><h3>Diverse biomes</h3><p>Forest, desert, snow, jungle, volcano, ocean and the mystical Void — every world looks different.</p></div>
+      <div class="feat reveal"><div class="ic">⛏️</div><h3>Build &amp; mine</h3><p>Mine blocks, gather resources and build your own structures.</p></div>
+      <div class="feat reveal"><div class="ic">🌋</div><h3>Dimensions</h3><p>Travel between the Overworld, a lava dimension and more — each with its own dangers and loot.</p></div>
+      <div class="feat reveal"><div class="ic">🏯</div><h3>Dungeons &amp; shrines</h3><p>Hidden ruins, towers, enchanter shrines and dungeons full of rare ores are waiting to be discovered.</p></div>
+      <div class="feat reveal"><div class="ic">👥</div><h3>Multiplayer &amp; chat</h3><p>Play with others in the same world and chat (13+, with filter).</p></div>
+      <div class="feat reveal"><div class="ic">📜</div><h3>Quests &amp; achievements</h3><p>Complete challenges and unlock achievements while exploring the world.</p></div>
+      <div class="feat reveal"><div class="ic">🛒</div><h3>Shop &amp; upgrades</h3><p>Upgrade your gear and unlock useful abilities.</p></div>
+      <div class="feat reveal"><div class="ic">🏆</div><h3>Daily treasure hunt</h3><p>A new hidden treasure every day — whoever finds it fastest climbs the ranking.</p></div>
     </div>
   </section>
 
   <section id="weekly">
     <div class="sec-head reveal">
-      <p class="kicker">Welt-Seed der Woche</p>
-      <h2>🌱 Wöchentlicher Welt-Seed</h2>
-      <p class="sub">Jede Woche gibt es einen neuen, für alle gleichen Seed — perfekt, um dieselbe Welt wie alle anderen Spieler zu erleben.</p>
+      <p class="kicker">World seed of the week</p>
+      <h2>🌱 Weekly World Seed</h2>
+      <p class="sub">Every week there's a new seed, the same for everyone — perfect for experiencing the same world as all other players.</p>
     </div>
     <div class="card reveal">
       <div class="seed-row">
         <div class="seed-box mono" id="weekly-seed">WEEKLY-…</div>
-        <button class="btn btn-primary" id="weekly-copy-btn">📋 Kopieren</button>
+        <button class="btn btn-primary" id="weekly-copy-btn">📋 Copy</button>
       </div>
       <div class="meta-row">
-        <span>Aktuelle Woche: <b id="weekly-label">—</b></span>
-        <span>Erneuert in: <b class="countdown" id="weekly-countdown">—</b></span>
+        <span>Current week: <b id="weekly-label">—</b></span>
+        <span>Renews in: <b class="countdown" id="weekly-countdown">—</b></span>
       </div>
       <div class="howto">
-        <b>So benutzt du den Seed im Spiel:</b>
+        <b>How to use the seed in-game:</b>
         <ol>
-          <li>Seed oben kopieren.</li>
-          <li>Voxeria öffnen.</li>
-          <li>Den Seed in das Feld <b>„Seed“</b> oben im Spiel einfügen.</li>
-          <li>Auf <b>„New World“</b> klicken — fertig, du spielst die Welt der Woche!</li>
+          <li>Copy the seed above.</li>
+          <li>Open Voxeria.</li>
+          <li>Paste the seed into the <b>"Seed"</b> field at the top of the game.</li>
+          <li>Click <b>"New World"</b> — done, you're playing this week's world!</li>
         </ol>
       </div>
     </div>
@@ -345,62 +357,62 @@
 
   <section id="community">
     <div class="sec-head reveal">
-      <p class="kicker">Von Spielern für Spieler</p>
-      <h2>🌐 Community-Seeds</h2>
-      <p class="sub">Im Spiel kannst du über <b style="color:var(--text)">„🌱 Community Seeds“</b> deine eigene Welt mit einem Namen teilen. Alle geteilten Seeds erscheinen live hier — und umgekehrt: was du hier teilst, taucht sofort auch im Spiel auf.</p>
+      <p class="kicker">By players, for players</p>
+      <h2>🌐 Community Seeds</h2>
+      <p class="sub">In the game you can share your own world with a name via <b style="color:var(--text)">"🌱 Community Seeds"</b>. All shared seeds appear live here — and vice versa: whatever you share here instantly shows up in the game too.</p>
     </div>
 
     <div class="card reveal">
-      <h3 style="margin:0 0 4px; font-size:16px;">📤 Eigenen Seed teilen</h3>
-      <p class="sub" style="font-size:13.5px;">Trage den Seed deiner aktuellen Welt und einen kurzen Namen ein.</p>
+      <h3 style="margin:0 0 4px; font-size:16px;">📤 Share your seed</h3>
+      <p class="sub" style="font-size:13.5px;">Enter the seed of your current world and a short name.</p>
       <div class="share-form">
-        <input type="text" id="cs-seed-input" class="mono" placeholder="Dein Seed, z.B. 1234567" maxlength="60">
-        <input type="text" id="cs-label-input" placeholder="Name deiner Welt" maxlength="40">
-        <button class="btn btn-violet" id="cs-share-btn">🌱 Seed teilen</button>
+        <input type="text" id="cs-seed-input" class="mono" placeholder="Your seed, e.g. 1234567" maxlength="60">
+        <input type="text" id="cs-label-input" placeholder="Name of your world" maxlength="40">
+        <button class="btn btn-violet" id="cs-share-btn">🌱 Share seed</button>
       </div>
     </div>
 
     <div class="card reveal">
       <div class="head-flex">
-        <h3 style="margin:0; font-size:16px;">Geteilte Welten</h3>
-        <button class="btn btn-ghost" id="cs-refresh-btn">⟳ Aktualisieren</button>
+        <h3 style="margin:0; font-size:16px;">Shared worlds</h3>
+        <button class="btn btn-ghost" id="cs-refresh-btn">⟳ Refresh</button>
       </div>
       <div class="cs-list" id="cs-list">
-        <div class="empty-msg">Lade Community-Seeds…</div>
+        <div class="empty-msg">Loading community seeds…</div>
       </div>
-      <div class="lb-status"><span class="dot off" id="cs-dot"></span><span id="cs-status-text">Verbinde…</span></div>
+      <div class="lb-status"><span class="dot off" id="cs-dot"></span><span id="cs-status-text">Connecting…</span></div>
     </div>
   </section>
 
   <section id="daily">
     <div class="sec-head reveal">
-      <p class="kicker">Tagesevent</p>
-      <h2>📅 Tägliche Schatzsuche</h2>
-      <p class="sub">Jeden Tag versteckt sich ein neuer Schatz in der Welt. Im Spiel einfach auf den <b style="color:var(--text)">📅 Daily</b>-Button klicken, oder den heutigen Seed unten von Hand kopieren.</p>
+      <p class="kicker">Daily event</p>
+      <h2>📅 Daily Treasure Hunt</h2>
+      <p class="sub">A new treasure is hidden in the world every day. In-game, just click the <b style="color:var(--text)">📅 Daily</b> button, or copy today's seed below by hand.</p>
     </div>
     <div class="card daily-card reveal">
       <div class="seed-row">
         <div class="seed-box mono" id="daily-seed">DAILY-…</div>
-        <button class="btn btn-gold" id="daily-copy-btn">📋 Kopieren</button>
+        <button class="btn btn-gold" id="daily-copy-btn">📋 Copy</button>
       </div>
       <div class="meta-row">
-        <span>Heute: <b id="daily-label">—</b></span>
-        <span>Nächste Schatzsuche in: <b class="countdown" id="daily-countdown">—</b></span>
+        <span>Today: <b id="daily-label">—</b></span>
+        <span>Next treasure hunt in: <b class="countdown" id="daily-countdown">—</b></span>
       </div>
     </div>
 
     <div class="card reveal">
       <div class="head-flex">
-        <h3 style="margin:0; font-size:16px;">🏆 Tagesrangliste</h3>
-        <button class="btn btn-ghost" id="lb-refresh-btn">⟳ Aktualisieren</button>
+        <h3 style="margin:0; font-size:16px;">🏆 Daily Leaderboard</h3>
+        <button class="btn btn-ghost" id="lb-refresh-btn">⟳ Refresh</button>
       </div>
       <table id="lb-table">
-        <thead><tr><th>#</th><th>Name</th><th>Zeit</th></tr></thead>
+        <thead><tr><th>#</th><th>Name</th><th>Time</th></tr></thead>
         <tbody id="lb-body">
-          <tr class="empty-row"><td colspan="3">Lade Rangliste…</td></tr>
+          <tr class="empty-row"><td colspan="3">Loading leaderboard…</td></tr>
         </tbody>
       </table>
-      <div class="lb-status"><span class="dot off" id="lb-dot"></span><span id="lb-status-text">Verbinde…</span></div>
+      <div class="lb-status"><span class="dot off" id="lb-dot"></span><span id="lb-status-text">Connecting…</span></div>
     </div>
   </section>
 
@@ -408,14 +420,15 @@
 
 <footer>
   <div class="fbrand">VOXERIA</div>
-  Diese Seite zeigt nur öffentliche Spieldaten (Seeds, Community-Welten &amp; Bestenliste). Keine Anmeldung, keine personenbezogenen Daten.
+  This page only shows public game data (seeds, community worlds &amp; leaderboard). No login, no personal data.
+  <div><a class="cg-link" href="https://www.crazygames.com/" target="_blank" rel="noopener">🎮 Back to CrazyGames</a></div>
 </footer>
 
 <div id="toast-wrap"></div>
 
 <script type="module">
 // ===========================================================
-// Toast-Benachrichtigungen
+// Toast notifications
 // ===========================================================
 function toast(msg, isError) {
   const wrap = document.getElementById('toast-wrap');
@@ -431,8 +444,8 @@ function toast(msg, isError) {
 }
 
 // ===========================================================
-// Gleicher Seed-/Datums-Algorithmus wie im Spiel, damit die
-// Seeds hier 1:1 mit dem in-game "Seed"-Feld kompatibel sind.
+// Same seed/date algorithm as the game, so seeds here are
+// 1:1 compatible with the in-game "Seed" field.
 // ===========================================================
 function getDailySeedString(d = new Date()) {
   const y = d.getFullYear();
@@ -443,8 +456,8 @@ function getDailySeedString(d = new Date()) {
 
 function getISOWeekInfo(d = new Date()) {
   const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const dayNum = (date.getDay() + 6) % 7; // Montag = 0
-  date.setDate(date.getDate() - dayNum + 3); // Donnerstag derselben Woche
+  const dayNum = (date.getDay() + 6) % 7; // Monday = 0
+  date.setDate(date.getDate() - dayNum + 3); // Thursday of the same week
   const firstThursday = new Date(date.getFullYear(), 0, 4);
   const firstDayNum = (firstThursday.getDay() + 6) % 7;
   firstThursday.setDate(firstThursday.getDate() - firstDayNum + 3);
@@ -494,11 +507,11 @@ function setupCopyButton(btnId, sourceId, label) {
   btn.addEventListener('click', async () => {
     const text = document.getElementById(sourceId).textContent;
     const ok = await copyText(text);
-    if (!ok) { toast('Kopieren nicht möglich — bitte manuell markieren.', true); return; }
+    if (!ok) { toast('Could not copy — please select manually.', true); return; }
     btn.classList.add('copied');
     const old = btn.innerHTML;
-    btn.innerHTML = '✅ Kopiert!';
-    toast((label || 'Seed') + ' kopiert: ' + text);
+    btn.innerHTML = '✅ Copied!';
+    toast((label || 'Seed') + ' copied: ' + text);
     setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = old; }, 1600);
   });
 }
@@ -509,32 +522,32 @@ function refreshSeedDisplays() {
   const { year, week } = getISOWeekInfo(now);
   const weeklySeed = `WEEKLY-${year}-W${String(week).padStart(2, '0')}`;
   document.getElementById('weekly-seed').textContent = weeklySeed;
-  document.getElementById('weekly-label').textContent = `${year}, Woche ${week}`;
+  document.getElementById('weekly-label').textContent = `${year}, week ${week}`;
   document.getElementById('weekly-countdown').textContent = fmtCountdown(nextMondayMidnight(now) - now);
 
   const dailySeed = getDailySeedString(now);
   document.getElementById('daily-seed').textContent = dailySeed;
-  document.getElementById('daily-label').textContent = now.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  document.getElementById('daily-label').textContent = now.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
   document.getElementById('daily-countdown').textContent = fmtCountdown(nextMidnight(now) - now);
 
   return dailySeed;
 }
 
-setupCopyButton('weekly-copy-btn', 'weekly-seed', 'Wochen-Seed');
-setupCopyButton('daily-copy-btn', 'daily-seed', 'Tages-Seed');
+setupCopyButton('weekly-copy-btn', 'weekly-seed', 'Weekly seed');
+setupCopyButton('daily-copy-btn', 'daily-seed', 'Daily seed');
 
 let _lastDailySeed = refreshSeedDisplays();
 setInterval(() => {
   const seedNow = refreshSeedDisplays();
   if (seedNow !== _lastDailySeed) {
     _lastDailySeed = seedNow;
-    loadLeaderboard(); // neuer Tag -> Rangliste neu laden
+    loadLeaderboard(); // new day -> reload leaderboard
   }
 }, 1000);
 
 // ===========================================================
-// Firebase: gleiche Datenbank wie das Spiel (nur öffentliche
-// Collections: Daily-Leaderboard & Community-Seeds).
+// Firebase: same database as the game (public collections
+// only: daily leaderboard & community seeds).
 // ===========================================================
 const firebaseConfig = {
   apiKey: "AIzaSyAZzGkkqTyRxbJDehI-gtsNjf6IcgAPZoY",
@@ -581,16 +594,16 @@ async function initFirebase() {
     db = storeMod.getFirestore(app);
     const cred = await authMod.signInAnonymously(auth);
     userId = cred?.user?.uid || null;
-    setStatus(lbDot, lbStatusText, true, 'Verbunden mit Voxeria-Datenbank');
-    setStatus(csDot, csStatusText, true, 'Verbunden mit Voxeria-Datenbank');
+    setStatus(lbDot, lbStatusText, true, 'Connected to Voxeria database');
+    setStatus(csDot, csStatusText, true, 'Connected to Voxeria database');
     return true;
   } catch (e) {
     console.error('Firebase init error:', e);
-    const msg = 'Konnte nicht verbinden (Domain evtl. nicht in Firebase freigegeben)';
+    const msg = 'Could not connect (domain may not be authorized in Firebase)';
     setStatus(lbDot, lbStatusText, false, msg);
     setStatus(csDot, csStatusText, false, msg);
-    lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">Keine Verbindung zur Datenbank.</td></tr>';
-    csList.innerHTML = '<div class="empty-msg">Keine Verbindung zur Datenbank.</div>';
+    lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">No connection to the database.</td></tr>';
+    csList.innerHTML = '<div class="empty-msg">No connection to the database.</div>';
     return false;
   }
 }
@@ -598,14 +611,14 @@ async function initFirebase() {
 // ---------- Daily Leaderboard ----------
 async function loadLeaderboard() {
   if (!db) return;
-  lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">Lade Rangliste…</td></tr>';
+  lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">Loading leaderboard…</td></tr>';
   const dateStr = getDailySeedString();
   try {
     const colRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'voxeria_daily_lb');
     const snap = await getDocs(query(colRef, where('date', '==', dateStr), orderBy('time', 'asc'), limitQuery(20)));
     if (snap.empty) {
-      lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">Heute noch keine Einträge — sei der/die Erste! 🏆</td></tr>';
-      setStatus(lbDot, lbStatusText, true, 'Aktualisiert um ' + new Date().toLocaleTimeString());
+      lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">No entries yet today — be the first! 🏆</td></tr>';
+      setStatus(lbDot, lbStatusText, true, 'Updated at ' + new Date().toLocaleTimeString());
       return;
     }
     const medals = ['🥇', '🥈', '🥉'];
@@ -618,27 +631,27 @@ async function loadLeaderboard() {
       html += `<tr><td class="rk ${cls}">${rkStr}</td><td>${escHtml(r.name || 'Player')}</td><td class="mono">${fmtTime(r.time)}</td></tr>`;
     });
     lbBody.innerHTML = html;
-    setStatus(lbDot, lbStatusText, true, 'Aktualisiert um ' + new Date().toLocaleTimeString());
+    setStatus(lbDot, lbStatusText, true, 'Updated at ' + new Date().toLocaleTimeString());
   } catch (e) {
     console.error('Leaderboard load error:', e);
-    lbBody.innerHTML = '<tr class="empty-row"><td colspan="3" style="color:#ff8080;">Rangliste konnte nicht geladen werden.</td></tr>';
-    setStatus(lbDot, lbStatusText, false, 'Fehler beim Laden');
+    lbBody.innerHTML = '<tr class="empty-row"><td colspan="3" style="color:#ff8080;">Leaderboard could not be loaded.</td></tr>';
+    setStatus(lbDot, lbStatusText, false, 'Error while loading');
   }
 }
 document.getElementById('lb-refresh-btn').addEventListener('click', loadLeaderboard);
 setInterval(() => { if (db) loadLeaderboard(); }, 60000);
 
-// ---------- Community Seeds (live, gleiche Collection wie im Spiel) ----------
+// ---------- Community Seeds (live, same collection as the game) ----------
 let csUnsub = null;
 
 function renderCommunitySeeds(seeds) {
   if (!seeds.length) {
-    csList.innerHTML = '<div class="empty-msg">Noch keine Community-Seeds — sei die/der Erste! 🌱</div>';
+    csList.innerHTML = '<div class="empty-msg">No community seeds yet — be the first! 🌱</div>';
     return;
   }
   csList.innerHTML = seeds.map(s => {
-    const date = s.ts ? new Date(s.ts).toLocaleDateString('de-DE') : '?';
-    const label = s.label || 'Unbenannte Welt';
+    const date = s.ts ? new Date(s.ts).toLocaleDateString('en-US') : '?';
+    const label = s.label || 'Unnamed world';
     const seed = String(s.seed ?? '');
     return `<div class="cs-entry">
       <div class="cs-info">
@@ -646,7 +659,7 @@ function renderCommunitySeeds(seeds) {
         <div class="cs-meta">Seed: <span class="mono">${escHtml(seed)}</span> &nbsp;·&nbsp; ${date}</div>
       </div>
       <div class="cs-actions">
-        <button class="btn btn-primary cs-copy" data-seed="${escHtml(seed)}">📋 Kopieren</button>
+        <button class="btn btn-primary cs-copy" data-seed="${escHtml(seed)}">📋 Copy</button>
       </div>
     </div>`;
   }).join('');
@@ -661,10 +674,10 @@ function subscribeCommunitySeeds() {
     snap.forEach(d => seeds.push({ id: d.id, ...d.data() }));
     seeds.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     renderCommunitySeeds(seeds.slice(0, 30));
-    setStatus(csDot, csStatusText, true, seeds.length + ' geteilte Welten · live');
+    setStatus(csDot, csStatusText, true, seeds.length + ' shared worlds · live');
   }, (err) => {
     console.error('Community seeds snapshot error:', err);
-    setStatus(csDot, csStatusText, false, 'Fehler beim Laden');
+    setStatus(csDot, csStatusText, false, 'Error while loading');
   });
 }
 
@@ -674,12 +687,12 @@ csList.addEventListener('click', async (e) => {
   const seed = btn.dataset.seed;
   const ok = await copyText(seed);
   if (ok) {
-    toast('Seed kopiert: ' + seed);
+    toast('Seed copied: ' + seed);
     const old = btn.innerHTML;
-    btn.innerHTML = '✅ Kopiert!';
+    btn.innerHTML = '✅ Copied!';
     setTimeout(() => { btn.innerHTML = old; }, 1400);
   } else {
-    toast('Kopieren nicht möglich.', true);
+    toast('Could not copy.', true);
   }
 });
 
@@ -690,22 +703,22 @@ document.getElementById('cs-share-btn').addEventListener('click', async () => {
   const labelInput = document.getElementById('cs-label-input');
   const btn = document.getElementById('cs-share-btn');
   const seed = seedInput.value.trim();
-  const label = (labelInput.value.trim() || 'Unbenannte Welt').slice(0, 40);
-  if (!seed) { toast('Bitte zuerst einen Seed eingeben.', true); seedInput.focus(); return; }
-  if (!db) { toast('Keine Verbindung zur Datenbank.', true); return; }
+  const label = (labelInput.value.trim() || 'Unnamed world').slice(0, 40);
+  if (!seed) { toast('Please enter a seed first.', true); seedInput.focus(); return; }
+  if (!db) { toast('No connection to the database.', true); return; }
   btn.disabled = true;
   const oldText = btn.innerHTML;
-  btn.innerHTML = 'Teile…';
+  btn.innerHTML = 'Sharing…';
   try {
     const docId = (userId || 'anon') + '_' + Date.now();
     await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'voxeria_community_seeds', docId), {
       seed: seed.slice(0, 60), label, userId: userId || 'anon', ts: Date.now()
     });
-    toast('🌱 Seed geteilt — er erscheint jetzt auch im Spiel!');
+    toast('🌱 Seed shared — it now also appears in the game!');
     seedInput.value = ''; labelInput.value = '';
   } catch (e) {
     console.error('Share seed error:', e);
-    toast('Teilen fehlgeschlagen.', true);
+    toast('Sharing failed.', true);
   } finally {
     btn.disabled = false;
     btn.innerHTML = oldText;
@@ -721,7 +734,7 @@ document.getElementById('cs-share-btn').addEventListener('click', async () => {
 })();
 
 // ===========================================================
-// Juice: Micro-Interaktionen
+// Juice: micro-interactions
 // ===========================================================
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
