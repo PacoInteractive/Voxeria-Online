@@ -3,118 +3,232 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxeria — Seeds &amp; Leaderboard</title>
-<meta name="description" content="Alles zu Voxeria: Spielinfos, der wöchentliche Welt-Seed zum Kopieren und das tägliche Schatzsuche-Leaderboard.">
+<title>Voxeria — Seeds, Community-Welten &amp; Leaderboard</title>
+<meta name="description" content="Alles zu Voxeria: Spielinfos, der wöchentliche Welt-Seed zum Kopieren, von der Community geteilte Seeds und das tägliche Schatzsuche-Leaderboard.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0a0e1a; --bg2:#0d1224; --card:#121831; --card2:#161d3a;
-    --accent:#4facfe; --accent2:#00f2fe; --gold:#ffd200; --gold2:#ff9500;
-    --text:#e6e9f5; --muted:#8a90b3; --border:rgba(79,172,254,0.25);
+    --bg:#070912; --bg-grad:#10172e;
+    --card:#11172a; --card2:#161e38; --card-border:rgba(255,255,255,0.08);
+    --accent:#4facfe; --accent2:#00f2fe; --violet:#8b6bff;
+    --gold:#ffd200; --gold2:#ff9500;
+    --text:#eef0fb; --muted:#8b91b0; --muted-dim:#5b6080;
+    --border:rgba(255,255,255,0.09); --border-strong:rgba(79,172,254,0.35);
+    --radius:16px;
   }
   *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
   body{
-    margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; color:var(--text);
-    background: radial-gradient(circle at 20% 0%, #14224a 0%, var(--bg) 55%);
-    min-height:100vh;
+    margin:0; font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif; color:var(--text);
+    background:
+      radial-gradient(900px 500px at 12% -5%, rgba(139,107,255,0.18), transparent 60%),
+      radial-gradient(900px 600px at 88% 8%, rgba(79,172,254,0.16), transparent 55%),
+      var(--bg);
+    min-height:100vh; -webkit-font-smoothing:antialiased;
   }
-  a{color:var(--accent2);}
+  a{color:var(--accent2); text-decoration:none;}
+  .mono{font-family:'JetBrains Mono',Consolas,monospace;}
+
+  /* ---------- Header ---------- */
   header{
     display:flex; align-items:center; justify-content:space-between;
-    padding:18px 28px; position:sticky; top:0; z-index:10;
-    background:rgba(10,14,26,0.85); backdrop-filter:blur(8px);
+    padding:16px 32px; position:sticky; top:0; z-index:50;
+    background:rgba(7,9,18,0.78); backdrop-filter:blur(14px) saturate(140%);
     border-bottom:1px solid var(--border);
   }
-  .logo{font-size:22px; font-weight:900; letter-spacing:1px;
-    background:linear-gradient(135deg,var(--accent),var(--accent2));
-    -webkit-background-clip:text; background-clip:text; color:transparent;}
-  nav a{margin-left:20px; text-decoration:none; color:var(--muted); font-weight:600; font-size:14px;}
-  nav a:hover{color:var(--text);}
-  .wrap{max-width:980px; margin:0 auto; padding:0 20px;}
-  .hero{text-align:center; padding:70px 20px 40px;}
-  .hero h1{font-size:42px; margin:0 0 12px; font-weight:900;}
-  .hero p{color:var(--muted); font-size:17px; max-width:620px; margin:0 auto;}
-  section{padding:50px 0;}
-  h2{font-size:26px; margin:0 0 6px; display:flex; align-items:center; gap:10px;}
-  .sub{color:var(--muted); margin:0 0 26px; font-size:14px;}
-  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px;}
-  .feat{
-    background:var(--card); border:1px solid var(--border); border-radius:14px;
-    padding:18px; transition:transform .15s, box-shadow .15s;
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    font-size:17px; background:linear-gradient(135deg,var(--violet),var(--accent)); box-shadow:0 4px 16px rgba(79,172,254,0.35);
   }
-  .feat:hover{transform:translateY(-3px); box-shadow:0 8px 24px rgba(79,172,254,0.15);}
-  .feat .ic{font-size:26px; margin-bottom:8px;}
-  .feat h3{margin:0 0 6px; font-size:16px;}
-  .feat p{margin:0; color:var(--muted); font-size:13px; line-height:1.5;}
+  .logo{font-size:18px; font-weight:800; letter-spacing:0.5px;}
+  nav{display:flex; gap:6px;}
+  nav a{
+    padding:8px 14px; border-radius:9px; color:var(--muted); font-weight:600; font-size:13.5px;
+    transition:color .15s, background .15s;
+  }
+  nav a:hover{color:var(--text); background:rgba(255,255,255,0.05);}
 
+  .wrap{max-width:1040px; margin:0 auto; padding:0 24px;}
+
+  /* ---------- Hero ---------- */
+  .hero{text-align:center; padding:96px 24px 56px; position:relative;}
+  .badge{
+    display:inline-flex; align-items:center; gap:7px; padding:6px 14px; border-radius:999px;
+    background:rgba(79,172,254,0.1); border:1px solid var(--border-strong); color:var(--accent2);
+    font-size:12.5px; font-weight:700; letter-spacing:.3px; margin-bottom:22px;
+  }
+  .badge .pulse{width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 8px #22c55e; animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+  .hero h1{
+    font-size:clamp(38px,6vw,58px); margin:0 0 16px; font-weight:900; letter-spacing:-1px; line-height:1.05;
+    background:linear-gradient(135deg,#ffffff 20%,var(--accent2) 60%,var(--violet) 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero p{color:var(--muted); font-size:18px; max-width:640px; margin:0 auto; line-height:1.6;}
+  .hero-stats{display:flex; justify-content:center; gap:36px; margin-top:40px; flex-wrap:wrap;}
+  .hstat{text-align:center;}
+  .hstat .n{font-size:24px; font-weight:800; color:var(--text);}
+  .hstat .l{font-size:12.5px; color:var(--muted-dim); margin-top:2px;}
+
+  /* ---------- Sections ---------- */
+  section{padding:64px 0; border-top:1px solid var(--border);}
+  section:first-of-type{border-top:none;}
+  .sec-head{margin-bottom:30px;}
+  .kicker{font-size:12.5px; font-weight:800; letter-spacing:1.2px; color:var(--accent2); text-transform:uppercase; margin:0 0 8px;}
+  h2{font-size:28px; margin:0 0 8px; font-weight:800; letter-spacing:-.3px;}
+  .sub{color:var(--muted); margin:0; font-size:15px; max-width:620px; line-height:1.6;}
+
+  /* ---------- Feature grid ---------- */
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px;}
+  .feat{
+    background:linear-gradient(160deg,var(--card2),var(--card));
+    border:1px solid var(--card-border); border-radius:var(--radius);
+    padding:20px; transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .feat:hover{transform:translateY(-4px); border-color:var(--border-strong); box-shadow:0 14px 32px rgba(79,172,254,0.12);}
+  .feat .ic{
+    width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:18px; background:rgba(79,172,254,0.12); margin-bottom:12px;
+  }
+  .feat h3{margin:0 0 6px; font-size:15.5px; font-weight:700;}
+  .feat p{margin:0; color:var(--muted); font-size:13.5px; line-height:1.55;}
+
+  /* ---------- Cards ---------- */
   .card{
     background:linear-gradient(160deg,var(--card2),var(--card));
-    border:1px solid var(--border); border-radius:18px; padding:26px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    border:1px solid var(--card-border); border-radius:20px; padding:28px;
+    box-shadow:0 16px 40px rgba(0,0,0,0.35);
   }
-  .seed-row{display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-top:16px;}
+  .card + .card{margin-top:20px;}
+  .seed-row{display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-top:18px;}
   .seed-box{
-    flex:1; min-width:220px; background:#070a16; border:1px solid var(--border);
-    border-radius:10px; padding:14px 16px; font-family:'Consolas',monospace;
-    font-size:20px; font-weight:700; letter-spacing:1px; color:var(--accent2);
+    flex:1; min-width:220px; background:#05060c; border:1px solid var(--border);
+    border-radius:12px; padding:16px 18px; font-family:'JetBrains Mono',Consolas,monospace;
+    font-size:19px; font-weight:700; letter-spacing:.5px; color:var(--accent2);
     display:flex; align-items:center; word-break:break-all;
   }
-  .copy-btn{
-    border:none; border-radius:10px; padding:0 22px; font-weight:800; font-size:14px;
-    cursor:pointer; background:linear-gradient(135deg,var(--accent),var(--accent2));
-    color:#001020; transition:filter .15s, transform .15s;
+  .btn{
+    border:none; border-radius:12px; padding:0 22px; font-weight:700; font-size:14px;
+    cursor:pointer; transition:filter .15s, transform .15s, opacity .15s;
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
   }
-  .copy-btn:hover{filter:brightness(1.12); transform:scale(1.03);}
-  .copy-btn.copied{background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff;}
-  .meta-row{display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; font-size:13px; color:var(--muted);}
-  .meta-row b{color:var(--text);}
-  .howto{margin-top:18px; padding-top:18px; border-top:1px solid var(--border); font-size:13px; color:var(--muted);}
-  .howto ol{margin:8px 0 0; padding-left:20px; line-height:1.7;}
+  .btn:disabled{opacity:.55; cursor:not-allowed;}
+  .btn:hover:not(:disabled){filter:brightness(1.1); transform:translateY(-1px);}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#001020;}
+  .btn-primary.copied{background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff;}
+  .btn-gold{background:linear-gradient(135deg,var(--gold2),var(--gold)); color:#241800;}
+  .btn-gold.copied{background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff;}
+  .btn-ghost{background:transparent; border:1px solid var(--border); color:var(--muted);}
+  .btn-ghost:hover:not(:disabled){color:var(--text); border-color:var(--border-strong); filter:none;}
+  .btn-violet{background:linear-gradient(135deg,var(--violet),#a98bff); color:#fff;}
+
+  .meta-row{display:flex; gap:22px; flex-wrap:wrap; margin-top:16px; font-size:13.5px; color:var(--muted);}
+  .meta-row b{color:var(--text); font-weight:700;}
+  .howto{margin-top:20px; padding-top:20px; border-top:1px solid var(--border); font-size:13.5px; color:var(--muted);}
+  .howto ol{margin:10px 0 0; padding-left:20px; line-height:1.8;}
   .howto b{color:var(--text);}
 
   .daily-card .seed-box{color:var(--gold);}
-  .daily-card .copy-btn{background:linear-gradient(135deg,var(--gold2),var(--gold)); color:#241800;}
 
-  #lb-table{width:100%; border-collapse:collapse; margin-top:16px; font-size:14px;}
-  #lb-table th{text-align:left; color:var(--muted); font-weight:700; font-size:12px;
-    text-transform:uppercase; letter-spacing:.5px; padding:8px 10px; border-bottom:1px solid var(--border);}
-  #lb-table td{padding:9px 10px; border-bottom:1px solid rgba(255,255,255,0.05);}
-  #lb-table tr:hover td{background:rgba(79,172,254,0.06);}
-  .rk{font-weight:800; width:36px;}
-  .rk.g{color:#FFD700;} .rk.s{color:#C0C0C0;} .rk.b{color:#cd7f32;}
-  .lb-status{font-size:13px; color:var(--muted); margin-top:14px; display:flex; align-items:center; gap:8px;}
-  .dot{width:8px; height:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 8px #22c55e;}
+  /* ---------- Leaderboard ---------- */
+  .head-flex{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:4px;}
+  #lb-table{width:100%; border-collapse:collapse; margin-top:14px; font-size:14px;}
+  #lb-table th{text-align:left; color:var(--muted-dim); font-weight:700; font-size:11.5px;
+    text-transform:uppercase; letter-spacing:.6px; padding:10px 12px; border-bottom:1px solid var(--border);}
+  #lb-table td{padding:11px 12px; border-bottom:1px solid rgba(255,255,255,0.04);}
+  #lb-table tbody tr{transition:background .15s;}
+  #lb-table tbody tr:hover{background:rgba(79,172,254,0.06);}
+  #lb-table tbody tr:last-child td{border-bottom:none;}
+  .rk{font-weight:800; width:36px; font-size:15px;}
+  .rk.g{color:#FFD700;} .rk.s{color:#C9D2E0;} .rk.b{color:#e0a667;}
+  .empty-row td{color:var(--muted); text-align:center; padding:30px; font-size:14px;}
+  .empty-msg{color:var(--muted); text-align:center; padding:30px; font-size:14px;}
+  .lb-status{font-size:12.5px; color:var(--muted-dim); margin-top:16px; display:flex; align-items:center; gap:8px;}
+  .dot{width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 8px #22c55e; flex-shrink:0;}
   .dot.off{background:#ef4444; box-shadow:0 0 8px #ef4444;}
-  .refresh-btn{
-    margin-left:auto; background:none; border:1px solid var(--border); color:var(--muted);
-    border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer;
+  .countdown{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--text);}
+
+  /* ---------- Community seeds ---------- */
+  .share-form{display:flex; gap:10px; flex-wrap:wrap; margin-top:18px;}
+  .share-form input{
+    flex:1; min-width:160px; background:#05060c; border:1px solid var(--border); border-radius:12px;
+    padding:13px 16px; color:var(--text); font-size:14px; font-family:'Inter',sans-serif;
   }
-  .refresh-btn:hover{color:var(--text); border-color:var(--accent);}
-  .head-flex{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;}
-  .countdown{font-family:monospace; font-weight:700; color:var(--text);}
-  footer{text-align:center; padding:40px 20px; color:var(--muted); font-size:12px; border-top:1px solid var(--border);}
+  .share-form input.mono{font-family:'JetBrains Mono',monospace;}
+  .share-form input:focus{outline:none; border-color:var(--border-strong); box-shadow:0 0 0 3px rgba(79,172,254,0.12);}
+  .cs-list{margin-top:22px; display:flex; flex-direction:column; gap:10px;}
+  .cs-entry{
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    background:rgba(255,255,255,0.025); border:1px solid var(--border); border-radius:14px; padding:14px 16px;
+  }
+  .cs-info{min-width:0;}
+  .cs-name{font-weight:700; font-size:14px; margin-bottom:3px;}
+  .cs-meta{font-size:12.5px; color:var(--muted-dim);}
+  .cs-meta .mono{color:var(--accent2);}
+  .cs-actions{display:flex; gap:8px; flex-shrink:0;}
+  .cs-actions .btn{padding:0 16px; height:36px; font-size:12.5px;}
+
+  /* ---------- Footer ---------- */
+  footer{text-align:center; padding:48px 24px 36px; color:var(--muted-dim); font-size:12.5px; border-top:1px solid var(--border);}
+  footer .fbrand{font-weight:800; color:var(--muted); letter-spacing:1px; margin-bottom:6px;}
+
+  /* ---------- Toast ---------- */
+  #toast-wrap{position:fixed; bottom:22px; right:22px; display:flex; flex-direction:column; gap:10px; z-index:100;}
+  .toast{
+    background:#11172a; border:1px solid var(--border-strong); color:var(--text);
+    padding:13px 18px; border-radius:12px; font-size:13.5px; font-weight:600;
+    box-shadow:0 12px 30px rgba(0,0,0,0.45); opacity:0; transform:translateY(10px);
+    transition:opacity .25s, transform .25s;
+  }
+  .toast.show{opacity:1; transform:translateY(0);}
+  .toast.error{border-color:rgba(239,68,68,0.5);}
+
+  @media (max-width:640px){
+    header{padding:14px 18px;}
+    nav{display:none;}
+    .hero{padding:64px 18px 40px;}
+    section{padding:46px 0;}
+    .card{padding:20px;}
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">VOXERIA</div>
+  <div class="brand">
+    <div class="brand-mark">🟪</div>
+    <div class="logo">VOXERIA</div>
+  </div>
   <nav>
     <a href="#about">Über das Spiel</a>
-    <a href="#weekly">Wöchentlicher Seed</a>
-    <a href="#daily">Tägliche Schatzsuche</a>
+    <a href="#weekly">Wochen-Seed</a>
+    <a href="#community">Community-Seeds</a>
+    <a href="#daily">Schatzsuche</a>
   </nav>
 </header>
 
 <div class="hero">
+  <div class="badge"><span class="pulse"></span> Live-Daten direkt aus dem Spiel</div>
   <h1>VOXERIA</h1>
   <p>Ein 2D-Sandbox-Survival-Abenteuer: Welten erkunden, abbauen, bauen und gemeinsam mit anderen Spielern überleben — voller Biome, Dimensionen und versteckter Schätze.</p>
+  <div class="hero-stats">
+    <div class="hstat"><div class="n">7+</div><div class="l">Biome &amp; Dimensionen</div></div>
+    <div class="hstat"><div class="n">1×</div><div class="l">Neuer Seed pro Woche</div></div>
+    <div class="hstat"><div class="n">24h</div><div class="l">Neue Schatzsuche</div></div>
+  </div>
 </div>
 
 <div class="wrap">
 
   <section id="about">
-    <h2>🎮 Über das Spiel</h2>
-    <p class="sub">Was dich in Voxeria erwartet.</p>
+    <div class="sec-head">
+      <p class="kicker">Das Spiel</p>
+      <h2>Was dich in Voxeria erwartet</h2>
+      <p class="sub">Eine handgemachte Pixel-Welt voller Geheimnisse — allein oder mit Freunden.</p>
+    </div>
     <div class="grid">
       <div class="feat"><div class="ic">🌍</div><h3>Vielfältige Biome</h3><p>Wald, Wüste, Schnee, Dschungel, Vulkan, Ozean und das mystische Void — jede Welt sieht anders aus.</p></div>
       <div class="feat"><div class="ic">⛏️</div><h3>Bauen &amp; Abbauen</h3><p>Blöcke abbauen, Ressourcen sammeln und eigene Bauwerke errichten.</p></div>
@@ -128,12 +242,15 @@
   </section>
 
   <section id="weekly">
-    <h2>🌱 Wöchentlicher Welt-Seed</h2>
-    <p class="sub">Jede Woche gibt es einen neuen, für alle gleichen Community-Seed — perfekt, um dieselbe Welt wie andere Spieler zu erleben.</p>
+    <div class="sec-head">
+      <p class="kicker">Welt-Seed der Woche</p>
+      <h2>🌱 Wöchentlicher Welt-Seed</h2>
+      <p class="sub">Jede Woche gibt es einen neuen, für alle gleichen Seed — perfekt, um dieselbe Welt wie alle anderen Spieler zu erleben.</p>
+    </div>
     <div class="card">
       <div class="seed-row">
-        <div class="seed-box" id="weekly-seed">WEEKLY-…</div>
-        <button class="copy-btn" id="weekly-copy-btn">📋 Kopieren</button>
+        <div class="seed-box mono" id="weekly-seed">WEEKLY-…</div>
+        <button class="btn btn-primary" id="weekly-copy-btn">📋 Kopieren</button>
       </div>
       <div class="meta-row">
         <span>Aktuelle Woche: <b id="weekly-label">—</b></span>
@@ -151,13 +268,45 @@
     </div>
   </section>
 
+  <section id="community">
+    <div class="sec-head">
+      <p class="kicker">Von Spielern für Spieler</p>
+      <h2>🌐 Community-Seeds</h2>
+      <p class="sub">Im Spiel kannst du über <b style="color:var(--text)">„🌱 Community Seeds“</b> deine eigene Welt mit einem Namen teilen. Alle geteilten Seeds erscheinen live hier — und umgekehrt: was du hier teilst, taucht sofort auch im Spiel auf.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 4px; font-size:16px;">📤 Eigenen Seed teilen</h3>
+      <p class="sub" style="font-size:13.5px;">Trage den Seed deiner aktuellen Welt und einen kurzen Namen ein.</p>
+      <div class="share-form">
+        <input type="text" id="cs-seed-input" class="mono" placeholder="Dein Seed, z.B. 1234567" maxlength="60">
+        <input type="text" id="cs-label-input" placeholder="Name deiner Welt" maxlength="40">
+        <button class="btn btn-violet" id="cs-share-btn">🌱 Seed teilen</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head-flex">
+        <h3 style="margin:0; font-size:16px;">Geteilte Welten</h3>
+        <button class="btn btn-ghost" id="cs-refresh-btn">⟳ Aktualisieren</button>
+      </div>
+      <div class="cs-list" id="cs-list">
+        <div class="empty-msg">Lade Community-Seeds…</div>
+      </div>
+      <div class="lb-status"><span class="dot off" id="cs-dot"></span><span id="cs-status-text">Verbinde…</span></div>
+    </div>
+  </section>
+
   <section id="daily">
-    <h2>📅 Tägliche Schatzsuche</h2>
-    <p class="sub">Jeden Tag versteckt sich ein neuer Schatz in der Welt. Im Spiel einfach auf den <b>📅 Daily</b>-Button klicken, oder den heutigen Seed unten von Hand kopieren.</p>
+    <div class="sec-head">
+      <p class="kicker">Tagesevent</p>
+      <h2>📅 Tägliche Schatzsuche</h2>
+      <p class="sub">Jeden Tag versteckt sich ein neuer Schatz in der Welt. Im Spiel einfach auf den <b style="color:var(--text)">📅 Daily</b>-Button klicken, oder den heutigen Seed unten von Hand kopieren.</p>
+    </div>
     <div class="card daily-card">
       <div class="seed-row">
-        <div class="seed-box" id="daily-seed">DAILY-…</div>
-        <button class="copy-btn" id="daily-copy-btn">📋 Kopieren</button>
+        <div class="seed-box mono" id="daily-seed">DAILY-…</div>
+        <button class="btn btn-gold" id="daily-copy-btn">📋 Kopieren</button>
       </div>
       <div class="meta-row">
         <span>Heute: <b id="daily-label">—</b></span>
@@ -165,15 +314,15 @@
       </div>
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card">
       <div class="head-flex">
-        <h2 style="margin:0;">🏆 Tagesrangliste</h2>
-        <button class="refresh-btn" id="lb-refresh-btn">⟳ Aktualisieren</button>
+        <h3 style="margin:0; font-size:16px;">🏆 Tagesrangliste</h3>
+        <button class="btn btn-ghost" id="lb-refresh-btn">⟳ Aktualisieren</button>
       </div>
       <table id="lb-table">
         <thead><tr><th>#</th><th>Name</th><th>Zeit</th></tr></thead>
         <tbody id="lb-body">
-          <tr><td colspan="3" style="color:var(--muted);text-align:center;padding:24px;">Lade Rangliste…</td></tr>
+          <tr class="empty-row"><td colspan="3">Lade Rangliste…</td></tr>
         </tbody>
       </table>
       <div class="lb-status"><span class="dot off" id="lb-dot"></span><span id="lb-status-text">Verbinde…</span></div>
@@ -183,10 +332,29 @@
 </div>
 
 <footer>
-  VOXERIA — Diese Seite zeigt nur öffentliche Spieldaten (Seeds &amp; Bestenliste). Keine Anmeldung, keine personenbezogenen Daten.
+  <div class="fbrand">VOXERIA</div>
+  Diese Seite zeigt nur öffentliche Spieldaten (Seeds, Community-Welten &amp; Bestenliste). Keine Anmeldung, keine personenbezogenen Daten.
 </footer>
 
+<div id="toast-wrap"></div>
+
 <script type="module">
+// ===========================================================
+// Toast-Benachrichtigungen
+// ===========================================================
+function toast(msg, isError) {
+  const wrap = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, 3200);
+}
+
 // ===========================================================
 // Gleicher Seed-/Datums-Algorithmus wie im Spiel, damit die
 // Seeds hier 1:1 mit dem in-game "Seed"-Feld kompatibel sind.
@@ -217,8 +385,7 @@ function nextMondayMidnight(d = new Date()) {
 }
 
 function nextMidnight(d = new Date()) {
-  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
-  return next;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
 }
 
 function fmtCountdown(ms) {
@@ -230,21 +397,34 @@ function fmtCountdown(ms) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function setupCopyButton(btnId, sourceId) {
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+}
+
+function setupCopyButton(btnId, sourceId, label) {
   const btn = document.getElementById(btnId);
   btn.addEventListener('click', async () => {
     const text = document.getElementById(sourceId).textContent;
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (e) {
-      const ta = document.createElement('textarea');
-      ta.value = text; document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); ta.remove();
-    }
+    const ok = await copyText(text);
+    if (!ok) { toast('Kopieren nicht möglich — bitte manuell markieren.', true); return; }
     btn.classList.add('copied');
-    const old = btn.textContent;
-    btn.textContent = '✅ Kopiert!';
-    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = old; }, 1600);
+    const old = btn.innerHTML;
+    btn.innerHTML = '✅ Kopiert!';
+    toast((label || 'Seed') + ' kopiert: ' + text);
+    setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = old; }, 1600);
   });
 }
 
@@ -265,8 +445,8 @@ function refreshSeedDisplays() {
   return dailySeed;
 }
 
-setupCopyButton('weekly-copy-btn', 'weekly-seed');
-setupCopyButton('daily-copy-btn', 'daily-seed');
+setupCopyButton('weekly-copy-btn', 'weekly-seed', 'Wochen-Seed');
+setupCopyButton('daily-copy-btn', 'daily-seed', 'Tages-Seed');
 
 let _lastDailySeed = refreshSeedDisplays();
 setInterval(() => {
@@ -278,8 +458,8 @@ setInterval(() => {
 }, 1000);
 
 // ===========================================================
-// Live-Bestenliste der täglichen Schatzsuche (selbe Firebase-
-// Datenbank wie das Spiel, nur lesend).
+// Firebase: gleiche Datenbank wie das Spiel (nur öffentliche
+// Collections: Daily-Leaderboard & Community-Seeds).
 // ===========================================================
 const firebaseConfig = {
   apiKey: "AIzaSyAZzGkkqTyRxbJDehI-gtsNjf6IcgAPZoY",
@@ -291,86 +471,179 @@ const firebaseConfig = {
 };
 const APP_ID = firebaseConfig.projectId;
 
-const lbDot = document.getElementById('lb-dot');
-const lbStatusText = document.getElementById('lb-status-text');
-const lbBody = document.getElementById('lb-body');
-
-function setStatus(online, text) {
-  lbDot.classList.toggle('off', !online);
-  lbStatusText.textContent = text;
-}
-
 function fmtTime(s) {
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 function escHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-let db = null;
-let getDocs, query, where, orderBy, limitQuery, collection;
+let db = null, userId = null;
+let getDocs, query, where, orderBy, limitQuery, collection, doc, setDoc, onSnapshot;
 
-async function initFirebaseReadOnly() {
+const lbDot = document.getElementById('lb-dot');
+const lbStatusText = document.getElementById('lb-status-text');
+const lbBody = document.getElementById('lb-body');
+const csDot = document.getElementById('cs-dot');
+const csStatusText = document.getElementById('cs-status-text');
+const csList = document.getElementById('cs-list');
+
+function setStatus(dotEl, textEl, online, text) {
+  dotEl.classList.toggle('off', !online);
+  textEl.textContent = text;
+}
+
+async function initFirebase() {
   try {
     const appMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
     const [authMod, storeMod] = await Promise.all([
       import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"),
       import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")
     ]);
-    ({ collection, getDocs, query, where, orderBy, limit: limitQuery } = storeMod);
+    ({ collection, doc, setDoc, onSnapshot, getDocs, query, where, orderBy, limit: limitQuery } = storeMod);
     const app = appMod.initializeApp(firebaseConfig);
     const auth = authMod.getAuth(app);
     db = storeMod.getFirestore(app);
-    await authMod.signInAnonymously(auth);
-    setStatus(true, 'Verbunden mit Voxeria-Datenbank');
+    const cred = await authMod.signInAnonymously(auth);
+    userId = cred?.user?.uid || null;
+    setStatus(lbDot, lbStatusText, true, 'Verbunden mit Voxeria-Datenbank');
+    setStatus(csDot, csStatusText, true, 'Verbunden mit Voxeria-Datenbank');
     return true;
   } catch (e) {
     console.error('Firebase init error:', e);
-    setStatus(false, 'Konnte nicht verbinden (evtl. Domain nicht freigegeben)');
+    const msg = 'Konnte nicht verbinden (Domain evtl. nicht in Firebase freigegeben)';
+    setStatus(lbDot, lbStatusText, false, msg);
+    setStatus(csDot, csStatusText, false, msg);
+    lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">Keine Verbindung zur Datenbank.</td></tr>';
+    csList.innerHTML = '<div class="empty-msg">Keine Verbindung zur Datenbank.</div>';
     return false;
   }
 }
 
+// ---------- Daily Leaderboard ----------
 async function loadLeaderboard() {
   if (!db) return;
-  lbBody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:24px;">Lade Rangliste…</td></tr>';
+  lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">Lade Rangliste…</td></tr>';
   const dateStr = getDailySeedString();
   try {
     const colRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'voxeria_daily_lb');
     const snap = await getDocs(query(colRef, where('date', '==', dateStr), orderBy('time', 'asc'), limitQuery(20)));
     if (snap.empty) {
-      lbBody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:24px;">Heute noch keine Einträge — sei der/die Erste! 🏆</td></tr>';
-      setStatus(true, 'Aktualisiert um ' + new Date().toLocaleTimeString());
+      lbBody.innerHTML = '<tr class="empty-row"><td colspan="3">Heute noch keine Einträge — sei der/die Erste! 🏆</td></tr>';
+      setStatus(lbDot, lbStatusText, true, 'Aktualisiert um ' + new Date().toLocaleTimeString());
       return;
     }
     const medals = ['🥇', '🥈', '🥉'];
-    let html = '';
-    let rank = 0;
+    let html = '', rank = 0;
     snap.forEach(d => {
       rank++;
       const r = d.data();
       const cls = rank === 1 ? 'g' : rank === 2 ? 's' : rank === 3 ? 'b' : '';
       const rkStr = rank <= 3 ? medals[rank - 1] : rank;
-      html += `<tr><td class="rk ${cls}">${rkStr}</td><td>${escHtml(r.name || 'Player')}</td><td>${fmtTime(r.time)}</td></tr>`;
+      html += `<tr><td class="rk ${cls}">${rkStr}</td><td>${escHtml(r.name || 'Player')}</td><td class="mono">${fmtTime(r.time)}</td></tr>`;
     });
     lbBody.innerHTML = html;
-    setStatus(true, 'Aktualisiert um ' + new Date().toLocaleTimeString());
+    setStatus(lbDot, lbStatusText, true, 'Aktualisiert um ' + new Date().toLocaleTimeString());
   } catch (e) {
     console.error('Leaderboard load error:', e);
-    lbBody.innerHTML = '<tr><td colspan="3" style="color:#ff6b6b;text-align:center;padding:24px;">Rangliste konnte nicht geladen werden.</td></tr>';
-    setStatus(false, 'Fehler beim Laden');
+    lbBody.innerHTML = '<tr class="empty-row"><td colspan="3" style="color:#ff8080;">Rangliste konnte nicht geladen werden.</td></tr>';
+    setStatus(lbDot, lbStatusText, false, 'Fehler beim Laden');
   }
 }
-
 document.getElementById('lb-refresh-btn').addEventListener('click', loadLeaderboard);
+setInterval(() => { if (db) loadLeaderboard(); }, 60000);
+
+// ---------- Community Seeds (live, gleiche Collection wie im Spiel) ----------
+let csUnsub = null;
+
+function renderCommunitySeeds(seeds) {
+  if (!seeds.length) {
+    csList.innerHTML = '<div class="empty-msg">Noch keine Community-Seeds — sei die/der Erste! 🌱</div>';
+    return;
+  }
+  csList.innerHTML = seeds.map(s => {
+    const date = s.ts ? new Date(s.ts).toLocaleDateString('de-DE') : '?';
+    const label = s.label || 'Unbenannte Welt';
+    const seed = String(s.seed ?? '');
+    return `<div class="cs-entry">
+      <div class="cs-info">
+        <div class="cs-name">${escHtml(label)}</div>
+        <div class="cs-meta">Seed: <span class="mono">${escHtml(seed)}</span> &nbsp;·&nbsp; ${date}</div>
+      </div>
+      <div class="cs-actions">
+        <button class="btn btn-primary cs-copy" data-seed="${escHtml(seed)}">📋 Kopieren</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function subscribeCommunitySeeds() {
+  if (!db) return;
+  if (csUnsub) csUnsub();
+  const ref = collection(db, 'artifacts', APP_ID, 'public', 'data', 'voxeria_community_seeds');
+  csUnsub = onSnapshot(ref, (snap) => {
+    const seeds = [];
+    snap.forEach(d => seeds.push({ id: d.id, ...d.data() }));
+    seeds.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    renderCommunitySeeds(seeds.slice(0, 30));
+    setStatus(csDot, csStatusText, true, seeds.length + ' geteilte Welten · live');
+  }, (err) => {
+    console.error('Community seeds snapshot error:', err);
+    setStatus(csDot, csStatusText, false, 'Fehler beim Laden');
+  });
+}
+
+csList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.cs-copy');
+  if (!btn) return;
+  const seed = btn.dataset.seed;
+  const ok = await copyText(seed);
+  if (ok) {
+    toast('Seed kopiert: ' + seed);
+    const old = btn.innerHTML;
+    btn.innerHTML = '✅ Kopiert!';
+    setTimeout(() => { btn.innerHTML = old; }, 1400);
+  } else {
+    toast('Kopieren nicht möglich.', true);
+  }
+});
+
+document.getElementById('cs-refresh-btn').addEventListener('click', subscribeCommunitySeeds);
+
+document.getElementById('cs-share-btn').addEventListener('click', async () => {
+  const seedInput = document.getElementById('cs-seed-input');
+  const labelInput = document.getElementById('cs-label-input');
+  const btn = document.getElementById('cs-share-btn');
+  const seed = seedInput.value.trim();
+  const label = (labelInput.value.trim() || 'Unbenannte Welt').slice(0, 40);
+  if (!seed) { toast('Bitte zuerst einen Seed eingeben.', true); seedInput.focus(); return; }
+  if (!db) { toast('Keine Verbindung zur Datenbank.', true); return; }
+  btn.disabled = true;
+  const oldText = btn.innerHTML;
+  btn.innerHTML = 'Teile…';
+  try {
+    const docId = (userId || 'anon') + '_' + Date.now();
+    await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'voxeria_community_seeds', docId), {
+      seed: seed.slice(0, 60), label, userId: userId || 'anon', ts: Date.now()
+    });
+    toast('🌱 Seed geteilt — er erscheint jetzt auch im Spiel!');
+    seedInput.value = ''; labelInput.value = '';
+  } catch (e) {
+    console.error('Share seed error:', e);
+    toast('Teilen fehlgeschlagen.', true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = oldText;
+  }
+});
 
 (async () => {
-  const ok = await initFirebaseReadOnly();
-  if (ok) await loadLeaderboard();
+  const ok = await initFirebase();
+  if (ok) {
+    await loadLeaderboard();
+    subscribeCommunitySeeds();
+  }
 })();
-
-// Rangliste zusätzlich alle 60s automatisch neu laden (z.B. neue Einträge anderer Spieler)
-setInterval(() => { if (db) loadLeaderboard(); }, 60000);
 </script>
 
 </body>
