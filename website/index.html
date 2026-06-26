@@ -58,6 +58,7 @@
     box-shadow:0 4px 14px rgba(123,47,247,0.35); transition:transform .15s, filter .15s;
   }
   .cg-link:hover{transform:translateY(-1px); filter:brightness(1.1);}
+  .atlas-link{background:linear-gradient(135deg,var(--gold2),var(--gold)); color:#241800 !important; box-shadow:0 4px 14px rgba(255,210,0,0.3);}
 
   .wrap{max-width:1040px; margin:0 auto; padding:0 24px;}
 
@@ -182,7 +183,7 @@
   /* ---------- Footer ---------- */
   footer{text-align:center; padding:48px 24px 36px; color:var(--muted-dim); font-size:12.5px; border-top:1px solid var(--border);}
   footer .fbrand{font-weight:800; color:var(--muted); letter-spacing:1px; margin-bottom:6px;}
-  footer .cg-link{margin-top:14px; display:inline-flex;}
+  footer .cg-link{display:inline-flex;}
 
   /* ---------- Toast ---------- */
   #toast-wrap{position:fixed; bottom:22px; right:22px; display:flex; flex-direction:column; gap:10px; z-index:100;}
@@ -290,6 +291,7 @@
       <a href="#community">Community Seeds</a>
       <a href="#daily">Treasure Hunt</a>
     </nav>
+    <a class="cg-link atlas-link" href="blocks.html">🧱 Block Atlas</a>
     <a class="cg-link" href="https://www.crazygames.com/" target="_blank" rel="noopener">🎮 Back to CrazyGames</a>
   </div>
 </header>
@@ -421,7 +423,10 @@
 <footer>
   <div class="fbrand">VOXERIA</div>
   This page only shows public game data (seeds, community worlds &amp; leaderboard). No login, no personal data.
-  <div><a class="cg-link" href="https://www.crazygames.com/" target="_blank" rel="noopener">🎮 Back to CrazyGames</a></div>
+  <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:14px;">
+    <a class="cg-link atlas-link" href="blocks.html">🧱 Block Atlas</a>
+    <a class="cg-link" href="https://www.crazygames.com/" target="_blank" rel="noopener">🎮 Back to CrazyGames</a>
+  </div>
 </footer>
 
 <div id="toast-wrap"></div>
