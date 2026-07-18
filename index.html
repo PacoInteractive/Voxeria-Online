@@ -195,6 +195,85 @@
       z-index: 300; width: 640px; max-height: 88vh; overflow: hidden;
       flex-direction: column;
     }
+
+#ach-btn {
+  background: linear-gradient(135deg, #1a2e1a, #162e16);
+  border: 1px solid rgba(80,255,120,0.6); color: #4ade80;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  box-shadow: 0 0 12px rgba(80,255,120,0.3); transition: all 0.2s;
+  font-weight: 700; font-size: 13px;
+}
+#ach-btn:hover { filter: brightness(1.2); transform: scale(1.05); box-shadow: 0 0 20px rgba(80,255,120,0.5); }
+#quest-btn {
+  background: linear-gradient(135deg, #2e2a00, #2e1e00);
+  border: 1px solid rgba(250,204,21,0.6); color: #facc15;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  box-shadow: 0 0 12px rgba(250,204,21,0.3); transition: all 0.2s;
+  font-weight: 700; font-size: 13px;
+}
+#quest-btn:hover { filter: brightness(1.2); transform: scale(1.05); box-shadow: 0 0 20px rgba(250,204,21,0.5); }
+#seed-book-btn {
+  background: linear-gradient(135deg, #0d2e1a, #0a2d28);
+  border: 1px solid rgba(0,255,150,0.6); color: #34d399;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  box-shadow: 0 0 12px rgba(0,255,150,0.3); transition: all 0.2s;
+  font-weight: 700; font-size: 13px;
+}
+#seed-book-btn:hover { filter: brightness(1.2); transform: scale(1.05); box-shadow: 0 0 20px rgba(0,255,150,0.5); }
+#seed-book-modal {
+  display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: rgba(10,20,15,0.97); backdrop-filter: blur(20px);
+  border: 2px solid rgba(0,255,150,0.3); padding: 0; border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 40px rgba(0,255,150,0.1);
+  z-index: 300; width: 580px; max-height: 88vh; overflow: hidden; flex-direction: column;
+}
+#seed-book-modal.open { display: flex; }
+#sb-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 24px; border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(135deg, rgba(0,200,100,0.12), rgba(0,80,50,0.2)); flex-shrink: 0;
+}
+#sb-header h2 { font-size: 20px; color: #6ee7b7; letter-spacing: 1px; }
+#sb-close {
+  background: rgba(255,50,50,0.15); color: #ff6b6b; border: 1px solid rgba(255,50,50,0.4);
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+#sb-close:hover { background: #ff5555; color: white; }
+#sb-share-bar {
+  display: flex; gap: 8px; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.3); flex-shrink: 0; align-items: center; flex-wrap: wrap;
+}
+#sb-label-input {
+  flex: 1; min-width: 140px; background: rgba(0,0,0,0.5); border: 1px solid rgba(0,255,150,0.4);
+  color: white; padding: 7px 12px; border-radius: 6px; font-size: 13px; outline: none;
+}
+#sb-share-btn {
+  background: linear-gradient(135deg, #059669, #047857); border: none; color: white;
+  padding: 7px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap;
+}
+#sb-share-btn:hover { filter: brightness(1.15); }
+#sb-seed-display {
+  font-family: monospace; font-size: 12px; color: #6ee7b7;
+  background: rgba(0,0,0,0.4); padding: 7px 12px; border-radius: 6px; border: 1px solid rgba(0,255,150,0.2); min-width: 100px;
+}
+#sb-list { flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 10px; }
+#sb-list::-webkit-scrollbar { width: 6px; }
+#sb-list::-webkit-scrollbar-thumb { background: #059669; border-radius: 3px; }
+.sb-entry {
+  background: rgba(0,0,0,0.4); border: 1px solid rgba(0,255,150,0.15); border-radius: 10px;
+  padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.sb-entry:hover { border-color: rgba(0,255,150,0.4); }
+.sb-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.sb-name { font-size: 14px; font-weight: bold; color: #d1fae5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-meta { font-size: 11px; color: #6b7280; font-family: monospace; }
+.sb-load-btn {
+  background: linear-gradient(135deg, #1d4ed8, #1e3a8a); border: none; color: white;
+  padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; white-space: nowrap; flex-shrink: 0;
+}
+.sb-load-btn:hover { filter: brightness(1.2); transform: scale(1.05); }
+#sb-empty { text-align: center; color: #6b7280; font-size: 14px; padding: 30px; }
     #portal-book-modal.open { display: flex; }
     #pb-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -275,6 +354,45 @@
     }
     #treasure-found-overlay.active { background: rgba(255,215,0,0.08); }
 
+    #daily-timer{font-size:13px;font-weight:800;font-family:monospace;color:#ffd200;letter-spacing:1px;padding-left:10px;border-left:1px solid rgba(255,200,0,.3);}
+    #daily-lb-btn{background:linear-gradient(135deg,#1a1a00,#2a2200);border:1px solid rgba(255,200,0,.6);color:#ffd200;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;display:none;}
+    #dv-modal{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:500;width:480px;max-width:95%;}#dv-modal.open{display:flex;justify-content:center;}
+    #dv-box{background:radial-gradient(circle at 50% 0%,rgba(255,210,0,.13),rgba(8,6,18,.98));border:2px solid rgba(255,210,0,.55);border-radius:20px;padding:28px 26px;width:100%;display:flex;flex-direction:column;gap:13px;backdrop-filter:blur(20px);text-align:center;}
+    #dv-trophy{font-size:46px;}#dv-title{font-size:19px;font-weight:900;color:#ffd200;}#dv-big-time{font-size:52px;font-weight:900;font-family:monospace;color:#fff;letter-spacing:3px;}
+    #dv-sub{font-size:11px;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:2.5px;}
+    #dv-badge{display:inline-block;background:linear-gradient(135deg,#ffd200,#ff9500);color:#1a1000;font-weight:900;font-size:13px;padding:5px 20px;border-radius:20px;align-self:center;}
+    #dv-name-row{display:flex;gap:8px;}#dv-name-input{flex:1;background:rgba(0,0,0,.5);border:1px solid rgba(255,200,0,.4);color:#fff;padding:8px 12px;border-radius:7px;font-size:14px;outline:none;}
+    #dv-name-submit{background:linear-gradient(135deg,#ffd200,#ff9500);border:none;color:#1a1000;padding:9px 16px;border-radius:7px;cursor:pointer;font-weight:900;font-size:13px;}
+    #dv-lb-box{background:rgba(0,0,0,.42);border:1px solid rgba(255,200,0,.14);border-radius:12px;padding:13px 15px;text-align:left;}
+    .dv-lb-hdr{font-size:10px;color:rgba(255,200,0,.55);text-transform:uppercase;letter-spacing:2px;margin-bottom:9px;font-weight:700;}
+    .dv-row{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;}
+    .dv-rk{font-weight:900;color:rgba(255,255,255,.35);width:26px;font-size:12px;}.dv-rk.gold{color:#ffd200;font-size:16px;}.dv-rk.silver{color:#c0c0c0;font-size:15px;}.dv-rk.bronze{color:#cd7f32;font-size:15px;}
+    .dv-nm{flex:1;color:#ddd;font-weight:600;padding:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.dv-nm.me{color:#ffd200;}
+    .dv-tm{font-family:monospace;font-weight:800;color:#4facfe;}.dv-tm.me{color:#ffd200;}
+    #dv-btns{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;}
+    .dvb-share{background:linear-gradient(135deg,#25d366,#128c7e);border:none;color:#fff;padding:11px 18px;border-radius:9px;cursor:pointer;font-weight:800;font-size:14px;flex:1;min-width:120px;}
+    .dvb-lb{background:linear-gradient(135deg,#4facfe,#00f2fe);border:none;color:#001a2e;padding:11px 18px;border-radius:9px;cursor:pointer;font-weight:800;font-size:14px;flex:1;min-width:120px;}
+    .dvb-close{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:rgba(255,255,255,.55);padding:9px 18px;border-radius:9px;cursor:pointer;font-size:13px;width:100%;}
+    #dlb-modal{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(8,6,18,.97);backdrop-filter:blur(20px);border:2px solid rgba(255,200,0,.32);border-radius:16px;z-index:450;width:400px;max-width:95%;flex-direction:column;max-height:84vh;overflow:hidden;}#dlb-modal.open{display:flex;}
+    #dlb-hdr{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;}
+    #dlb-hdr h2{font-size:16px;color:#ffd200;font-weight:900;}#dlb-hdr-date{font-size:10px;color:rgba(255,255,255,.36);margin-top:2px;letter-spacing:1px;}
+    #dlb-x{background:rgba(255,50,50,.15);color:#ff6b6b;border:1px solid rgba(255,50,50,.4);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;}
+    #dlb-list{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:5px;}
+    .dlb-row{display:flex;align-items:center;padding:8px 11px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font-size:13px;gap:7px;}
+    .dlb-row.me{background:rgba(255,210,0,.07);border-color:rgba(255,210,0,.24);}.dlb-row.top1{background:rgba(255,210,0,.1);border-color:rgba(255,210,0,.33);}
+    .dlbr-rk{font-weight:900;width:26px;color:rgba(255,255,255,.35);text-align:center;font-size:12px;}.dlbr-rk.gold{color:#ffd200;font-size:16px;}.dlbr-rk.silver{color:#c0c0c0;font-size:15px;}.dlbr-rk.bronze{color:#cd7f32;font-size:15px;}
+    .dlbr-nm{flex:1;color:#ddd;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.dlbr-nm.me{color:#ffd200;}
+    .dlbr-tm{font-family:monospace;font-weight:800;color:#4facfe;font-size:14px;}.dlbr-tm.me{color:#ffd200;}
+    #dlb-play{margin:0 16px 16px;background:linear-gradient(135deg,#f7971e,#ffd200);border:none;color:#1a1000;padding:11px;border-radius:8px;cursor:pointer;font-weight:900;font-size:14px;flex-shrink:0;}
+    #chat-wrap{position:absolute;bottom:14px;left:14px;z-index:300;width:300px;max-width:calc(100vw - 28px);display:flex;flex-direction:column;pointer-events:none;}
+    #chat-messages{pointer-events:auto;background:rgba(5,4,15,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.09);border-bottom:none;border-radius:12px 12px 0 0;padding:10px 10px 8px;display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto;scrollbar-width:thin;}
+    .chat-msg{font-size:12px;line-height:1.4;word-break:break-word;animation:chatIn .18s ease;}
+    .chat-msg .chat-who{font-weight:800;margin-right:4px;}.chat-msg .chat-txt{color:rgba(255,255,255,.82);}
+    .chat-msg.me .chat-who{color:#ffd200;}.chat-msg.other .chat-who{color:#4facfe;}.chat-msg.sys{color:rgba(255,255,255,.32);font-style:italic;font-size:11px;}
+    @keyframes chatIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+    #chat-input-row{pointer-events:auto;display:flex;background:rgba(5,4,15,.88);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.13);border-radius:0 0 12px 12px;overflow:hidden;}
+    #chat-input{flex:1;background:transparent;border:none;color:#fff;font-size:13px;padding:8px 10px;outline:none;}#chat-input::placeholder{color:rgba(255,255,255,.28);}
+    #chat-send{background:rgba(79,172,254,.18);border:none;border-left:1px solid rgba(255,255,255,.1);color:#4facfe;padding:8px 13px;cursor:pointer;font-size:13px;font-weight:700;}
     /* ── Video Intro Overlay ─────────────────────────────────────── */
     #intro-overlay {
       position: fixed;
@@ -297,6 +415,7 @@
     }
     /* ─────────────────────────────────────────────────────────────── */
 </style>
+  <script src="https://sdk.crazygames.com/crazygames-sdk-v1.js" async></script>
 </head>
 <body>
 <div id="intro-overlay">
@@ -325,9 +444,29 @@
       <div id="mp-status">Waiting for multiplayer...</div>
       <div id="shop-btn" onclick="toggleShop()">🛒 Upgrades</div>
       <div id="portal-book-btn" onclick="togglePortalBook()">📖 Portal Book</div>
+      <div id="ach-btn" onclick="buildAchievementPanel()">🏆 Achievements</div>
+      <div id="quest-btn" onclick="buildQuestPanel()">📜 Quests</div>
+      <div id="seed-book-btn" onclick="toggleSeedBook()">🌱 Community Seeds</div>
+      <div id="daily-lb-btn" onclick="toggleDailyLB()">🏆 Daily Ranking</div>
     </div>
+
     
-    <div id="canvas-wrapper">
+<div id="seed-book-modal">
+  <div id="sb-header">
+    <h2>🌱 Community Seeds</h2>
+    <button id="sb-close" onclick="toggleSeedBook()">✕</button>
+  </div>
+  <div id="sb-share-bar">
+    <div id="sb-seed-display">Seed: —</div>
+    <input type="text" id="sb-label-input" placeholder="Give this world a name (optional)" maxlength="40" autocomplete="off">
+    <button id="sb-share-btn" onclick="shareSeed()">📤 Share Seed</button>
+  </div>
+  <div id="sb-list">
+    <div id="sb-empty">Loading community seeds…</div>
+  </div>
+</div>
+
+      <div id="canvas-wrapper">
       <button id="fullscreen-btn" onclick="toggleFullscreenMode()" aria-label="Toggle fullscreen">⛶</button>
       <div id="dynamite-timer-box">
         <canvas id="dyn-icon" width="32" height="32"></canvas>
@@ -343,6 +482,7 @@
           <div id="radar-label">Daily Treasure</div>
           <div id="radar-text">— m</div>
         </div>
+        <div id="daily-timer">0:00</div>
       </div>
       <div id="treasure-found-overlay"></div>
       <div id="shop-modal">
@@ -446,13 +586,18 @@ window.firebaseReady = import("https://www.gstatic.com/firebasejs/11.6.1/firebas
     collection: storeMod.collection,
     doc: storeMod.doc,
     setDoc: storeMod.setDoc,
-    onSnapshot: storeMod.onSnapshot
+    onSnapshot: storeMod.onSnapshot,
+    getDocs: storeMod.getDocs,
+    query: storeMod.query,
+    where: storeMod.where,
+    orderBy: storeMod.orderBy,
+    limitQuery: storeMod.limit
   }));
 
 // =========================================================
 // FIREBASE MULTIPLAYER
 // =========================================================
-let initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, doc, setDoc, onSnapshot;
+let initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, doc, setDoc, onSnapshot, getDocs, query, where, orderBy, limitQuery;
 let db, auth, userId, appId;
 let isMultiplayerActive = false;
 let otherPlayers = {};
@@ -460,7 +605,7 @@ let isApplyingRemoteSeed = false;
 
 async function initFirebase() {
     try {
-        ({ initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, doc, setDoc, onSnapshot } = await window.firebaseReady);
+        ({ initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, doc, setDoc, onSnapshot, getDocs, query, where, orderBy, limitQuery } = await window.firebaseReady);
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         appId = typeof __app_id !== 'undefined' ? __app_id : 'voxeria-multiplayer-app';
         if (!firebaseConfig) { document.getElementById('mp-status').innerText = "Offline (Local)"; return; }
@@ -643,6 +788,7 @@ function restartBgMusicFromSeed() {
 function initAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
+  window._vAudio = audioCtx;
   loadBgMusic();
 }
 
@@ -982,6 +1128,9 @@ function resetGameAndWorld() {
   animals.length = 0;
   piranhas.length = 0;
   damageCooldown = 0;
+  lavaDamageTimer = 0;
+  voidGravityScale = 1.0;
+  damageFlashTimer = 0; comboCount = 0; comboTimer = 0; healFlashTimer = 0;
   animalSpawnTick = 0;
   rainDrops.length = 0; snowFlakes.length = 0; itemDrops.length = 0; waterfallParticles.length = 0;
   weather = { type: 'clear', intensity: 0, targetIntensity: 0, timer: 0, nextChange: 600, lightning: 0, thunderTimer: 0, overlay: 0 };
@@ -1006,6 +1155,8 @@ function resetGameAndWorld() {
 
   const spawnX = findSafeSpawnX();
   const newSy = getSurfaceYAt(spawnX, "OVERWORLD");
+  initialSpawnX = spawnX;
+  spawnY = newSy;
   player.x = spawnX * TILE;
   player.y = (newSy - 2) * TILE;
   camX = player.x - (COLS >> 1) * TILE;
@@ -1480,6 +1631,127 @@ function getChunk(cx, targetDim = currentDim) {
     }
   }
 
+
+  // ══════════════════════════════════════════════════════════
+  // CAVE SYSTEM — Worm Carving (OVERWORLD only)
+  // ══════════════════════════════════════════════════════════
+  const midSY = surfaceY[Math.floor(CHUNK_W / 2)];
+
+  // 2–3 cave worms per chunk
+  const numWorms = 2 + (seededRandom('cave-count', cx) > 0.65 ? 1 : 0);
+  for (let w = 0; w < numWorms; w++) {
+    const startLX = seededInt(0, CHUNK_W - 1, 'cave-wx', cx, w);
+    let cwx = cx * CHUNK_W + startLX;
+    let cwy = midSY + 12 + seededInt(0, 30, 'cave-wy', cx, w);
+    if (cwy >= WORLD_H - 8) continue;
+
+    let angle = seededRandom('cave-angle', cx, w) * Math.PI * 2;
+    const wormLen = 30 + seededInt(0, 40, 'cave-len', cx, w);
+    const baseRadius = 2.2 + seededRandom('cave-base-r', cx, w) * 1.8;
+
+    for (let step = 0; step < wormLen; step++) {
+      angle += (seededRandom('cave-turn', cx, w, step) - 0.5) * 0.7;
+      const r = baseRadius + Math.sin(step * 0.4) * 0.8;
+      const ry = r * 0.65;
+
+      for (let dx2 = -Math.ceil(r); dx2 <= Math.ceil(r); dx2++) {
+        for (let dy2 = -Math.ceil(ry); dy2 <= Math.ceil(ry); dy2++) {
+          if ((dx2 * dx2) / (r * r) + (dy2 * dy2) / (ry * ry) <= 1) {
+            const bx = Math.floor(cwx + dx2);
+            const by = Math.floor(cwy + dy2);
+            const localX = bx - cx * CHUNK_W;
+            const minDepth = (localX >= 0 && localX < CHUNK_W) ? surfaceY[localX] + 5 : midSY + 5;
+            if (by >= minDepth && by < WORLD_H - 3) {
+              localSetBlock(bx, by, BLOCKS.AIR);
+            }
+          }
+        }
+      }
+      cwx += Math.cos(angle) * 1.6;
+      cwy += Math.sin(angle) * 0.45;
+      cwy = Math.max(midSY + 8, Math.min(WORLD_H - 10, cwy));
+    }
+
+    // ── Chamber at worm endpoint (50% chance) ──
+    if (seededRandom('cave-chamber', cx, w) > 0.5) {
+      const chR  = 5 + seededInt(0, 5, 'ch-r', cx, w);
+      const chRY = Math.floor(chR * 0.65);
+      const chX  = Math.floor(cwx);
+      const chY  = Math.floor(cwy);
+
+      for (let dx2 = -chR; dx2 <= chR; dx2++) {
+        for (let dy2 = -chRY; dy2 <= chRY; dy2++) {
+          if ((dx2*dx2)/(chR*chR) + (dy2*dy2)/(chRY*chRY) <= 1) {
+            const bx = chX + dx2, by = chY + dy2;
+            const localX = bx - cx * CHUNK_W;
+            const minD = (localX >= 0 && localX < CHUNK_W) ? surfaceY[localX] + 5 : midSY + 5;
+            if (by >= minD && by < WORLD_H - 3) localSetBlock(bx, by, BLOCKS.AIR);
+          }
+        }
+      }
+
+      // Stalactites (from ceiling)
+      for (let dx2 = -chR + 1; dx2 < chR; dx2++) {
+        if (seededRandom('stal-t', cx, w, dx2 + 50) < 0.45) {
+          const bx = chX + dx2;
+          const topY = chY - chRY + 1;
+          const len = 1 + seededInt(0, 4, 'stal-tl', cx, w, dx2);
+          for (let s = 0; s < len; s++) {
+            const by = topY + s;
+            if (getBlock(bx, by - 1) !== BLOCKS.AIR) localSetBlock(bx, by, BLOCKS.STONE);
+          }
+        }
+      }
+      // Stalagmites (from floor)
+      for (let dx2 = -chR + 1; dx2 < chR; dx2++) {
+        if (seededRandom('stal-b', cx, w, dx2 + 100) < 0.45) {
+          const bx = chX + dx2;
+          const botY = chY + chRY - 1;
+          const len = 1 + seededInt(0, 4, 'stal-bl', cx, w, dx2);
+          for (let s = 0; s < len; s++) {
+            const by = botY - s;
+            if (getBlock(bx, by + 1) !== BLOCKS.AIR) localSetBlock(bx, by, BLOCKS.STONE);
+          }
+        }
+      }
+
+      // Underground pool (water shallow / lava deep)
+      const caveDepth = chY - midSY;
+      if (seededRandom('cave-pool', cx, w) < 0.5) {
+        const poolBlock = caveDepth > 45 ? BLOCKS.LAVA : BLOCKS.WATER;
+        const poolW = Math.floor(chR * 0.55);
+        for (let dx2 = -poolW; dx2 <= poolW; dx2++) {
+          const bx = chX + dx2;
+          const botY = chY + chRY - 1;
+          if (getBlock(bx, botY + 1) !== BLOCKS.AIR) localSetBlock(bx, botY, poolBlock);
+        }
+      }
+
+      // Torch in some chambers
+      if (seededRandom('cave-torch', cx, w) < 0.35) {
+        const bx = chX;
+        const botY = chY + chRY - 1;
+        if (getBlock(bx, botY + 1) !== BLOCKS.AIR && getBlock(bx, botY) === BLOCKS.AIR) {
+          localSetBlock(bx, botY, BLOCKS.TORCH);
+        }
+      }
+
+      // Ore veins on chamber walls (reward exploration)
+      if (caveDepth > 20) {
+        for (let dx2 = -chR + 1; dx2 < chR; dx2++) {
+          if (seededRandom('ch-ore', cx, w, dx2) < 0.12) {
+            const bx = chX + dx2;
+            const veinY = chY + seededInt(-chRY + 1, chRY - 1, 'ch-vy', cx, w, dx2);
+            const oreBlock = caveDepth > 40 ? BLOCKS.DIAMOND_ORE
+                           : caveDepth > 25 ? BLOCKS.GOLD_ORE
+                           : BLOCKS.IRON_ORE;
+            if (getBlock(bx, veinY) === BLOCKS.STONE) localSetBlock(bx, veinY, oreBlock);
+          }
+        }
+      }
+    }
+  }
+
   // ── VOLCANO STRUCTURES: Lava Shrine ──
   if (biome === "VOLCANO" && cx !== 0 && seededRandom('volcano-shrine', cx) < 0.18) {
     const sX = seededInt(4, CHUNK_W - 10, 'vs-x', cx);
@@ -1706,11 +1978,11 @@ function activatePortal(cx2, cy2, targetDim, msg) {
   showNotification(msg); playSound('portal'); screenShake = 15;
 }
 
-const initialSpawnX = findSafeSpawnX();
-const startY = getSurfaceYAt(initialSpawnX, "OVERWORLD");
+let initialSpawnX = findSafeSpawnX();
+let spawnY = getSurfaceYAt(initialSpawnX, "OVERWORLD");
 
 const player = {
-  x: initialSpawnX * TILE, y: (startY - 2) * TILE,
+  x: initialSpawnX * TILE, y: (spawnY - 2) * TILE,
   vx: 0, vy: 0, w: TILE * 0.8, h: TILE * 1.8, onGround: false, health: 20,
   scaleX: 1.0, scaleY: 1.0, tilt: 0,
   color: `hsl(${Math.floor(Math.random() * 360)}, 100%, 70%)`
@@ -1726,6 +1998,10 @@ let inventory = [{ block: BLOCKS.DIRT, count: 10 }];
 let selectedSlot = 0;
 const keys = {};
 let frameCount = 0;
+let damageFlashTimer = 0;      // white/red flash on hit
+let comboCount = 0;            // consecutive block breaks
+let comboTimer = 0;            // cooldown before combo resets
+let healFlashTimer = 0;        // green flash on heal
 let notifTimeout;
 let mouseScreenX = -100;
 let mouseScreenY = -100;
@@ -1760,8 +2036,30 @@ function showNotification(text) {
   notifTimeout = setTimeout(() => notif.classList.remove('show'), 2500);
 }
 
+// Several overlays (shop, seed book, daily leaderboard, achievements, quests)
+// can be opened independently and have mismatched z-indexes, so opening one
+// while another is already open could leave the new one hidden behind it.
+// Always close the others first so only one panel is ever visible at a time.
+function closeAllPanels(except) {
+  if (except !== 'shop') document.getElementById('shop-modal')?.classList.remove('open');
+  if (except !== 'seedbook') {
+    const sb = document.getElementById('seed-book-modal');
+    if (sb && sb.classList.contains('open')) {
+      sb.classList.remove('open');
+      seedBookOpen = false;
+      if (sbUnsubscribe) { sbUnsubscribe(); sbUnsubscribe = null; }
+    }
+  }
+  if (except !== 'dlb') document.getElementById('dlb-modal')?.classList.remove('open');
+  if (except !== 'dv') document.getElementById('dv-modal')?.classList.remove('open');
+  if (except !== 'ach') document.getElementById('ach-panel')?.remove();
+  if (except !== 'quest') document.getElementById('quest-panel')?.remove();
+}
+
 function toggleShop() {
-  document.getElementById('shop-modal').classList.toggle('open');
+  const modal = document.getElementById('shop-modal');
+  if (!modal.classList.contains('open')) closeAllPanels('shop');
+  modal.classList.toggle('open');
   updateShopButtons();
 }
 
@@ -1798,7 +2096,7 @@ function buyUpgrade(type, costBlock, costAmount) {
   else if (type === 'pickaxe')    { hasSuperPickaxe = true; showNotification("⛏️ Upgrade: Iron Pickaxe (3x3 Mining)!"); }
   else if (type === 'doublejump') { maxJumps = 2; showNotification("🚀 Upgrade: Double Jump!"); }
   else if (type === 'triple')     { yieldMultiplier = Math.max(yieldMultiplier, 3); showNotification("💎 Upgrade: Triple Drops!"); }
-  else if (type === 'heal')       { player.health = 20; drawHealth(); showNotification("💖 Fully healed!"); }
+  else if (type === 'heal')       { player.health = 20; drawHealth(); showNotification("💖 Fully healed!"); healFlashTimer = 18; }
   drawHotbar(); updateShopButtons();
 }
 
@@ -1897,6 +2195,11 @@ function updatePlayer(dt) {
   }
   if (player.onGround && Math.abs(player.vx) > 0.5 && Math.random() < 0.15) spawnDust(player.x + player.w/2, player.y + player.h);
   if (player.y > WORLD_H * TILE) { player.y = -100; player.vy = 0; }
+  // Combo decay
+  if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) comboCount = 0; }
+  // Flash timers
+  if (damageFlashTimer > 0) damageFlashTimer -= dt;
+  if (healFlashTimer > 0) healFlashTimer -= dt;
 
   const tcamX = player.x - (COLS >> 1) * TILE;
   const tcamY = player.y - (ROWS >> 1) * TILE;
@@ -2000,7 +2303,7 @@ function drawBlock(x, y, btype) {
 
   if (btype === BLOCKS.FLOWER) {
     const sway = Math.sin(frameCount*0.08 + x*0.7) * 1.5;
-    ctx.fillStyle = '#22aa22'; ctx.fillRect(sx+9+sway*0.3, sy+8, 2, 12);
+    ctx.fillStyle = '#22aa22'; ctx.fillRect(sx+9+sway*0.3, sy+8, 2, TILE-8);
     ctx.fillStyle = '#ff3333'; ctx.fillRect(sx+6+sway, sy+4, 8, 6);
     ctx.fillStyle = '#ff88aa'; ctx.fillRect(sx+4+sway, sy+6, 4, 4);
     ctx.fillStyle = '#ffff55'; ctx.fillRect(sx+8+sway, sy+5, 4, 4);
@@ -2053,6 +2356,12 @@ function drawBlock(x, y, btype) {
   ctx.fillStyle = colors[1]; ctx.fillRect(sx, sy, 3, TILE);
 
   if (btype === BLOCKS.GRASS) { ctx.fillStyle = colors[2]; ctx.fillRect(sx, sy, TILE, 5); }
+  if (btype === BLOCKS.LEAVES) {
+    const leafSway = Math.sin(frameCount*0.04 + x*0.5)*1.5;
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.fillRect(sx+leafSway, sy, TILE, 4);
+    ctx.fillRect(sx-leafSway, sy+TILE-4, TILE, 4);
+  }
   if (btype === BLOCKS.CACTUS) {
     ctx.fillStyle = '#0a290a';
     ctx.fillRect(sx+2, sy+4, 2, 2); ctx.fillRect(sx+16, sy+12, 2, 2);
@@ -2065,10 +2374,28 @@ function drawBlock(x, y, btype) {
     } else ctx.fillStyle = colors[3];
     ctx.fillRect(sx+4, sy+4, 4, 4); ctx.fillRect(sx+11, sy+9, 4, 4); ctx.fillRect(sx+4, sy+11, 4, 4);
   }
+  if ([BLOCKS.DIAMOND_ORE, BLOCKS.RAINBOW_ORE, BLOCKS.VOID_ORE, BLOCKS.ETHER_CRYSTAL, BLOCKS.EMBER_ORE].includes(btype)) {
+    const shimmerPhase = Math.sin(frameCount*0.12 + x*0.5 + y*0.7);
+    if (shimmerPhase > 0.6) {
+      const shimCol = btype===BLOCKS.RAINBOW_ORE ? `hsl(${(frameCount*6+x*20)%360},100%,80%)` :
+                      btype===BLOCKS.DIAMOND_ORE ? 'rgba(150,240,255,0.6)' :
+                      btype===BLOCKS.VOID_ORE ? 'rgba(180,100,255,0.6)' :
+                      btype===BLOCKS.ETHER_CRYSTAL ? 'rgba(80,255,220,0.6)' : 'rgba(255,120,30,0.6)';
+      ctx.fillStyle = shimCol;
+      ctx.fillRect(sx+4+Math.floor(shimmerPhase*3), sy+4, 4, 4);
+      ctx.fillRect(sx+14, sy+12+Math.floor(shimmerPhase*2), 4, 4);
+    }
+  }
   if (btype === BLOCKS.TORCH) {
+    const flicker = Math.sin(frameCount*0.35+x*1.3)*1.2;
     ctx.fillStyle = '#8B6914'; ctx.fillRect(sx+8, sy+4, 4, 12);
-    ctx.fillStyle = '#ff9900'; ctx.fillRect(sx+7, sy+1, 6, 5);
-    ctx.fillStyle = '#ffff00'; ctx.fillRect(sx+9, sy+2, 2, 3);
+    ctx.fillStyle = '#ff9900'; ctx.fillRect(sx+7+flicker*0.3, sy+1+flicker*0.2, 6, 5);
+    ctx.fillStyle = '#ffff00'; ctx.fillRect(sx+9+flicker*0.5, sy+2, 2, 3);
+    // Glow halo around torch
+    const tg=ctx.createRadialGradient(sx+10,sy+3,1,sx+10,sy+3,14+flicker);
+    tg.addColorStop(0,`rgba(255,180,0,${0.18+flicker*0.03})`);
+    tg.addColorStop(1,'rgba(255,180,0,0)');
+    ctx.fillStyle=tg; ctx.fillRect(sx-4,sy-10,TILE+8,TILE+12);
   }
   if (btype === BLOCKS.WATER) {
     let depth = 0;
@@ -2308,7 +2635,7 @@ function drawBlock(x, y, btype) {
     const below = getBlock(x, y + 1); if (below !== BLOCKS.AIR) drawBlock(x, y + 1, below);
     const cfHue = (frameCount*3+x*30+y*30)%360;
     // Stem
-    ctx.fillStyle='#5a3a8a'; ctx.fillRect(sx+9,sy+10,2,10);
+    ctx.fillStyle='#5a3a8a'; ctx.fillRect(sx+9,sy+10,2,TILE-10);
     // Crystal petals
     for (let p = 0; p < 5; p++) {
       const angle = (p/5)*Math.PI*2 + frameCount*0.02;
@@ -2772,7 +3099,10 @@ function drawPlayer() {
   ctx.scale(player.scaleX, player.scaleY);
   player.tilt += (player.vx*0.04 - player.tilt)*0.2;
   ctx.rotate(player.tilt);
-  const drawX=-player.w/2, drawY=-player.h;
+  // Idle bob
+  const idleSpeed = Math.abs(player.vx) < 0.3 && player.onGround ? 1 : 0;
+  const bobY = idleSpeed ? Math.sin(frameCount*0.07)*1.5 : 0;
+  const drawX=-player.w/2, drawY=-player.h + bobY;
   ctx.fillStyle=player.color; ctx.fillRect(drawX,drawY,player.w,player.h*0.45);
   ctx.fillStyle='#4477cc'; ctx.fillRect(drawX,drawY+player.h*0.45,player.w,player.h*0.55);
   ctx.fillStyle='#1e3799'; ctx.fillRect(drawX,drawY,player.w,4);
@@ -2850,6 +3180,14 @@ function drawHover() {
   const inRange=isInRange(wx,wy);
   const pulse=Math.sin(frameCount*0.15)*0.1+0.2;
   const boxScale=Math.sin(frameCount*0.15)*1.5;
+  // Outer glow
+  if (inRange) {
+    const glowSize = 4 + Math.sin(frameCount*0.12)*2;
+    const g = ctx.createRadialGradient(sx+TILE/2,sy+TILE/2,TILE*0.2,sx+TILE/2,sy+TILE/2,TILE*0.9+glowSize);
+    g.addColorStop(0,'rgba(255,255,255,0)');
+    g.addColorStop(1,`rgba(255,255,255,${pulse*0.5})`);
+    ctx.fillStyle=g; ctx.fillRect(sx-glowSize,sy-glowSize,TILE+glowSize*2,TILE+glowSize*2);
+  }
   ctx.fillStyle=inRange?`rgba(255,255,255,${pulse})`:`rgba(255,0,0,${pulse})`;
   ctx.fillRect(sx,sy,TILE,TILE);
   ctx.strokeStyle=inRange?'#ffffff':'#ff0000';
@@ -2886,7 +3224,8 @@ function takeDamage(amount) {
       drawHealth();
       if (player.health<=0) {
         showNotification("💀 You died! Respawning...");
-        setTimeout(() => { player.health=20; player.x=initialSpawnX*TILE; player.y=(startY-2)*TILE; player.vy=0; drawHealth(); }, 1500);
+        _sdkRequestAd();
+        setTimeout(() => { player.health=20; player.x=initialSpawnX*TILE; player.y=(spawnY-2)*TILE; player.vy=0; drawHealth(); _sdkGameplayStart(); }, 1500);
       }
     }, 350);
   } else {
@@ -2894,6 +3233,7 @@ function takeDamage(amount) {
     drawHealth();
   }
   screenShake=Math.max(screenShake,4);
+  damageFlashTimer=10;
   playSound('hurt');
 }
 
@@ -2985,6 +3325,14 @@ function breakSingleBlock(wx, wy, isSuper) {
     floatingTexts.push({x:wx*TILE+TILE/2,y:wy*TILE,text:"+"+dropCount+" "+(blockNames[b]||""),color:textColor,life:40,maxLife:40,vy:-1});
     spawnItemDrop(wx,wy,b);
     setBlockAndBroadcast(wx,wy,BLOCKS.AIR);
+    // Combo counter
+    comboCount++; comboTimer = 90;
+    if (comboCount >= 3) {
+      const comboColors = ['#fff','#ffff00','#ff9900','#ff3300','#ff00ff','#00ffff'];
+      const col = comboColors[Math.min(comboCount - 3, comboColors.length - 1)];
+      addJuiceText(wx*TILE+TILE/2, wy*TILE-TILE, comboCount+'x COMBO!', col);
+      if (comboCount % 5 === 0) screenShake = Math.max(screenShake, 5);
+    }
     let invItem=inventory.find(item=>item.block===b);
     if (invItem) invItem.count+=dropCount;
     else { inventory.push({block:b,count:dropCount}); if(!isSuper||Math.random()<0.2) showNotification("🎉 "+(blockNames[b]||"Block")); }
@@ -3056,12 +3404,18 @@ document.getElementById('tc-mine').addEventListener('touchstart',(e)=>{e.prevent
 document.getElementById('tc-place').addEventListener('touchstart',(e)=>{e.preventDefault();e.stopPropagation();const{wx,wy}=getMouseWorldCoords();executePlace(wx,wy);},{passive:false});
 
 document.addEventListener('keydown',(e)=>{
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   keys[e.key.toLowerCase()]=true;
   const n=parseInt(e.key);
   if (n>=1&&n<=9) { if (n-1<inventory.length) { selectedSlot=n-1; drawHotbar(); } }
   if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())||['w','a','s','d'].includes(e.key.toLowerCase())) e.preventDefault();
 });
-document.addEventListener('keyup',(e)=>{keys[e.key.toLowerCase()]=false;});
+document.addEventListener('keyup',(e)=>{
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  keys[e.key.toLowerCase()]=false;
+});
 
 // =========================================================
 // ITEM DROP ANIMATION
@@ -3223,6 +3577,8 @@ function updateFire(dt) {
 
 function doTeleport() {
   teleportCooldown = 150;
+  // Teleport flash
+  damageFlashTimer = 0; healFlashTimer = 18;
   const pTileX = Math.floor(player.x / TILE + 0.5);
   const pTileY = Math.floor(player.y / TILE + 1.0);
 
@@ -3306,7 +3662,7 @@ function updateAndDrawIntro(ctx, dt) {
     if(allSettled) introPhase="FADING";
   } else if (introPhase==="FADING") {
     introAlpha-=0.01*dt;
-    if(introAlpha<=0) gameState="PLAYING";
+    if(introAlpha<=0){gameState="PLAYING";_sdkLoadingStop();_sdkGameplayStart();}
   }
   ctx.globalAlpha=introAlpha;
   for(let b of introBlocks){
@@ -3362,6 +3718,9 @@ function applyDailySeed() {
   getChunk(Math.floor(dailyChestX/CHUNK_W),"OVERWORLD");
   localSetBlock(dailyChestX,dailyChestY,BLOCKS.CHEST,"OVERWORLD");
   document.getElementById('radar-hud').classList.add('visible');
+  document.getElementById('daily-timer').textContent='0:00';
+  document.getElementById('daily-lb-btn').style.display='';
+  _dailyStartTime=Date.now(); _dailyRunning=true;
   showNotification("📅 Daily Hunt started! Find the hidden chest!");
   playSound('portal');
   if (!isApplyingRemoteSeed&&isMultiplayerActive&&db&&userId) {
@@ -3387,6 +3746,8 @@ function updateDailyRadar() {
 function foundDailyTreasure() {
   if (dailyTreasureFound) return;
   dailyTreasureFound=true;
+  _dailyRunning=false;
+  _dailyElapsed=Math.round((Date.now()-_dailyStartTime)/1000);
   const DIAMONDS=50;
   let dItem=inventory.find(i=>i.block===BLOCKS.DIAMOND_ORE);
   if (dItem) dItem.count+=DIAMONDS; else inventory.push({block:BLOCKS.DIAMOND_ORE,count:DIAMONDS});
@@ -3411,6 +3772,7 @@ function foundDailyTreasure() {
   const overlay=document.getElementById('treasure-found-overlay');
   if (overlay) { overlay.style.display='block'; overlay.classList.add('active'); setTimeout(()=>{overlay.classList.remove('active');setTimeout(()=>{overlay.style.display='none';},500);},800); }
   showNotification("🏆 DAILY TREASURE FOUND! +50 Diamonds!");
+  setTimeout(_showDailyVictory, 1800);
 }
 
 function playDailyTreasureSound() {
@@ -3579,6 +3941,33 @@ function gameLoop(now) {
   }
 
   if(inventory.some(i=>i.block===BLOCKS.RAINBOW_ORE||i.block===BLOCKS.DIAMOND_DYNAMITE||i.block===BLOCKS.GOLD_BRICK)) drawHotbar();
+
+  // ── Damage flash (red) ──
+  if (damageFlashTimer > 0) {
+    const ft = damageFlashTimer / 10;
+    ctx.fillStyle = `rgba(255,0,0,${ft * 0.45})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  // ── Heal flash (green) ──
+  if (healFlashTimer > 0) {
+    const hft = healFlashTimer / 18;
+    ctx.fillStyle = `rgba(0,255,100,${hft * 0.35})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  // ── Low health vignette (red pulsing border) ──
+  if (player.health <= 6 && player.health > 0) {
+    const vigAlpha = (0.25 + Math.sin(frameCount * 0.08) * 0.15) * (1 - player.health / 8);
+    const vigG = ctx.createRadialGradient(canvas.width/2,canvas.height/2,canvas.height*0.28,canvas.width/2,canvas.height/2,canvas.height*0.75);
+    vigG.addColorStop(0, 'rgba(180,0,0,0)');
+    vigG.addColorStop(1, `rgba(180,0,0,${vigAlpha})`);
+    ctx.fillStyle = vigG; ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+  // ── Depth darkness (deeper = darker) ──
+  const playerDepth = Math.floor(player.y/TILE) - 30;
+  if (playerDepth > 20) {
+    const darkAlpha = Math.min(0.35, (playerDepth - 20) / 80);
+    ctx.fillStyle = `rgba(0,0,0,${darkAlpha})`; ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
 
   requestAnimationFrame(gameLoop);
 }
@@ -3801,11 +4190,92 @@ function renderPortalBook() {
   }
 }
 
+
+// =========================================================
+// COMMUNITY SEEDS
+// =========================================================
+let seedBookOpen = false;
+let sbUnsubscribe = null;
+
+function toggleSeedBook() {
+  const modal = document.getElementById('seed-book-modal');
+  seedBookOpen = !seedBookOpen;
+  if (seedBookOpen) {
+    closeAllPanels('seedbook');
+    modal.classList.add('open');
+    document.getElementById('sb-seed-display').textContent = 'Seed: ' + rawSeedString;
+    subscribeCommunitySeeds();
+  } else {
+    modal.classList.remove('open');
+    if (sbUnsubscribe) { sbUnsubscribe(); sbUnsubscribe = null; }
+  }
+}
+
+function subscribeCommunitySeeds() {
+  if (!db || !appId) { renderSeedList([]); return; }
+  if (sbUnsubscribe) sbUnsubscribe();
+  const ref = collection(db, 'artifacts', appId, 'public', 'data', 'voxeria_community_seeds');
+  sbUnsubscribe = onSnapshot(ref, (snap) => {
+    const seeds = [];
+    snap.forEach(d => seeds.push({ id: d.id, ...d.data() }));
+    seeds.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    renderSeedList(seeds);
+  }, () => renderSeedList([]));
+}
+
+function renderSeedList(seeds) {
+  const list = document.getElementById('sb-list');
+  if (!seeds.length) {
+    list.innerHTML = '<div id="sb-empty">No community seeds yet — be the first to share one! 🌱</div>';
+    return;
+  }
+  list.innerHTML = seeds.map(s => {
+    const date = s.ts ? new Date(s.ts).toLocaleDateString() : '?';
+    const label = s.label || 'Unnamed World';
+    return '<div class="sb-entry">' +
+      '<div class="sb-info">' +
+        '<div class="sb-name">' + escapeHtml(label) + '</div>' +
+        '<div class="sb-meta">Seed: ' + escapeHtml(s.seed) + ' &nbsp;·&nbsp; ' + date + '</div>' +
+      '</div>' +
+      '<button class="sb-load-btn" onclick="loadCommunitySeed(' + JSON.stringify(s.seed) + ')">▶ Load</button>' +
+    '</div>';
+  }).join('');
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function loadCommunitySeed(seedStr) {
+  document.getElementById('seed-input').value = seedStr;
+  if (seedBookOpen) toggleSeedBook();
+  applySeedFromUI();
+}
+
+function shareSeed() {
+  if (!db || !appId) { showNotification("⚠️ Multiplayer not connected — seed not shared."); return; }
+  const label = (document.getElementById('sb-label-input').value.trim() || 'Unnamed World').slice(0, 40);
+  const docId = (userId || 'anon') + '_' + Date.now();
+  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'voxeria_community_seeds', docId), {
+    seed: rawSeedString, label: label, userId: userId || 'anon', ts: Date.now()
+  }).then(() => {
+    showNotification("🌱 Seed shared: " + rawSeedString);
+    document.getElementById('sb-label-input').value = '';
+  }).catch(e => { console.error("Share seed error:", e); showNotification("❌ Share failed."); });
+}
+
 window.togglePortalBook = togglePortalBook;
 window.showPBTab = showPBTab;
 
 window.applySeedFromUI=applySeedFromUI;
+window.toggleSeedBook=toggleSeedBook;
+window.shareSeed=shareSeed;
+window.loadCommunitySeed=loadCommunitySeed;
 window.applyDailySeed=applyDailySeed;
+window.toggleDailyLB=toggleDailyLB;
+window.submitDailyScore=submitDailyScore;
+window.shareDailyResult=shareDailyResult;
+window.closeDV=closeDV;
 window.toggleShop=toggleShop;
 window.buyUpgrade=buyUpgrade;
 window.toggleFullscreenMode=toggleFullscreenMode;
@@ -3818,7 +4288,10 @@ initFirebase(); drawHealth(); drawHotbar(); updateShopButtons(); requestAnimatio
   const video   = document.getElementById('intro-video');
   if (!overlay || !video) return;
 
+  let dismissed = false;
   function dismissIntro() {
+    if (dismissed) return;
+    dismissed = true;
     overlay.classList.add('fade-out');
     setTimeout(function() {
       overlay.style.display = 'none';
@@ -3828,9 +4301,843 @@ initFirebase(); drawHealth(); drawHotbar(); updateShopButtons(); requestAnimatio
   video.addEventListener('ended', dismissIntro);
   // Fallback: if video fails to load/play, dismiss after 3s
   video.addEventListener('error', function() { setTimeout(dismissIntro, 3000); });
+  // Let players skip the intro by clicking/tapping or pressing any key
+  overlay.addEventListener('click', dismissIntro);
+  overlay.addEventListener('touchstart', dismissIntro, { passive: true });
+  window.addEventListener('keydown', dismissIntro, { once: true });
+  // Hard safety net: never let the overlay block the game forever, even if
+  // autoplay is blocked or 'ended'/'error' never fire in some browsers.
+  setTimeout(dismissIntro, 10000);
 })();
 // ─────────────────────────────────────────────────────────────────────────────
 
+// =========================================================
+// SESSION STORAGE – Tab-Wechsel überleben
+// =========================================================
+
+function saveSession() {
+  try {
+    sessionStorage.setItem('voxeria_session', JSON.stringify({
+      x: player.x,
+      y: player.y,
+      dim: currentDim,
+      health: player.health,
+      inventory: inventory,
+      seed: rawSeedString,
+      isDailyMode: isDailyMode
+    }));
+  } catch(e) {}
+}
+
+function tryResumeSession() {
+  try {
+    const raw = sessionStorage.getItem('voxeria_session');
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    // Nur wiederherstellen wenn Seed übereinstimmt
+    if (s.seed !== rawSeedString) return;
+    player.x = s.x;
+    player.y = s.y;
+    currentDim = s.dim || 'OVERWORLD';
+    player.health = s.health || 20;
+    if (s.inventory && s.inventory.length) inventory = s.inventory;
+    voidGravityScale = currentDim === 'VOID' ? 0.35 : 1.0;
+    drawHealth(); drawHotbar();
+    showNotification('🌿 Welcome back, explorer!');
+  } catch(e) {}
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && gameState === 'PLAYING') saveSession();
+});
+
+
+// =========================================================
+// ACHIEVEMENT SYSTEM
+// =========================================================
+
+const ACHIEVEMENTS = [
+  // ── Entdeckung ──
+  {
+    id: 'first_steps',
+    title: 'First Steps',
+    desc: 'Place or break your first block.',
+    icon: '🪨',
+    rarity: 'common',
+    secret: false
+  },
+  {
+    id: 'deep_dive',
+    title: 'Deep Dive',
+    desc: 'Reach depth Y > 80 underground.',
+    icon: '⛏️',
+    rarity: 'common',
+    secret: false
+  },
+  {
+    id: 'sky_high',
+    title: 'Sky High',
+    desc: 'Reach height Y < 10 — near the top of the world.',
+    icon: '☁️',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'first_portal',
+    title: 'Dimensional Shift',
+    desc: 'Enter a dimension portal for the first time.',
+    icon: '🌀',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'ocean_depth',
+    title: 'Pressure Point',
+    desc: 'Explore the Ocean Depth dimension.',
+    icon: '🌊',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'lava_core',
+    title: 'Heart of Fire',
+    desc: 'Survive the Lava Core dimension.',
+    icon: '🔥',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'void_realm',
+    title: 'Into the Blither',
+    desc: 'Set foot in the Blither — the floating void realm.',
+    icon: '🌌',
+    rarity: 'rare',
+    secret: false
+  },
+  {
+    id: 'gold_dimension',
+    title: 'All That Glitters',
+    desc: 'Enter the Gold Dimension.',
+    icon: '🌟',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'dimension_collector',
+    title: 'World Hopper',
+    desc: 'Visit all four dimensions in one session.',
+    icon: '🗺️',
+    rarity: 'rare',
+    secret: false
+  },
+
+  // ── Erkundung & Überleben ──
+  {
+    id: 'survivor',
+    title: 'By a Thread',
+    desc: 'Survive with only 1 heart remaining.',
+    icon: '❤️',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'storm_chaser',
+    title: 'Storm Chaser',
+    desc: 'Stay outside during a full lightning storm.',
+    icon: '⚡',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'daily_hunter',
+    title: 'Daily Hunter',
+    desc: 'Find the hidden Daily Hunt treasure chest.',
+    icon: '📦',
+    rarity: 'rare',
+    secret: false
+  },
+  {
+    id: 'block_breaker',
+    title: 'Miner\'s Mark',
+    desc: 'Break 100 blocks.',
+    icon: '💥',
+    rarity: 'common',
+    secret: false
+  },
+  {
+    id: 'block_master',
+    title: 'Terrain Terror',
+    desc: 'Break 500 blocks.',
+    icon: '🏔️',
+    rarity: 'uncommon',
+    secret: false
+  },
+
+  // ── Seltene Ressourcen ──
+  {
+    id: 'found_diamond',
+    title: 'Carbon Copy',
+    desc: 'Mine a Diamond Ore.',
+    icon: '💎',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'found_rainbow',
+    title: 'Spectrum',
+    desc: 'Mine a Rainbow Ore — rarest of the overworld.',
+    icon: '🌈',
+    rarity: 'rare',
+    secret: false
+  },
+  {
+    id: 'found_void_ore',
+    title: 'From Nothing',
+    desc: 'Mine Void Ore from the Blither.',
+    icon: '🫧',
+    rarity: 'epic',
+    secret: true
+  },
+  {
+    id: 'found_ether',
+    title: 'Crystal Clear',
+    desc: 'Collect an Ether Crystal from the Blither.',
+    icon: '🔮',
+    rarity: 'rare',
+    secret: false
+  },
+
+  // ── Geheime Achievements ──
+  {
+    id: 'void_fall',
+    title: 'Falling Upward',
+    desc: 'Fall off the edge of the Blither into the void.',
+    icon: '🌠',
+    rarity: 'uncommon',
+    secret: true
+  },
+  {
+    id: 'lava_swim',
+    title: 'Molten Heart',
+    desc: 'Touch lava and survive.',
+    icon: '🫀',
+    rarity: 'rare',
+    secret: true
+  },
+  {
+    id: 'mystic_biome',
+    title: 'Under the Hazelnut',
+    desc: 'Discover the Mystic Biome.',
+    icon: '🌿',
+    rarity: 'uncommon',
+    secret: false
+  },
+  {
+    id: 'volcano_biome',
+    title: 'Magma Walker',
+    desc: 'Set foot in the Volcano Biome.',
+    icon: '🌋',
+    rarity: 'uncommon',
+    secret: false
+  }
+];
+
+// Fortschritts-Tracking
+let achProgress = {
+  blocksBreaked: 0,
+  dimsVisited: new Set(),
+  stormTimer: 0,
+  touchedLava: false
+};
+
+// Gespeicherte Achievements aus localStorage laden
+function loadAchievements() {
+  try {
+    const raw = localStorage.getItem('voxeria_ach');
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch(e) { return new Set(); }
+}
+
+function saveAchievements(unlocked) {
+  try {
+    localStorage.setItem('voxeria_ach', JSON.stringify([...unlocked]));
+  } catch(e) {}
+}
+
+let unlockedAchievements = loadAchievements();
+
+function unlockAchievement(id) {
+  if (unlockedAchievements.has(id)) return;
+  const ach = ACHIEVEMENTS.find(a => a.id === id);
+  if (!ach) return;
+  unlockedAchievements.add(id);
+  saveAchievements(unlockedAchievements);
+  showAchievementToast(ach);
+}
+
+// ── Toast-Anzeige ──
+function showAchievementToast(ach) {
+  const rarityColors = {
+    common:   '#aaaaaa',
+    uncommon: '#4ade80',
+    rare:     '#60a5fa',
+    epic:     '#c084fc'
+  };
+  const rarityLabel = {
+    common:   'Common',
+    uncommon: 'Uncommon',
+    rare:     'Rare',
+    epic:     'Epic'
+  };
+
+  // Entfernt alten Toast falls vorhanden
+  const existing = document.getElementById('ach-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'ach-toast';
+  toast.innerHTML = `
+    <div style="font-size:11px;color:${rarityColors[ach.rarity]};font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;">
+      Achievement Unlocked · ${rarityLabel[ach.rarity]}
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+      <span style="font-size:28px;line-height:1;">${ach.icon}</span>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#fff;">${ach.title}</div>
+        <div style="font-size:12px;color:#ccc;margin-top:2px;">${ach.desc}</div>
+      </div>
+    </div>
+  `;
+  toast.style.cssText = `
+    position:fixed;
+    bottom:90px;
+    right:20px;
+    background:rgba(10,10,20,0.95);
+    border:1.5px solid ${rarityColors[ach.rarity]};
+    border-radius:10px;
+    padding:12px 16px;
+    min-width:260px;
+    max-width:320px;
+    box-shadow:0 4px 24px rgba(0,0,0,0.7), 0 0 12px ${rarityColors[ach.rarity]}44;
+    z-index:9999;
+    font-family:sans-serif;
+    opacity:0;
+    transform:translateX(20px);
+    transition:opacity 0.3s ease, transform 0.3s ease;
+    pointer-events:none;
+  `;
+  document.body.appendChild(toast);
+
+  // Einblenden
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(0)';
+  });
+
+  // Ausblenden nach 4s
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    setTimeout(() => toast.remove(), 350);
+  }, 4000);
+}
+
+// ── Achievement-Panel (öffnen mit Tab) ──
+function buildAchievementPanel() {
+  const existing = document.getElementById('ach-panel');
+  if (existing) { existing.remove(); return; }
+  closeAllPanels('ach');
+
+  const rarityColors = {
+    common: '#aaaaaa', uncommon: '#4ade80', rare: '#60a5fa', epic: '#c084fc'
+  };
+
+  const panel = document.createElement('div');
+  panel.id = 'ach-panel';
+  panel.style.cssText = `
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:580px; max-height:75vh; overflow-y:auto;
+    background:rgba(8,8,18,0.97);
+    border:1.5px solid #334;
+    border-radius:14px;
+    padding:24px 28px;
+    z-index:10000;
+    font-family:sans-serif;
+    color:#fff;
+    box-shadow:0 8px 40px rgba(0,0,0,0.8);
+  `;
+
+  const total = ACHIEVEMENTS.length;
+  const done = unlockedAchievements.size;
+  const pct = Math.round((done / total) * 100);
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <div>
+        <div style="font-size:20px;font-weight:700;">🏆 Achievements</div>
+        <div style="font-size:12px;color:#778;margin-top:3px;">${done} / ${total} unlocked · ${pct}% complete</div>
+      </div>
+      <button onclick="document.getElementById('ach-panel').remove()"
+        style="background:none;border:1px solid #334;color:#aaa;border-radius:6px;
+               padding:4px 12px;cursor:pointer;font-size:13px;">✕ Close</button>
+    </div>
+    <div style="height:4px;background:#1a1a2e;border-radius:2px;margin-bottom:20px;">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#60a5fa,#c084fc);border-radius:2px;transition:width 0.4s;"></div>
+    </div>
+    <div id="ach-list" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+  `;
+  document.body.appendChild(panel);
+
+  const list = panel.querySelector('#ach-list');
+
+  ACHIEVEMENTS.forEach(ach => {
+    const unlocked = unlockedAchievements.has(ach.id);
+    const isSecret = ach.secret && !unlocked;
+
+    const card = document.createElement('div');
+    card.style.cssText = `
+      display:flex; gap:10px; align-items:flex-start;
+      background:${unlocked ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)'};
+      border:1px solid ${unlocked ? rarityColors[ach.rarity] + '55' : '#1e1e2e'};
+      border-radius:8px; padding:10px 12px;
+      opacity:${unlocked ? '1' : '0.55'};
+      transition:opacity 0.2s;
+    `;
+    card.innerHTML = `
+      <span style="font-size:22px;line-height:1;filter:${unlocked ? 'none' : 'grayscale(1)'};">${isSecret ? '❓' : ach.icon}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:${unlocked ? '#fff' : '#666'};">
+          ${isSecret ? '???' : ach.title}
+        </div>
+        <div style="font-size:11px;color:${unlocked ? '#999' : '#444'};margin-top:2px;line-height:1.4;">
+          ${isSecret ? 'Secret achievement' : ach.desc}
+        </div>
+        <div style="font-size:10px;color:${rarityColors[ach.rarity]};margin-top:4px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">
+          ${ach.rarity}${unlocked ? ' ✓' : ''}
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// Tab-Taste öffnet Achievement-Panel
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Tab' && gameState === 'PLAYING') {
+    e.preventDefault();
+    buildAchievementPanel();
+  }
+});
+
+
+// =========================================================
+// ACHIEVEMENT TRIGGER HOOKS
+// =========================================================
+
+// ── Block gebrochen (patchet breakSingleBlock) ──
+const _origBreakSingle = breakSingleBlock;
+breakSingleBlock = function(wx, wy, isSuper) {
+  const btype = getBlock(wx, wy);
+  _origBreakSingle(wx, wy, isSuper);
+
+  achProgress.blocksBreaked++;
+  unlockAchievement('first_steps');
+  if (achProgress.blocksBreaked >= 100) unlockAchievement('block_breaker');
+  if (achProgress.blocksBreaked >= 500) unlockAchievement('block_master');
+
+  // Seltene Erzfunde
+  if (btype === BLOCKS.DIAMOND_ORE)  unlockAchievement('found_diamond');
+  if (btype === BLOCKS.RAINBOW_ORE)  unlockAchievement('found_rainbow');
+  if (btype === BLOCKS.VOID_ORE)     unlockAchievement('found_void_ore');
+  if (btype === BLOCKS.ETHER_CRYSTAL) unlockAchievement('found_ether');
+
+  // Biom-Erkennung über Block-Typen
+  if ([BLOCKS.MYSTIC_EARTH, BLOCKS.GLOWSHROOM, BLOCKS.CRYSTAL_FLOWER, BLOCKS.HAZELNUT_WOOD, BLOCKS.HAZELNUT_SHELL].includes(btype)) {
+    unlockAchievement('mystic_biome');
+  }
+  if ([BLOCKS.VOLCANIC_ROCK, BLOCKS.ASH_DIRT, BLOCKS.SULFUR_ORE, BLOCKS.CINDER_BLOCK].includes(btype)) {
+    unlockAchievement('volcano_biome');
+  }
+};
+
+// ── Dimension betreten (patchet doTeleport) ──
+const _origDoTeleport = doTeleport;
+doTeleport = function() {
+  _origDoTeleport();
+  // currentDim ist jetzt bereits gesetzt
+  unlockAchievement('first_portal');
+  if (currentDim === 'OCEAN') unlockAchievement('ocean_depth');
+  if (currentDim === 'LAVA')  unlockAchievement('lava_core');
+  if (currentDim === 'VOID')  unlockAchievement('void_realm');
+  if (currentDim === 'GOLD')  unlockAchievement('gold_dimension');
+
+  achProgress.dimsVisited.add(currentDim);
+  if (['GOLD','OCEAN','LAVA','VOID'].every(d => achProgress.dimsVisited.has(d))) {
+    unlockAchievement('dimension_collector');
+  }
+};
+
+// ── Daily Hunt gefunden ──
+const _origFoundDaily = foundDailyTreasure;
+foundDailyTreasure = function() {
+  _origFoundDaily();
+  unlockAchievement('daily_hunter');
+};
+
+// ── Schaden genommen ──
+const _origTakeDamage = takeDamage;
+takeDamage = function(amount) {
+  _origTakeDamage(amount);
+
+  // Knapp überlebt (1 Herz = health ≤ 2)
+  if (player.health <= 2 && player.health > 0) unlockAchievement('survivor');
+
+  // Lava berührt und überlebt
+  const lx = Math.floor(player.x/TILE+0.4), ly = Math.floor(player.y/TILE+1.8);
+  if (getBlock(lx, ly) === BLOCKS.LAVA || getBlock(lx+1, ly) === BLOCKS.LAVA) {
+    achProgress.touchedLava = true;
+    if (player.health > 0) unlockAchievement('lava_swim');
+  }
+
+  // Void Fall
+  if (currentDim === 'VOID' && player.y > WORLD_H * TILE + 100) {
+    unlockAchievement('void_fall');
+  }
+};
+
+// ── Per-Frame-Checks (angehängt an gameLoop via setInterval) ──
+setInterval(() => {
+  if (gameState !== 'PLAYING') return;
+
+  // Tiefe / Höhe
+  const py = Math.floor(player.y / TILE);
+  if (py > 80) unlockAchievement('deep_dive');
+  if (py < 10) unlockAchievement('sky_high');
+
+  // Sturm-Achievement – 10 Sekunden im Gewitter überleben
+  if (weather.type === 'storm' && weather.intensity > 0.5) {
+    achProgress.stormTimer++;
+    if (achProgress.stormTimer >= 600) unlockAchievement('storm_chaser'); // 600 * 1s Intervall → nein, 600 * 0.1s = 60s
+  } else {
+    achProgress.stormTimer = 0;
+  }
+
+  // Mystic/Volcano Biom per Biome-String
+  if (currentDim === 'OVERWORLD') {
+    const playerCx = Math.floor(player.x / (CHUNK_W * TILE));
+    const biome = getBiome(playerCx);
+    if (biome === 'MYSTIC')   unlockAchievement('mystic_biome');
+    if (biome === 'VOLCANO')  unlockAchievement('volcano_biome');
+  }
+}, 100);
+
+
+// =========================================================
+// QUEST SYSTEM
+// =========================================================
+
+const QUESTS = [
+  // ── Chapter 1: Beginnings ──
+  { id:'q_first_block', chapter:'1 · Beginnings',  title:'First Dig',        desc:'Break your first block.',                      icon:'⛏️',  type:'break',      target:1   },
+  { id:'q_break_10',    chapter:'1 · Beginnings',  title:'Getting Started',  desc:'Break 10 blocks.',                             icon:'🪨',  type:'break',      target:10  },
+  { id:'q_break_100',   chapter:'1 · Beginnings',  title:'Block Breaker',    desc:'Break 100 blocks.',                            icon:'💪',  type:'break',      target:100 },
+  { id:'q_break_500',   chapter:'1 · Beginnings',  title:'Master Miner',     desc:'Break 500 blocks total.',                      icon:'⛏️',  type:'break',      target:500 },
+  // ── Chapter 2: Underground ──
+  { id:'q_depth_40',    chapter:'2 · Underground', title:'Going Underground', desc:'Descend to depth Y 40.',                      icon:'🕳️',  type:'depth',      target:40  },
+  { id:'q_depth_80',    chapter:'2 · Underground', title:'Deep Descent',     desc:'Reach depth Y 80.',                            icon:'🌑',  type:'depth',      target:80  },
+  { id:'q_height_10',   chapter:'2 · Underground', title:'Touch the Sky',    desc:'Climb near the top of the world (Y ≤ 10).',    icon:'☁️',  type:'height',     target:10  },
+  // ── Chapter 3: Resources ──
+  { id:'q_find_coal',    chapter:'3 · Resources',  title:'Coal Miner',       desc:'Mine your first Coal.',                        icon:'🖤',  type:'ore', oreId:8,  target:1 },
+  { id:'q_find_iron',    chapter:'3 · Resources',  title:'Iron Will',        desc:'Mine your first Iron Ore.',                    icon:'🔩',  type:'ore', oreId:9,  target:1 },
+  { id:'q_find_gold',    chapter:'3 · Resources',  title:'Golden Touch',     desc:'Mine your first Gold Ore.',                    icon:'🥇',  type:'ore', oreId:10, target:1 },
+  { id:'q_find_diamond', chapter:'3 · Resources',  title:'Diamond Hunter',   desc:'Mine your first Diamond Ore.',                 icon:'💎',  type:'ore', oreId:16, target:1 },
+  { id:'q_find_rainbow', chapter:'3 · Resources',  title:'Over the Rainbow', desc:'Find the rare Rainbow Ore!',                  icon:'🌈',  type:'ore', oreId:25, target:1 },
+  // ── Chapter 4: Dimensions ──
+  { id:'q_first_portal', chapter:'4 · Dimensions', title:'Portal Pioneer',   desc:'Enter any dimension portal.',                  icon:'🌀',  type:'dimension', dimId:'ANY',   target:1 },
+  { id:'q_ocean_dim',    chapter:'4 · Dimensions', title:'Ocean Explorer',   desc:'Visit the Ocean Depth dimension.',             icon:'🌊',  type:'dimension', dimId:'OCEAN', target:1 },
+  { id:'q_lava_dim',     chapter:'4 · Dimensions', title:'Fire Walker',      desc:'Survive the Lava Core dimension.',             icon:'🔥',  type:'dimension', dimId:'LAVA',  target:1 },
+  { id:'q_void_dim',     chapter:'4 · Dimensions', title:'Void Wanderer',    desc:'Step into the Blither — the void realm.',      icon:'🌌',  type:'dimension', dimId:'VOID',  target:1 },
+  { id:'q_all_dims',     chapter:'4 · Dimensions', title:'World Hopper',     desc:'Visit all four dimensions.',                   icon:'🗺️',  type:'all_dims',              target:4 },
+  // ── Chapter 5: Survival ──
+  { id:'q_storm',        chapter:'5 · Survival',   title:'Storm Chaser',     desc:'Stay outside during a full lightning storm.',  icon:'⚡',  type:'storm',      target:1 },
+  { id:'q_low_health',   chapter:'5 · Survival',   title:'Close Call',       desc:'Survive with only 1 heart remaining.',         icon:'❤️',  type:'low_health', target:1 },
+  { id:'q_daily',        chapter:'5 · Survival',   title:'Treasure Hunter',  desc:'Find the hidden Daily Hunt treasure chest.',   icon:'📦',  type:'daily',      target:1 }
+];
+
+let questProgress = {
+  blocksBreaked: 0,
+  maxDepth: 0,
+  minHeight: 999,
+  oresMined: {},
+  dimsVisited: new Set(),
+  stormTimer: 0,
+  stormSurvived: false,
+  lowHealthSurvived: false,
+  dailyFound: false
+};
+
+let completedQuests = (function loadQP() {
+  try { const r = localStorage.getItem('voxeria_quests'); if (r) return new Set(JSON.parse(r)); } catch(e) {}
+  return new Set();
+})();
+
+function saveQuestProgress() {
+  try { localStorage.setItem('voxeria_quests', JSON.stringify([...completedQuests])); } catch(e) {}
+}
+
+function getQuestCurrent(q) {
+  switch (q.type) {
+    case 'break':      return Math.min(questProgress.blocksBreaked, q.target);
+    case 'depth':      return Math.min(questProgress.maxDepth, q.target);
+    case 'height':     return (questProgress.minHeight <= q.target) ? 1 : 0;
+    case 'ore':        return Math.min(questProgress.oresMined[q.oreId] || 0, q.target);
+    case 'dimension':  return (q.dimId === 'ANY' ? questProgress.dimsVisited.size > 0 : questProgress.dimsVisited.has(q.dimId)) ? 1 : 0;
+    case 'all_dims':   return Math.min(['GOLD','OCEAN','LAVA','VOID'].filter(d => questProgress.dimsVisited.has(d)).length, q.target);
+    case 'storm':      return questProgress.stormSurvived ? 1 : 0;
+    case 'low_health': return questProgress.lowHealthSurvived ? 1 : 0;
+    case 'daily':      return questProgress.dailyFound ? 1 : 0;
+  }
+  return 0;
+}
+
+function isQuestDone(q) {
+  if (completedQuests.has(q.id)) return true;
+  return getQuestCurrent(q) >= q.target;
+}
+
+function checkQuest(id) {
+  if (completedQuests.has(id)) return;
+  const q = QUESTS.find(q => q.id === id);
+  if (!q || !isQuestDone(q)) return;
+  completedQuests.add(id);
+  saveQuestProgress();
+  showQuestToast(q);
+  // Refresh panel if open
+  const panel = document.getElementById('quest-panel');
+  if (panel) buildQuestPanel(true);
+}
+
+function showQuestToast(q) {
+  const existing = document.getElementById('quest-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'quest-toast';
+  toast.innerHTML = `
+    <div style="font-size:11px;color:#facc15;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;">Quest Complete! ✓</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+      <span style="font-size:28px;line-height:1;">${q.icon}</span>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#fff;">${q.title}</div>
+        <div style="font-size:12px;color:#ccc;margin-top:2px;">${q.desc}</div>
+      </div>
+    </div>`;
+  toast.style.cssText = `position:fixed;bottom:140px;right:20px;background:rgba(10,10,20,0.97);border:1.5px solid #facc15;border-radius:10px;padding:12px 16px;min-width:260px;max-width:320px;box-shadow:0 4px 24px rgba(0,0,0,0.7),0 0 12px rgba(250,204,21,0.3);z-index:9998;font-family:sans-serif;opacity:0;transform:translateX(20px);transition:opacity 0.3s ease,transform 0.3s ease;pointer-events:none;`;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => { toast.style.opacity='1'; toast.style.transform='translateX(0)'; });
+  setTimeout(() => { toast.style.opacity='0'; toast.style.transform='translateX(20px)'; setTimeout(() => toast.remove(), 350); }, 4000);
+}
+
+function buildQuestPanel(refresh) {
+  if (!refresh) {
+    const existing = document.getElementById('quest-panel');
+    if (existing) { existing.remove(); return; }
+    closeAllPanels('quest');
+  }
+
+  const done  = completedQuests.size;
+  const total = QUESTS.length;
+  const pct   = Math.round((done / total) * 100);
+
+  const panel = document.createElement('div');
+  panel.id = 'quest-panel';
+  panel.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;max-height:78vh;overflow-y:auto;background:rgba(8,8,18,0.97);border:1.5px solid rgba(250,204,21,0.35);border-radius:14px;padding:24px 28px;z-index:10000;font-family:sans-serif;color:#fff;box-shadow:0 8px 40px rgba(0,0,0,0.8),0 0 24px rgba(250,204,21,0.1);`;
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <div>
+        <div style="font-size:20px;font-weight:700;">📜 Quests</div>
+        <div style="font-size:12px;color:#778;margin-top:3px;">${done} / ${total} completed · ${pct}%</div>
+      </div>
+      <button onclick="document.getElementById('quest-panel').remove()" style="background:none;border:1px solid #334;color:#aaa;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:13px;">✕ Close</button>
+    </div>
+    <div style="height:4px;background:#1a1a2e;border-radius:2px;margin-bottom:20px;">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#facc15,#f97316);border-radius:2px;"></div>
+    </div>
+    <div id="quest-list"></div>`;
+
+  // Group by chapter
+  const chapters = {};
+  QUESTS.forEach(q => { if (!chapters[q.chapter]) chapters[q.chapter]=[]; chapters[q.chapter].push(q); });
+
+  const list = panel.querySelector('#quest-list');
+  Object.entries(chapters).forEach(([chName, quests]) => {
+    const chDone = quests.filter(q => completedQuests.has(q.id)).length;
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'font-size:12px;font-weight:700;color:#facc15;text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px;display:flex;justify-content:space-between;';
+    hdr.innerHTML = `<span>${chName}</span><span style="color:#445">${chDone}/${quests.length}</span>`;
+    list.appendChild(hdr);
+
+    quests.forEach(q => {
+      const isDone = completedQuests.has(q.id);
+      const cur    = getQuestCurrent(q);
+      const pctQ   = q.target > 1 ? Math.round((cur / q.target) * 100) : (isDone ? 100 : 0);
+
+      const card = document.createElement('div');
+      card.style.cssText = `display:flex;gap:12px;align-items:center;background:${isDone?'rgba(250,204,21,0.06)':'rgba(0,0,0,0.3)'};border:1px solid ${isDone?'rgba(250,204,21,0.3)':'#1e1e2e'};border-radius:8px;padding:10px 14px;margin-bottom:6px;opacity:${isDone?'1':'0.75'};`;
+
+      const bar = q.target > 1 ? `
+        <div style="height:3px;background:#1a1a2e;border-radius:2px;margin-top:5px;">
+          <div style="height:100%;width:${pctQ}%;background:${isDone?'#facc15':'#444'};border-radius:2px;"></div>
+        </div>
+        <div style="font-size:10px;color:#556;margin-top:2px;">${cur} / ${q.target}</div>` : '';
+
+      card.innerHTML = `
+        <span style="font-size:22px;line-height:1;filter:${isDone?'none':'grayscale(0.5)'};">${q.icon}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:${isDone?'#facc15':'#ccc'};">${isDone?'✓ ':''}${q.title}</div>
+          <div style="font-size:11px;color:#667;margin-top:2px;">${q.desc}</div>
+          ${bar}
+        </div>`;
+      list.appendChild(card);
+    });
+  });
+
+  const existing = document.getElementById('quest-panel');
+  if (existing) existing.replaceWith(panel);
+  else document.body.appendChild(panel);
+}
+
+// ── Quest Trigger Hooks ──
+
+// Blocks brechen
+const _qBreak = breakSingleBlock;
+breakSingleBlock = function(wx, wy, isSuper) {
+  const btype = getBlock(wx, wy);
+  _qBreak(wx, wy, isSuper);
+  questProgress.blocksBreaked++;
+  questProgress.oresMined[btype] = (questProgress.oresMined[btype] || 0) + 1;
+  checkQuest('q_first_block');
+  checkQuest('q_break_10');
+  checkQuest('q_break_100');
+  checkQuest('q_break_500');
+  if (btype === BLOCKS.COAL_ORE)    checkQuest('q_find_coal');
+  if (btype === BLOCKS.IRON_ORE)    checkQuest('q_find_iron');
+  if (btype === BLOCKS.GOLD_ORE)    checkQuest('q_find_gold');
+  if (btype === BLOCKS.DIAMOND_ORE) checkQuest('q_find_diamond');
+  if (btype === BLOCKS.RAINBOW_ORE) checkQuest('q_find_rainbow');
+};
+
+// Dimension betreten
+const _qTeleport = doTeleport;
+doTeleport = function() {
+  _qTeleport();
+  questProgress.dimsVisited.add(currentDim);
+  checkQuest('q_first_portal');
+  if (currentDim === 'OCEAN') checkQuest('q_ocean_dim');
+  if (currentDim === 'LAVA')  checkQuest('q_lava_dim');
+  if (currentDim === 'VOID')  checkQuest('q_void_dim');
+  checkQuest('q_all_dims');
+};
+
+// Schaden / Überleben
+const _qTakeDamage = takeDamage;
+takeDamage = function(amount) {
+  _qTakeDamage(amount);
+  if (player.health <= 2 && player.health > 0) {
+    questProgress.lowHealthSurvived = true;
+    checkQuest('q_low_health');
+  }
+};
+
+// Daily Hunt
+const _qFoundDaily = foundDailyTreasure;
+foundDailyTreasure = function() {
+  _qFoundDaily();
+  questProgress.dailyFound = true;
+  checkQuest('q_daily');
+};
+
+// Per-Frame-Checks
+setInterval(() => {
+  if (gameState !== 'PLAYING') return;
+  const py = Math.floor(player.y / TILE);
+  if (py > questProgress.maxDepth) {
+    questProgress.maxDepth = py;
+    checkQuest('q_depth_40');
+    checkQuest('q_depth_80');
+  }
+  if (py < questProgress.minHeight) {
+    questProgress.minHeight = py;
+    checkQuest('q_height_10');
+  }
+  if (weather.type === 'storm' && weather.intensity > 0.5) {
+    questProgress.stormTimer++;
+    if (questProgress.stormTimer >= 600) {
+      questProgress.stormSurvived = true;
+      checkQuest('q_storm');
+    }
+  } else {
+    questProgress.stormTimer = 0;
+  }
+}, 100);
+
+// =========================================================
+// SESSION RESUME – nach Intro-Dismiss aufrufen
+// =========================================================
+// Patcht dismissIntro im Video-Overlay IIFE nicht möglich direkt,
+// deshalb: nach kurzer Verzögerung versuchen.
+// Sicherer: am Ende von resetGameAndWorld ruft tryResumeSession auf.
+const _origUpdateAndDrawIntro = updateAndDrawIntro;
+let _sessionResumeAttempted = false;
+updateAndDrawIntro = function(ctx, dt) {
+  _origUpdateAndDrawIntro(ctx, dt);
+  // Sobald das Intro fertig ist und das Spiel startet
+  if (gameState === 'PLAYING' && !_sessionResumeAttempted) {
+    _sessionResumeAttempted = true;
+    tryResumeSession();
+  }
+};
+
+var _crazysdk=null;
+function _sdkGet(){if(_crazysdk)return _crazysdk;if(window.CrazyGames&&window.CrazyGames.CrazySDK){_crazysdk=window.CrazyGames.CrazySDK.getInstance();_crazysdk.init();_crazysdk.addEventListener('adStarted',function(){if(window._vAudio)window._vAudio.suspend();});_crazysdk.addEventListener('adFinished',function(){if(window._vAudio)window._vAudio.resume();});_crazysdk.addEventListener('adError',function(){if(window._vAudio)window._vAudio.resume();});}return _crazysdk;}
+function _sdkLoadingStop(){var s=_sdkGet();if(s)s.sdkGameLoadingStop();}
+function _sdkGameplayStart(){var s=_sdkGet();if(s)s.gameplayStart();}
+function _sdkGameplayStop(){var s=_sdkGet();if(s)s.gameplayStop();}
+function _sdkRequestAd(){var s=_sdkGet();if(s){_sdkGameplayStop();s.requestAd('midgame');}}
+var _dailyStartTime=0,_dailyElapsed=0,_dailyRunning=false;
+setInterval(function(){if(!_dailyRunning)return;var sec=Math.floor((Date.now()-_dailyStartTime)/1000);var el=document.getElementById('daily-timer');if(el)el.textContent=_fmtTime(sec);},500);
+function _fmtTime(s){return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);}
+function _escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _showDailyVictory(){closeAllPanels('dv');var modal=document.getElementById('dv-modal'),timeEl=document.getElementById('dv-big-time'),nameEl=document.getElementById('dv-name-input'),btn=document.getElementById('dv-name-submit'),badge=document.getElementById('dv-badge');if(!modal)return;if(timeEl)timeEl.textContent=_fmtTime(_dailyElapsed);if(badge)badge.textContent='Enter your name to save your score';if(nameEl){nameEl.value='';nameEl.disabled=false;}if(btn){btn.disabled=false;btn.textContent='Submit';}modal.classList.add('open');}
+function closeDV(){var m=document.getElementById('dv-modal');if(m)m.classList.remove('open');}
+function submitDailyScore(){var nameEl=document.getElementById('dv-name-input'),name=nameEl?(nameEl.value.trim().substring(0,16)||'Player'):'Player',btn=document.getElementById('dv-name-submit');if(btn){btn.disabled=true;btn.textContent='Saving...';}if(typeof db!=='undefined'&&db&&typeof userId!=='undefined'&&userId){var dateStr=getDailySeedString();setDoc(doc(db,'artifacts',appId,'public','data','voxeria_daily_lb',dateStr+'_'+userId),{date:dateStr,time:_dailyElapsed,name:name,userId:userId,ts:Date.now()}).then(function(){var b=document.getElementById('dv-badge');if(b)b.textContent='Score saved!';if(btn)btn.textContent='Saved';_loadDailyLB('dv-lb-rows',8,true);}).catch(function(e){console.error(e);if(btn){btn.disabled=false;btn.textContent='Retry';}});}else{var b2=document.getElementById('dv-badge');if(b2)b2.textContent='Not connected';if(btn)btn.textContent='(offline)';}}
+function _loadDailyLB(listId,maxRows,isVictory){var el=document.getElementById(listId);if(!el)return;if(typeof db==='undefined'||!db){el.innerHTML='<div style="color:rgba(255,255,255,.3);padding:10px;font-size:13px;">Connect to multiplayer to see rankings</div>';return;}el.innerHTML='<div style="color:rgba(255,255,255,.3);padding:10px;font-size:13px;">Loading...</div>';var dateStr=getDailySeedString(),colRef=collection(db,'artifacts',appId,'public','data','voxeria_daily_lb');getDocs(query(colRef,where('date','==',dateStr),orderBy('time','asc'),limitQuery(maxRows||10))).then(function(snap){if(snap.empty){el.innerHTML='<div style="color:rgba(255,255,255,.3);padding:10px;font-size:13px;">No scores yet!</div>';return;}var rows=[];snap.forEach(function(d){rows.push(d.data());});var html='',medals=['\u{1F947}','\u{1F948}','\u{1F949}'];rows.forEach(function(r,i){var rank=i+1,isMe=(typeof userId!=='undefined'&&r.userId===userId),rkStr=rank<=3?medals[rank-1]:rank+'.',rkCls=rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';if(isVictory)html+='<div class="dv-row"><span class="dv-rk '+rkCls+'">'+rkStr+'</span><span class="dv-nm'+(isMe?' me':'')+'">'+_escH(r.name||'Player')+'</span><span class="dv-tm'+(isMe?' me':'')+'">'+_fmtTime(r.time)+'</span></div>';else html+='<div class="dlb-row'+(isMe?' me':'')+(rank===1?' top1':'')+'"><span class="dlbr-rk '+rkCls+'">'+rkStr+'</span><span class="dlbr-nm'+(isMe?' me':'')+'">'+_escH(r.name||'Player')+'</span><span class="dlbr-tm'+(isMe?' me':'')+'">'+_fmtTime(r.time)+'</span></div>';});el.innerHTML=html;if(isVictory){var myRank=rows.findIndex(function(r){return typeof userId!=='undefined'&&r.userId===userId;})+1;var b=document.getElementById('dv-badge');if(b&&myRank>0)b.textContent=myRank===1?'#1 - Fastest today!':myRank===2?'#2 - So close!':myRank===3?'#3 - On the podium!':'#'+myRank+' on the leaderboard';}}).catch(function(e){console.error(e);el.innerHTML='<div style="color:#ff6b6b;padding:10px;font-size:13px;">Could not load scores</div>';});}
+function toggleDailyLB(){var modal=document.getElementById('dlb-modal');if(!modal)return;if(modal.classList.contains('open')){modal.classList.remove('open');return;}closeAllPanels('dlb');var dateEl=document.getElementById('dlb-hdr-date');if(dateEl)dateEl.textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase();modal.classList.add('open');_loadDailyLB('dlb-list',20,false);}
+function shareDailyResult(){var d=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});var text='Voxeria Daily Hunt - '+d+'\nFound the chest in '+_fmtTime(_dailyElapsed)+'! Can you beat me?\nPlay free on CrazyGames! #Voxeria';if(navigator.share){navigator.share({title:'Voxeria Daily Hunt',text:text}).catch(function(){_copyText(text);});}else{_copyText(text);}}
+function _copyText(text){if(navigator.clipboard){navigator.clipboard.writeText(text).then(function(){showNotification('Copied!');});}}
+(function(){
+  var CHAT_MAX=40,_chatName=null,_chatReady=false;
+  function _getChatName(){if(_chatName)return _chatName;var s=localStorage.getItem('voxeria_chat_name');if(s){_chatName=s;return s;}_chatName=(typeof userId!=='undefined'&&userId)?'Player'+userId.slice(-4).toUpperCase():'Guest'+Math.floor(Math.random()*9000+1000);localStorage.setItem('voxeria_chat_name',_chatName);return _chatName;}
+  function _addMsg(name,text,isMe,isSys){var box=document.getElementById('chat-messages');if(!box)return;var div=document.createElement('div');div.className='chat-msg '+(isSys?'sys':isMe?'me':'other');div.innerHTML=isSys?'<span class="chat-txt">'+_escH(text)+'</span>':'<span class="chat-who">'+_escH(name)+':</span><span class="chat-txt">'+_escH(text)+'</span>';while(box.children.length>=CHAT_MAX)box.removeChild(box.firstChild);box.appendChild(div);box.scrollTop=box.scrollHeight;}
+  function _initChat(){if(_chatReady)return;if(typeof db==='undefined'||!db){setTimeout(_initChat,2000);return;}_chatReady=true;var box=document.getElementById('chat-messages');if(box)box.innerHTML='';onSnapshot(query(collection(db,'artifacts',appId,'public','data','voxeria_chat'),orderBy('ts','asc'),limitQuery(40)),function(snap){if(!snap||snap.empty)return;snap.docChanges().forEach(function(change){if(change.type==='added'){var d=change.doc.data(),isMe=(typeof userId!=='undefined'&&d.userId===userId);_addMsg(d.name||'Player',d.text||'',isMe,false);}});},function(err){console.warn('Chat:',err);});}
+  function _sendChat(){var input=document.getElementById('chat-input');if(!input)return;var text=input.value.trim();if(!text)return;input.value='';if(!_chatReady||typeof db==='undefined'||!db){_addMsg('','Not connected',false,true);return;}var name=_getChatName(),uid=(typeof userId!=='undefined'&&userId)?userId:'anon';setDoc(doc(db,'artifacts',appId,'public','data','voxeria_chat',Date.now()+'_'+uid.slice(-6)),{text:text,name:name,userId:uid,ts:Date.now()}).catch(function(e){console.warn(e);});}
+  window.addEventListener('DOMContentLoaded',function(){var inp=document.getElementById('chat-input'),btn=document.getElementById('chat-send');if(inp){inp.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter'){e.preventDefault();_sendChat();}if(e.key==='Escape')inp.blur();});inp.addEventListener('keyup',function(e){e.stopPropagation();});inp.addEventListener('keypress',function(e){e.stopPropagation();});}if(btn)btn.addEventListener('click',function(){_sendChat();inp&&inp.focus();});setTimeout(_initChat,1500);});
+})();
+(function(){
+  var _saveReady=false,_lastJson='';
+  function _saveInv(){if(typeof db==='undefined'||!db)return;if(typeof userId==='undefined'||!userId)return;var json=JSON.stringify(inventory);if(json===_lastJson)return;_lastJson=json;setDoc(doc(db,'artifacts',appId,'public','data','voxeria_saves',userId),{inventory:inventory,userId:userId,ts:Date.now()}).catch(function(e){console.warn('Inv save:',e);});}
+  function _loadInv(){if(_saveReady)return;if(typeof db==='undefined'||!db)return;if(typeof userId==='undefined'||!userId)return;_saveReady=true;var unsub=onSnapshot(doc(db,'artifacts',appId,'public','data','voxeria_saves',userId),function(snap){unsub();var data=snap&&snap.data?snap.data():null;if(!data||!data.inventory||!data.inventory.length)return;inventory=data.inventory;if(typeof drawHotbar==='function')drawHotbar();showNotification('Inventory restored!');},function(e){console.warn('Inv load:',e);});}
+  function _tryInit(){if(typeof db!=='undefined'&&db&&typeof userId!=='undefined'&&userId)_loadInv();else setTimeout(_tryInit,2000);}
+  setTimeout(_tryInit,2000);
+  setInterval(_saveInv,30000);
+  document.addEventListener('visibilitychange',function(){if(document.hidden)_saveInv();});
+  window.addEventListener('beforeunload',_saveInv);
+  window._saveInventory=_saveInv;
+})();
+
 </script>
+  <div id="chat-wrap"><div id="chat-messages"><div class="chat-msg sys"><span class="chat-txt">World Chat loading...</span></div></div><div id="chat-input-row"><input id="chat-input" maxlength="80" placeholder="Chat with all players..." autocomplete="off" /><button id="chat-send">&gt;</button></div></div>
+  <div id="dv-modal"><div id="dv-box"><div id="dv-trophy">&#127942;</div><div id="dv-title">Daily Hunt Complete!</div><div id="dv-big-time">0:00</div><div id="dv-sub">Your time today</div><div id="dv-badge">Enter your name</div><div id="dv-name-row"><input id="dv-name-input" maxlength="16" placeholder="Your name..." /><button id="dv-name-submit" onclick="submitDailyScore()">Submit</button></div><div id="dv-lb-box"><div class="dv-lb-hdr">Today's fastest</div><div id="dv-lb-rows"><div style="color:rgba(255,255,255,.3);padding:10px;font-size:13px;">Submit to see rankings</div></div></div><div id="dv-btns"><button class="dvb-share" onclick="shareDailyResult()">Share</button><button class="dvb-lb" onclick="closeDV();toggleDailyLB();">Full Ranking</button><button class="dvb-close" onclick="closeDV()">Continue</button></div></div></div>
+  <div id="dlb-modal"><div id="dlb-hdr"><div><h2>Daily Leaderboard</h2><div id="dlb-hdr-date"></div></div><div id="dlb-x" onclick="toggleDailyLB()">X</div></div><div id="dlb-list"><div style="color:#6b7280;font-size:14px;padding:28px;text-align:center;">Loading...</div></div><button id="dlb-play" onclick="toggleDailyLB();applyDailySeed();">Play Today's Challenge</button></div>
 </body>
 </html>
