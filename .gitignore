@@ -1,0 +1,14 @@
+# Build- und Abhängigkeits-Ordner
+node_modules/
+dist/
+output/
+Voxeria-win32-x64/
+
+# Alte Backup-Stände (liegen weiterhin auf der Platte, werden nur nicht versioniert –
+# jede Datei ist ~9,6 MB und würde das Repo unnötig aufblähen)
+Voxeria_core.backup*.html
+Voxeria_core.html.bak*
+Voxeria_core_(Backup*.html
+Voxeria_core.dev.html
+Voxeria_core+.html
+Voxeria_lite*.html

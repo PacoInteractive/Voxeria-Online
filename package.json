@@ -1,0 +1,34 @@
+{
+    "app_name": "Voxeria",
+    "author": "",
+    "devDependencies": {
+        "electron": "^43.2.0",
+        "electron-builder": "^26.15.3"
+    },
+    "license": "ISC",
+    "main": "Voxeria_core+.html",
+    "name": "voxeriafinal",
+    "node-main": "main.js",
+    "scripts": {
+        "build": "electron-builder --win nsis",
+        "start": "electron ."
+    },
+    "type": "commonjs",
+    "version": "1.0.0",
+    "webkit": {},
+    "window": {
+        "exe_icon": "Screenshot 2026-07-25 222319.png",
+        "frame": true,
+        "fullscreen": true,
+        "icon": "Screenshot 2026-07-25 222319.png",
+        "id": "VoxeriaFinal",
+        "mac_icon": "Screenshot 2026-07-25 222319.png",
+        "min_height": 720,
+        "resizable": true,
+        "show": true,
+        "show_in_taskbar": false,
+        "title": "VoxeriaFinal",
+        "visible": true,
+        "width": 1280
+    }
+}
