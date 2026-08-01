@@ -60,7 +60,7 @@
     #early-loading-hint .elh-bar-fill{position:absolute;top:0;bottom:0;width:40%;border-radius:3px;background:linear-gradient(90deg,rgba(255,217,122,0),rgba(255,217,122,.95),rgba(255,217,122,0));animation:elh-bar 1.25s linear infinite}
     #early-loading-hint .elh-tip{transition:opacity .4s ease;min-height:16px}
   </style>
-  <div id="early-loading-hint" style="position:fixed;inset:0;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(circle at center,#2a2a3e 0%,#111118 100%);color:#fff;font-family:sans-serif;text-align:center;padding:24px;box-sizing:border-box;">
+  <div id="early-loading-hint" style="position:fixed;inset:0;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(circle at center,#2a2a3e 0%,#111118 100%);color:#fff;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;text-align:center;padding:24px;box-sizing:border-box;">
     <span class="elh-spark" style="left:18%;--fx:10px;animation-duration:3.4s;animation-delay:.1s"></span>
     <span class="elh-spark" style="left:32%;--fx:-14px;animation-duration:4.1s;animation-delay:1.1s"></span>
     <span class="elh-spark" style="left:50%;--fx:6px;animation-duration:3.7s;animation-delay:.6s"></span>
@@ -74,8 +74,8 @@
     </div>
     <div class="elh-title" style="font-size:16px;font-weight:800;letter-spacing:0.5px;">Loading Voxeria<span class="elh-dots"><span>.</span><span>.</span><span>.</span></span></div>
     <div class="elh-bar-track"><div class="elh-bar-fill"></div></div>
-    <div style="font-size:12.5px;color:rgba(255,255,255,0.6);max-width:320px;line-height:1.5;">This is a big one-file game, so it can take a few seconds on slower connections. It'll appear automatically — no need to click anything yet.</div>
-    <div class="elh-tip" id="elh-tip-text" style="font-size:12px;color:rgba(255,217,122,0.85);max-width:320px;line-height:1.5;font-style:italic;">Tip: Falling blocks and flowing lava can turn into obsidian — watch your step!</div>
+    <div style="font-size:12.5px;color:rgba(255,255,255,0.6);max-width:320px;line-height:1.5;">This is a big one-file game, so it can take a few seconds on slower connections. It'll appear automatically. No need to click anything yet.</div>
+    <div class="elh-tip" id="elh-tip-text" style="font-size:12px;color:rgba(255,217,122,0.85);max-width:320px;line-height:1.5;font-style:italic;">Tip: Falling blocks and flowing lava can turn into obsidian, so watch your step!</div>
   </div>
   <script>
     // Hard fallback: if the game somehow never reaches "PLAYING" (e.g. a script
@@ -90,8 +90,8 @@
     // still attached rather than clearing the interval from the outside).
     (function () {
       var tips = [
-        "Tip: Falling blocks and flowing lava can turn into obsidian — watch your step!",
-        "Tip: Dying drops your blocks nearby — you've got time to grab them back.",
+        "Tip: Falling blocks and flowing lava can turn into obsidian, so watch your step!",
+        "Tip: Dying drops your blocks nearby, and you've got time to grab them back.",
         "Tip: Some dimensions demand matching armor to survive their hazards.",
         "Tip: The Portal Book remembers every dimension you've ever discovered."
       ];
@@ -132,6 +132,13 @@
       --hud-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
       --hud-blur: 8px;
       --accent: #a855f7; /* the one shared interactive accent (buttons, focus) — already the app's most-used CTA purple */
+      /* One shared type stack for the whole game. --font-ui is the default for
+         everything; --font-mono is reserved for readouts that must not jitter
+         or reflow as their value changes (seed & mod codes, FPS and luck
+         counters, slider values). Canvas text can't read CSS variables, so
+         the same stack is mirrored in JS as FONT_UI_STACK / fontUI(). */
+      --font-ui: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', monospace;
     }
     #bg-decor {
       position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
@@ -216,7 +223,7 @@
        doesn't care what size the canvas is drawn at. */
     #game-wrapper {
       display: flex; flex-direction: column; align-items: stretch; justify-content: center;
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; user-select: none;
+      font-family: var(--font-ui); user-select: none;
       padding: 0; height: 100vh; height: 100dvh; position: relative; z-index: 1;
     }
     #canvas-wrapper {
@@ -264,7 +271,7 @@
     }
     #seed-input {
       background: rgba(0,0,0,0.5); border: 1px solid var(--accent); color: white;
-      padding: 4px 8px; border-radius: 4px; font-family: monospace; width: 110px;
+      padding: 4px 8px; border-radius: 4px; font-family: var(--font-mono); width: 110px;
       font-size: 12px; outline: none; transition: border-color 0.2s;
     }
     #seed-input:focus { border-color: #c9a3ff; box-shadow: 0 0 5px rgba(168, 85, 247, 0.5); }
@@ -339,7 +346,7 @@
     }
     #fps-counter {
       display: none; position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right));
-      z-index: 250; color: #00ffaa; font-size: 12px; font-weight: 700; font-family: monospace;
+      z-index: 250; color: #00ffaa; font-size: 12px; font-weight: 700; font-family: var(--font-mono);
       background: rgba(15,14,28,0.5); padding: 4px 8px; border-radius: 5px;
       text-shadow: 0 1px 3px rgba(0,0,0,0.8); letter-spacing: 0.3px;
     }
@@ -496,7 +503,7 @@
       background: var(--hud-bg); backdrop-filter: blur(var(--hud-blur));
       border: 1px solid var(--hud-border); border-radius: var(--hud-radius);
       padding: 5px 10px; font-size: 13px; font-weight: 800; color: #6ee7b7;
-      box-shadow: var(--hud-shadow); font-family: monospace;
+      box-shadow: var(--hud-shadow); font-family: var(--font-mono);
       pointer-events: none;
     }
     #luck-hud.active { display: block; }
@@ -673,7 +680,7 @@
     .mb-textarea { resize: vertical; }
     .mb-slider-row { display: flex; align-items: center; gap: 10px; }
     .mb-slider-row input[type="range"] { flex: 1; accent-color: #e854dc; }
-    .mb-slider-val { font-family: monospace; font-size: 12.5px; color: #e78bf5; min-width: 40px; text-align: right; }
+    .mb-slider-val { font-family: var(--font-mono); font-size: 12.5px; color: #e78bf5; min-width: 40px; text-align: right; }
     .mb-checks { display: flex; flex-direction: column; gap: 6px; }
     .mb-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,0.85); cursor: pointer; }
     .mb-check input[type="checkbox"] { width: 16px; height: 16px; accent-color: #e854dc; cursor: pointer; flex-shrink: 0; }
@@ -709,7 +716,7 @@
     }
     .mb-out-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.4px; }
     .mb-code-box {
-      font-family: monospace; font-size: 11.5px; word-break: break-all; background: rgba(0,0,0,0.4);
+      font-family: var(--font-mono); font-size: 11.5px; word-break: break-all; background: rgba(0,0,0,0.4);
       border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; color: #e0e0e0; max-height: 90px; overflow-y: auto;
     }
     .mb-link-box { color: #7fc4ff; }
@@ -1247,7 +1254,7 @@
     .pb-dim-name { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
     .pb-dim-desc { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.5; margin-bottom: 8px; }
     .pb-dim-recipe-label { font-size: 10px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-    .pb-dim-recipe-text { font-size: 12px; color: rgba(255,255,255,0.7); font-family: monospace; }
+    .pb-dim-recipe-text { font-size: 12px; color: rgba(255,255,255,0.7); }
     .pb-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
     .pb-badge.unlocked { background: rgba(80,220,100,0.2); color: #4ade80; border: 1px solid rgba(80,220,100,0.3); }
     .pb-badge.locked { background: rgba(180,180,180,0.1); color: #888; border: 1px solid rgba(180,180,180,0.2); }
@@ -1319,7 +1326,7 @@
       border: 1.5px solid rgba(160,100,255,0.4); border-radius: 10px;
       padding: 10px; min-width: 190px; max-width: 260px;
       box-shadow: 0 10px 34px rgba(0,0,0,0.7);
-      font-family: sans-serif; color: #fff;
+      font-family: var(--font-ui); color: #fff;
     }
     #block-action-popover.open { display: block; }
     .bap-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -1539,7 +1546,7 @@
           </div>
           <div class="settings-row">
             <label for="vibrantvox-atmosphere">Lighting</label>
-            <select id="vibrantvox-atmosphere" onchange="VibrantVox.setAtmosphere(this.value)" title="Dynamic lighting and color grading — day/night, weather, and each dimension's mood.">
+            <select id="vibrantvox-atmosphere" onchange="VibrantVox.setAtmosphere(this.value)" title="Dynamic lighting and color grading for day/night, weather, and each dimension's mood.">
               <option value="rich">Rich</option>
               <option value="subtle">Subtle</option>
               <option value="off">Off</option>
@@ -1591,7 +1598,7 @@
         <div id="mod-creator-subtitle">Replace blocks with your own look &amp; decide which creatures appear in your world. Saved automatically.</div>
 
         <h2 class="mc-section-heading">🧱 Block Reskin</h2>
-        <div class="shop-subtitle">Choose how each block should look instead (visual only — mining &amp; selling stay unchanged)</div>
+        <div class="shop-subtitle">Choose how each block should look instead (visual only; mining &amp; selling stay unchanged)</div>
         <div id="reskin-list" class="mc-list"></div>
         <button id="reskin-reset-btn" onclick="resetBlockReskin()">Reset all reskins</button>
 
@@ -1604,7 +1611,7 @@
       <div id="mod-builder-modal">
         <button id="close-mod-builder-top" onclick="toggleModBuilder()">✕</button>
         <h2>🧩 Create &amp; Publish a Mod</h2>
-        <div id="mod-builder-subtitle">Build a shareable mod code — custom world, perks &amp; starting gear. Play it via the code or a direct-play link, right from the game, no website needed.</div>
+        <div id="mod-builder-subtitle">Build a shareable mod code with a custom world, perks &amp; starting gear. Play it via the code or a direct-play link, right from the game, no website needed.</div>
 
         <h2 class="mc-section-heading">📝 Basic Info</h2>
         <div class="mb-field">
@@ -1704,11 +1711,11 @@
             <button type="button" class="mb-btn-ghost" id="mb-copy-code-btn">📋 Copy code</button>
             <button type="button" class="mb-btn-primary" id="mb-copy-link-btn">🔗 Copy direct-play link</button>
           </div>
-          <div class="shop-subtitle">Paste the code into the Seed field, or share the link — one click and it plays.</div>
+          <div class="shop-subtitle">Paste the code into the Seed field, or share the link. One click and it plays.</div>
         </div>
 
         <h2 class="mc-section-heading">📤 Publish</h2>
-        <div class="shop-subtitle">Share it in the community gallery so other players can find &amp; play it — pick at least one tag</div>
+        <div class="shop-subtitle">Share it in the community gallery so other players can find &amp; play it. Pick at least one tag</div>
         <div class="mb-tags" id="mb-tags">
           <button type="button" class="mb-tag" data-tag="hardcore">💀 Hardcore</button>
           <button type="button" class="mb-tag" data-tag="speedrun">⏱️ Speedrun</button>
@@ -1753,7 +1760,7 @@
       <div id="hotbar"></div>
       <div id="block-tooltip"></div>
     </div>
-    <div id="controls-hint">Alpha Version — Goal: Explore and mine blocks · 4 Dimensions to discover — open the 📖 Portal Book to learn how to build each portal!</div>
+    <div id="controls-hint">Alpha Version · Goal: Explore and mine blocks · 4 Dimensions to discover. Open the 📖 Portal Book to learn how to build each portal!</div>
     <div id="fps-counter">-- FPS</div>
   </div>
 </div>
@@ -2190,7 +2197,7 @@ function renderRoomPanel() {
   if (!nameEl || !subEl) return;
   if (!isMultiplayerActive) {
     nameEl.textContent = 'Offline';
-    subEl.textContent = 'No connection — you are playing solo.';
+    subEl.textContent = 'No connection, so you are playing solo.';
     return;
   }
   if (_roomMeta) nameEl.textContent = _roomMeta.name || rawSeedString;
@@ -2275,7 +2282,7 @@ function confirmVoxeriaHub(targetUrl) {
   document.querySelector('#voxeriahub-modal h3').textContent = isMods ? 'Create Mods on Voxeria Hub?' : 'Visit Voxeria Hub?';
   document.querySelector('#voxeriahub-modal p').innerHTML = isMods
     ? 'You are leaving the game and opening <strong>voxeriahub.com</strong> in a new tab to create and publish mods.'
-    : 'You are leaving the game and opening <strong>voxeriahub.com</strong> in a new tab — community seeds, leaderboards, and easy modding tools all in one place.';
+    : 'You are leaving the game and opening <strong>voxeriahub.com</strong> in a new tab. You will find community seeds, leaderboards, and easy modding tools all in one place.';
   document.getElementById('voxeriahub-modal').classList.add('open');
 }
 function closeVoxeriaHub() {
@@ -2313,6 +2320,16 @@ function confirmNewWorld() {
 // =========================================================
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+
+// Canvas text can't read CSS custom properties, so the DOM UI's --font-ui
+// stack is mirrored here. Every ctx.font assignment goes through fontUI() so
+// in-world text (floating damage/pickup text, item-drop counts, forge labels,
+// the death screen) is the same typeface as the surrounding HUD instead of
+// each call site picking its own — this file used to mix bare `sans-serif`,
+// a partial `'Segoe UI', sans-serif` and even a stray `10px Arial`.
+const FONT_UI_STACK = "'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+function fontUI(spec) { return spec + ' ' + FONT_UI_STACK; }
+
 const TILE = 28;
 let COLS = Math.floor(1280 / TILE); // ~45
 let ROWS = Math.floor(720 / TILE);  // ~25
@@ -3388,51 +3405,51 @@ const blockNames = {
 // system, crafting recipes, portal recipes, biomes) rather than generic
 // flavor text, so it reads as documentation, not filler.
 const blockDescriptions = {
-  1: 'The living topsoil of the Overworld — spreads onto bare dirt exposed to open sky.',
+  1: 'The living topsoil of the Overworld. Spreads onto bare dirt exposed to open sky.',
   2: 'Common, soft earth. Breaks fast and turns up almost everywhere.',
-  3: "The Overworld's filler stone — sturdy, common, and everywhere underground.",
-  4: 'Harvested straight from trees — one of the first real crafting materials you find.',
+  3: "The Overworld's filler stone: sturdy, common, and everywhere underground.",
+  4: 'Harvested straight from trees, and one of the first real crafting materials you find.',
   5: 'Rustles atop trees. Breaks easily and drops nothing rare.',
   6: 'Loose desert terrain. Cacti take root here and slowly grow upward.',
-  7: "Flows and pools naturally — can't be mined, only displaced or built around.",
-  8: 'The first real ore tier — common enough to build an early stockpile.',
+  7: "Flows and pools naturally. Can't be mined, only displaced or built around.",
+  8: 'The first real ore tier, common enough to build an early stockpile.',
   9: 'A dependable mid-tier ore, tougher to find than Coal but still common.',
   10: 'Rarer than Iron, and the cross material in the Gold Dimension portal recipe.',
-  11: 'Indestructible world floor — marks the bottom of every dimension you dig into.',
+  11: 'Indestructible world floor. Marks the bottom of every dimension you dig into.',
   12: 'Freshly cut tree trunk, one step before it becomes Planks.',
   13: 'Transparent and fragile-looking, crafted for windows and light-friendly builds.',
-  14: 'Processed Wood, smooth and stackable — the backbone of most player-built structures.',
-  15: 'Placeable light source — pushes back the dark in caves and at night.',
-  16: "One of the rarest Overworld ores — a genuine 'stop and celebrate' find.",
-  19: 'Decorative — has a small chance to seed itself onto nearby grass over time.',
-  20: 'A tool, not a block — sets flammable materials like Wood ablaze.',
-  21: "Background wall planks — walkable, not minable, marks 'behind' the play space.",
-  22: 'Coats the ground in the Snow biome — purely cosmetic terrain dressing.',
+  14: 'Processed Wood, smooth and stackable, the backbone of most player-built structures.',
+  15: 'Placeable light source. Pushes back the dark in caves and at night.',
+  16: "One of the rarest Overworld ores, a genuine 'stop and celebrate' find.",
+  19: 'Decorative. Has a small chance to seed itself onto nearby grass over time.',
+  20: 'A tool, not a block. Sets flammable materials like Wood ablaze.',
+  21: "Background wall planks: walkable, not minable, marks 'behind' the play space.",
+  22: 'Coats the ground in the Snow biome. Purely cosmetic terrain dressing.',
   23: 'Grows on Sand up to 3 blocks tall whenever there is open air above it.',
-  24: 'Frozen water — slick, and the center material in the Ocean Depth portal recipe.',
-  25: 'The rarest Overworld ore by far — shifting hues, a real trophy find.',
-  26: "Not minable — the gateway itself, built from a dimension's own recipe.",
+  24: 'Frozen water: slick, and the center material in the Ocean Depth portal recipe.',
+  25: 'The rarest Overworld ore by far, with shifting hues. A real trophy find.',
+  26: "Not minable. The gateway itself, built from a dimension's own recipe.",
   27: 'A pale stone variant found in certain Overworld biomes.',
-  28: 'Placeable explosive — clears a wide crater once lit with a Lighter.',
-  29: 'A refined Gold product — the cross material in the Lava Core portal recipe.',
-  31: 'The Ocean Depth seafloor — Coral and Kelp anchor and spread across it.',
+  28: 'Placeable explosive. Clears a wide crater once lit with a Lighter.',
+  29: 'A refined Gold product, the cross material in the Lava Core portal recipe.',
+  31: 'The Ocean Depth seafloor. Coral and Kelp anchor and spread across it.',
   32: 'Colonizes Ocean Stone seafloor over time, spreading sideways once submerged.',
   33: 'Grows upward through open water above Ocean Stone, like real underwater algae.',
-  34: "Ocean Depth's own Water — deeper, darker, and far more dangerous to swim.",
+  34: "Ocean Depth's own Water: deeper, darker, and far more dangerous to swim.",
   35: 'A glowing block that lights up the murky Ocean Depth.',
-  36: 'The base terrain of Lava Core — solid, but always one step from danger.',
+  36: 'The base terrain of Lava Core. Solid, but always one step from danger.',
   37: 'Deals heavy contact damage and passive heat damage unless you\'re protected.',
   38: 'Forms near lava, and the main ingredient in the Obsidian Heat Suit.',
   39: 'A Lava Core specialty ore, also scattered through a few other dimensions.',
-  40: 'A rare Lava Core crystal that pulses with heat — used in Fireproof Draughts.',
-  41: 'The floating-island terrain of the Blither — used in Void Walker Boots.',
-  42: 'The rarest resource in the Blither — a true endgame trophy.',
+  40: 'A rare Lava Core crystal that pulses with heat, used in Fireproof Draughts.',
+  41: 'The floating-island terrain of the Blither, used in Void Walker Boots.',
+  42: 'The rarest resource in the Blither, a true endgame trophy.',
   43: 'A shimmering Blither material, and a key ingredient for Void Walker Boots.',
   44: "Grows on the Blither's floating islands, glowing with unstable energy.",
   45: 'A translucent, void-touched glass variant found only in the Blither.',
   46: "The Volcano biome's base terrain, right at home near Lava Pools.",
   47: "Scorched, grey soil found around the Volcano biome's slopes.",
-  48: 'An Overworld hazard — deals damage on contact even outside Lava Core.',
+  48: 'An Overworld hazard. Deals damage on contact even outside Lava Core.',
   49: 'A Volcano biome ore with a distinct sulfur-yellow tint.',
   50: 'A charred building material native to the Volcano biome.',
   51: "The purple-tinted soil of the Mystic biome's underground caves.",
@@ -5522,7 +5539,7 @@ function onTutorialBlockMined(b, wx, wy) {
 
 function completeTutorial() {
   tutorialState.step = 'done'; saveTutorialState();
-  showHintOnce('tut_done', '🎉 First portal built!', 'This one just leads back here — real dimension portals need rare ore. Check the 📖 Portal Book to see how. Welcome to Voxeria!');
+  showHintOnce('tut_done', '🎉 First portal built!', 'This one just leads back here. Real dimension portals need rare ore. Check the 📖 Portal Book to see how. Welcome to Voxeria!');
   updateTutorialUI();
   setTutorialWorldLock(false);
 }
@@ -5554,7 +5571,7 @@ function updateTutorialUI() {
   const placeVerb = isTouch ? 'long-press' : 'hold the right mouse button';
   const texts = {
     stone: ['⛏️ Mine the Stone', 'Climb the steps, then ' + mineVerb + ' on the grey block until it breaks.'],
-    leaves: ['🍃 Collect Leaves', tutorialState.leavesFound + '/4 — ' + mineVerb + ' on the green leaves.'],
+    leaves: ['🍃 Collect Leaves', tutorialState.leavesFound + '/4 · ' + mineVerb + ' on the green leaves.'],
     build: ['🌀 Build the Portal', 'Pick a block, then ' + placeVerb + ' to place it: Stone in the middle, Leaves in a cross around it.']
   };
   const t = texts[tutorialState.step] || ['', ''];
@@ -5825,7 +5842,7 @@ function legacyCopyFallback(text) {
 const CREATURE_DISPLAY_NAMES = {
   chicken: '🐔 Chicken (Forest)', parrot: '🦜 Parrot (Jungle)', lizard: '🦎 Lizard (Desert)',
   butterfly: '🦋 Butterfly (Forest/Jungle)', sparrow: '🐦 Sparrow (Forest)', seahorse: '🪸 Seahorse (Ocean)',
-  raccoon: '🦝 Raccoon — Enemy (Blood Moon, Forest)', crocodile: '🐊 Crocodile — Enemy (Blood Moon, Jungle/Desert)', tick: '🕷️ Tick — Enemy (Blood Moon, Forest/Jungle)'
+  raccoon: '🦝 Raccoon · Enemy (Blood Moon, Forest)', crocodile: '🐊 Crocodile · Enemy (Blood Moon, Jungle/Desert)', tick: '🕷️ Tick · Enemy (Blood Moon, Forest/Jungle)'
 };
 
 function toggleModCreator() {
@@ -6108,7 +6125,7 @@ async function mbPublish() {
       userId: userId || 'anon',
       ts: Date.now()
     });
-    showNotification('🧩 Mod published — it now appears in the gallery!');
+    showNotification('🧩 Mod published! It now appears in the gallery.');
   } catch (e) {
     console.error('Publish error:', e);
     showNotification('❌ Publishing failed.');
@@ -8641,7 +8658,7 @@ function drawOtherPlayers(dt) {
     // Falls back to a short id-based label when no name is set.
     const label = (p.name && String(p.name).trim()) ? String(p.name).slice(0, 20)
                 : ('Player' + String(id).slice(-4).toUpperCase());
-    ctx.font='10px Arial'; ctx.textAlign='center';
+    ctx.font=fontUI('10px'); ctx.textAlign='center';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.75)';
     ctx.strokeText(label, 0, -player.h-8); // outline keeps the name readable over any terrain
     ctx.fillStyle='white';
@@ -9005,7 +9022,7 @@ function drawFloatingTexts() {
     ft.y+=ft.vy; ft.life--;
     if (ft.life<=0) { floatingTexts.splice(i,1); continue; }
     ctx.globalAlpha=Math.max(0,ft.life/ft.maxLife);
-    ctx.fillStyle=ft.color; ctx.font="bold 13px 'Segoe UI', sans-serif";
+    ctx.fillStyle=ft.color; ctx.font=fontUI('bold 13px');
     ctx.textAlign="center"; ctx.strokeStyle="rgba(0,0,0,0.8)"; ctx.lineWidth=2;
     ctx.strokeText(ft.text, ft.x-drawCamX, ft.y-drawCamY);
     ctx.fillText(ft.text, ft.x-drawCamX, ft.y-drawCamY);
@@ -9335,16 +9352,16 @@ function handlePlayerDeath() {
     if (pocketCollapsing) return; // the collapse cinematic already owns the ending
     deathPending = true;
     spawnPlayerExplosion();
-    showNotification('💀 You died — hurled back to the surface!');
+    showNotification('💀 You died! Hurled back to the surface.');
     setTimeout(() => { endPocketRun(true); deathPending = false; }, 1400);
     return;
   }
   deathPending = true;
   spawnPlayerExplosion();
   const lostBlocks = dropBlocksOnDeath();
-  showNotification(lostBlocks > 0 ? `💀 You exploded and dropped ${lostBlocks} blocks — go get them back!` : "💀 You died! Respawning...");
+  showNotification(lostBlocks > 0 ? `💀 You exploded and dropped ${lostBlocks} blocks. Go get them back!` : "💀 You died! Respawning...");
   if (typeof showHintOnce === 'function') {
-    showHintOnce('death_recovery', '💀 Died?', 'You only drop a few blocks where you fell — everything else in your inventory stays with you. Rank up to unlock /home for a fast trip back.');
+    showHintOnce('death_recovery', '💀 Died?', 'You only drop a few blocks where you fell. Everything else in your inventory stays with you. Rank up to unlock /home for a fast trip back.');
   }
   if (typeof _maybeShowModTip === 'function') _maybeShowModTip();
   setTimeout(() => {
@@ -11056,7 +11073,7 @@ function drawDeathDrops() {
     if (colors && colors[1]) { ctx.fillStyle = colors[1]; ctx.fillRect(-7, -7, 7, 7); }
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5; ctx.strokeRect(-7, -7, 14, 14);
-    if (d.count > 1) { ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(d.count), 0, 22); }
+    if (d.count > 1) { ctx.fillStyle = '#fff'; ctx.font = fontUI('bold 11px'); ctx.textAlign = 'center'; ctx.fillText(String(d.count), 0, 22); }
     ctx.restore();
   }
 }
@@ -11259,8 +11276,8 @@ function endPocketRun(killed) {
   blockDamage = {}; blockHitFlashes.length = 0;
   particles.length = 0; floatingTexts.length = 0; burningBlocks.length = 0; activeDynamites.length = 0;
   if (!killed) showNotification("🌍 Back in the normal world!");
-  else if (dim === "OCEAN") showNotification("💀 You drowned — hurled back to the surface!");
-  else showNotification("💀 The dimension collapsed — hurled back to the surface!");
+  else if (dim === "OCEAN") showNotification("💀 You drowned! Hurled back to the surface.");
+  else showNotification("💀 The dimension collapsed! Hurled back to the surface.");
 }
 
 // Removes the overworld PORTAL blocks the player built to enter, so a pocket
@@ -11590,7 +11607,7 @@ function doTeleport() {
     // the recipe stays valid after the tutorial too) — a real portal by
     // mechanics, but it deliberately doesn't go anywhere. The actual Gold/
     // Ocean/Lava/Void portals above still require their real ore.
-    showNotification("🌀 Just a practice portal — it doesn't lead anywhere.");
+    showNotification("🌀 Just a practice portal. It doesn't lead anywhere.");
   } else {
     currentDim = targetDim;
     const dimNames = { GOLD: "🌟 Gold Dimension!", OCEAN: "🌊 Ocean Depth!", LAVA: "🔥 Lava Core!", VOID: "🌌 Blither!" };
@@ -11772,7 +11789,7 @@ function updateAndDrawIntro(ctx, dt) {
   ctx.scale(Math.max(0.001,pop), Math.max(0.001,pop));
 
   ctx.textAlign='center';
-  ctx.font="bold 54px 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  ctx.font=fontUI('bold 54px');
   ctx.fillStyle='rgba(0,0,0,0.35)';
   ctx.fillText('VOXERIA',3,3);
   const titleGrad=ctx.createLinearGradient(0,-30,0,20);
@@ -11781,7 +11798,7 @@ function updateAndDrawIntro(ctx, dt) {
   ctx.fillText('VOXERIA',0,0);
 
   const pct=Math.min(100,Math.floor(introFillCount/TOTAL_INTRO_BLOCKS*100));
-  ctx.font="16px 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  ctx.font=fontUI('16px');
   ctx.fillStyle='rgba(255,255,255,0.85)';
   ctx.fillText(introPhase==="FALLING" ? `Building world… ${pct}%` : 'Ready!', 0, 40);
 
@@ -12199,7 +12216,7 @@ const PORTAL_DEFS = [
   {
     id: 'GOLD', name: '🌟 Gold Dimension', unlocked: true,
     color: '#f1c40f', glow: 'rgba(255,215,0,0.3)',
-    desc: 'The safe starting dimension — no hazard of its own. Its Vulcan-Schmiede forges the Obsidian Heat Suit you need to survive the Lava Core. Mine its Obsidian & Ember Ore veins, then hold E at the forge.',
+    desc: 'The safe starting dimension, with no hazard of its own. Its Vulcan-Schmiede forges the Obsidian Heat Suit you need to survive the Lava Core. Mine its Obsidian & Ember Ore veins, then hold E at the forge.',
     recipe: { center: BLOCKS.RAINBOW_ORE, cross: BLOCKS.GOLD_ORE },
     centerLabel: 'Rainbow Ore', crossLabel: 'Gold Ore',
     rewards: 'Obsidian, Ember Ore, Rainbow Ore, Gold Bricks'
@@ -12207,7 +12224,7 @@ const PORTAL_DEFS = [
   {
     id: 'LAVA', name: '🔥 Lava Core', unlocked: true,
     color: '#ff4400', glow: 'rgba(255,80,0,0.3)',
-    desc: 'The molten heart of the world. Obsidian pillars rise from rivers of lava, and Fire Crystals pulse with dangerous energy. Heat damages you over time — bring the Obsidian Heat Suit forged back in the Gold Dimension.',
+    desc: 'The molten heart of the world. Obsidian pillars rise from rivers of lava, and Fire Crystals pulse with dangerous energy. Heat damages you over time, so bring the Obsidian Heat Suit forged back in the Gold Dimension.',
     recipe: { center: BLOCKS.COAL_ORE, cross: BLOCKS.GOLD_BRICK },
     centerLabel: 'Coal Ore', crossLabel: 'Gold Brick',
     rewards: 'Obsidian, Ember Ore, Fire Crystal, Magma Rock'
@@ -12215,7 +12232,7 @@ const PORTAL_DEFS = [
   {
     id: 'OCEAN', name: '🌊 Ocean Depth', unlocked: true,
     color: '#4fc3f7', glow: 'rgba(80,180,255,0.3)',
-    desc: 'An endless underwater world of coral reefs, kelp forests, and crushing deep-water pressure. Sea Lanterns light the murky depths — bring the Pressure Diving Suit forged back in the Lava Core.',
+    desc: 'An endless underwater world of coral reefs, kelp forests, and crushing deep-water pressure. Sea Lanterns light the murky depths. Bring the Pressure Diving Suit forged back in the Lava Core.',
     recipe: { center: BLOCKS.ICE, cross: BLOCKS.DIAMOND_ORE },
     centerLabel: 'Ice Block', crossLabel: 'Diamond Ore',
     rewards: 'Coral, Kelp, Sea Lantern, Ember Ore'
@@ -12223,7 +12240,7 @@ const PORTAL_DEFS = [
   {
     id: 'VOID', name: '🌌 Blither', unlocked: true,
     color: '#9966ff', glow: 'rgba(120,60,255,0.3)',
-    desc: 'Blither — a realm of floating islands drifting through infinite space. The deadly fall is survived only with the Void Walker Boots forged back in Ocean Depth. Its Ur-Altar forges the prestige Golden Aegis from Void Ore & Star Dust.',
+    desc: 'Blither, a realm of floating islands drifting through infinite space. The deadly fall is survived only with the Void Walker Boots forged back in Ocean Depth. Its Ur-Altar forges the prestige Golden Aegis from Void Ore & Star Dust.',
     recipe: { center: BLOCKS.DIAMOND_ORE, cross: BLOCKS.RAINBOW_ORE },
     centerLabel: 'Diamond Ore', crossLabel: 'Rainbow Ore',
     rewards: 'Void Stone, Void Ore, Star Dust, Ether Crystal, Void Glass'
@@ -12248,7 +12265,7 @@ function markDimVisited(dim) {
   if (DIM_CHAIN.includes(dim)) {
     visitedDims.add(dim);
     if (typeof showHintOnce === 'function') {
-      showHintOnce('dimension_armor', '🛡️ New dimension, new hazards!', "Check the Portal Book's Crafting tab — some armor is forged in-world at a dimension's own special structure, so look around!");
+      showHintOnce('dimension_armor', '🛡️ New dimension, new hazards!', "Check the Portal Book's Crafting tab. Some armor is forged in-world at a dimension's own special structure, so look around!");
     }
   }
 }
@@ -12373,7 +12390,7 @@ function renderPortalBook() {
         lock.textContent = '🔒';
         const title = document.createElement('div');
         title.className = 'pb-mystery-title';
-        title.textContent = '??? — Undiscovered Dimension';
+        title.textContent = '??? · Undiscovered Dimension';
         const hint = document.createElement('div');
         hint.className = 'pb-mystery-hint';
         hint.textContent = 'Discover the dimension before it to reveal this portal.';
@@ -12710,19 +12727,19 @@ function toggleArmorEquip(dim) {
 const CRAFTING_RECIPES = [
   // ── Survival armor ──
   { id: 'armor_lava',  type: 'armor', dim: 'LAVA',  icon: '🔥',
-    name: 'Obsidian Heat Suit', effect: 'Forged in the Gold Dimension from Obsidian & Ember Ore — negates Lava Core heat & lava-contact damage.',
+    name: 'Obsidian Heat Suit', effect: 'Forged in the Gold Dimension from Obsidian & Ember Ore. Negates Lava Core heat & lava-contact damage.',
     mats: { [BLOCKS.OBSIDIAN]: 6, [BLOCKS.EMBER_ORE]: 5 },
     forge: { dim: 'GOLD', name: 'Vulcan-Schmiede' } },
   { id: 'armor_ocean', type: 'armor', dim: 'OCEAN', icon: '🌊',
-    name: 'Pressure Diving Suit', effect: 'Forged in the Lava Core from Ember Ore & Fire Crystal — drastically slows Ocean Depth oxygen loss (not full immunity — you can still drown eventually).',
+    name: 'Pressure Diving Suit', effect: 'Forged in the Lava Core from Ember Ore & Fire Crystal. Drastically slows Ocean Depth oxygen loss (not full immunity, you can still drown eventually).',
     mats: { [BLOCKS.EMBER_ORE]: 6, [BLOCKS.FIRE_CRYSTAL]: 4 },
     forge: { dim: 'LAVA', name: 'Flut-Altar' } },
   { id: 'armor_void',  type: 'armor', dim: 'VOID',  icon: '🌌',
-    name: 'Void Walker Boots', effect: 'Forged in Ocean Depth from Coral & Kelp — saves you from the deadly fall in the Blither.',
+    name: 'Void Walker Boots', effect: 'Forged in Ocean Depth from Coral & Kelp. Saves you from the deadly fall in the Blither.',
     mats: { [BLOCKS.CORAL]: 8, [BLOCKS.KELP]: 8 },
     forge: { dim: 'OCEAN', name: 'Abgrund-Altar' } },
   { id: 'armor_gold',  type: 'armor', dim: 'GOLD',  icon: '✨',
-    name: 'Golden Aegis', effect: 'Forged in the Blither from Void Ore & Star Dust — pure damage resistance, the prestige capstone of the chain.',
+    name: 'Golden Aegis', effect: 'Forged in the Blither from Void Ore & Star Dust. Pure damage resistance, the prestige capstone of the chain.',
     mats: { [BLOCKS.VOID_ORE]: 6, [BLOCKS.STAR_DUST]: 4 },
     forge: { dim: 'VOID', name: 'Ur-Altar' } },
 ];
@@ -12760,7 +12777,7 @@ function craftItem(recipeId) {
   for (const b in r.mats) removeFromInventory(parseInt(b, 10), r.mats[b]);
   craftedArmor.add(r.dim);
   equippedArmor.add(r.dim); // auto-equip what you just made
-  showNotification('🛡️ Crafted ' + r.icon + ' ' + r.name + ' — equipped, you can survive there now!');
+  showNotification('🛡️ Crafted ' + r.icon + ' ' + r.name + '! Equipped, you can survive there now.');
   playSound('buy');
   syncProgressToCloud();
   drawHotbar();
@@ -12875,7 +12892,7 @@ function forgeCraftComplete(r) {
     LAVA:  '🔥 LAVA-RESISTENZ FREIGESCHALTET!',
     OCEAN: '🌊 OZEAN-RESISTENZ FREIGESCHALTET!',
     VOID:  '🌌 VOID-RESISTENZ FREIGESCHALTET!',
-    GOLD:  '✨ GOLDENE AEGIS GESCHMIEDET — Prestige komplett!'
+    GOLD:  '✨ GOLDENE AEGIS GESCHMIEDET · Prestige komplett!'
   };
   impactFlashColor = ARMOR_FLASH[r.dim] || '255,217,122';
   showNotification(ARMOR_MSG[r.dim] || ('✨ ' + r.dim + '-RESISTENZ FREIGESCHALTET!'));
@@ -12991,7 +13008,7 @@ function drawForgeHologram(fx, fy, r, tintRgb) {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(ix, topY, iconSize, iconSize);
     ctx.fillStyle = ok ? '#9dffb0' : '#ffe9c2';
-    ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.font = fontUI('bold 11px'); ctx.textAlign = 'center';
     ctx.fillText(Math.min(have, need) + '/' + need, ix + iconSize / 2, topY + iconSize + 12);
     ix += iconSize + gap;
   }
@@ -13085,7 +13102,7 @@ function drawForgeStructure(fx, fy, tintRgb, near, spent) {
     ctx.strokeStyle = `rgba(${tintRgb},0.95)`; ctx.lineWidth = 2;
     ctx.fillRect(kx, ky, kw, kh); ctx.strokeRect(kx, ky, kw, kh);
     ctx.globalAlpha = 1; ctx.fillStyle = '#fff';
-    ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = fontUI('bold 13px'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('E', cx, ky + kh / 2 + 1);
     ctx.textBaseline = 'alphabetic';
     ctx.restore();
@@ -13188,7 +13205,7 @@ function updateDimForge(dt) {
 
   // Not near the forge — a persistent nudge once materials are ready, so the
   // player knows to go find it (Step B of the quest).
-  if (recipeAffordable(r)) showForgeHint('⚒️ Materials ready — find the ' + forgeName + '!');
+  if (recipeAffordable(r)) showForgeHint('⚒️ Materials ready! Find the ' + forgeName + '.');
   else hideForgeHint();
 }
 
@@ -13206,7 +13223,7 @@ function renderCraftingTab(body) {
     recipes.forEach(r => wrap.appendChild(craftCard(r)));
   };
 
-  section('🛡️ Survival Armor', 'Permanent — stacks global damage reduction while equipped, wear all 4 for a set bonus. 🔒 pieces are forged in-world, not here.', CRAFTING_RECIPES.filter(r => r.type === 'armor'));
+  section('🛡️ Survival Armor', 'Permanent. Stacks global damage reduction while equipped, and wearing all 4 gives a set bonus. 🔒 pieces are forged in-world, not here.', CRAFTING_RECIPES.filter(r => r.type === 'armor'));
 
   body.appendChild(wrap);
 }
@@ -13315,7 +13332,7 @@ initFirebase(); drawHealth(); drawHotbar(); checkChatUnlockStatus(); updateDefen
     } else if (attempt < 8) {
       setTimeout(function() { announceMultiplayerStatus(attempt + 1); }, 500);
     } else {
-      showNotification("🔴 Multiplayer offline – playing solo");
+      showNotification("🔴 Multiplayer offline, playing solo");
     }
   }
   setTimeout(function() { announceMultiplayerStatus(0); }, 300);
@@ -13568,7 +13585,7 @@ function _checkOwnFlood(text){
   }
   var recentCount = _ownMsgHistory.filter(function(m){ return now - m.ts <= 15000; }).length;
   if (recentCount >= 6) {
-    return { ok: false, reason: "You're sending messages too fast — please slow down." };
+    return { ok: false, reason: "You're sending messages too fast. Please slow down." };
   }
   _ownMsgHistory.push({ text: normText, ts: now });
   return { ok: true };
@@ -13847,7 +13864,7 @@ window.addEventListener('DOMContentLoaded', function(){
   // bypasses its own send cooldown, every other player's client independently
   // hides that uid's messages once it floods, so nobody's chat view gets spammed.
   var _incomingBurst={},_burstWarned={};
-  function _initChat(){if(_chatReady)return;if(typeof db==='undefined'||!db){setTimeout(_initChat,2000);return;}_chatReady=true;var box=document.getElementById('chat-messages');if(box)box.innerHTML='';onSnapshot(query(collection(db,'artifacts',appId,'public','data','voxeria_chat'),orderBy('ts','asc'),limitQuery(40)),function(snap){if(!snap||snap.empty)return;snap.docChanges().forEach(function(change){if(change.type!=='added')return;var d=change.doc.data();if(_bannedUids[d.userId])return;var uid=d.userId||'?';if(!d.isAdmin&&!d.isRankAnnounce){var now=Date.now();var hist=_incomingBurst[uid]||(_incomingBurst[uid]=[]);while(hist.length&&now-hist[0]>8000)hist.shift();hist.push(now);if(hist.length>5){if(!_burstWarned[uid]){_burstWarned[uid]=true;_addMsg('',(d.name||'A player')+' is sending messages too fast — further messages are hidden briefly.',false,true);}return;}_burstWarned[uid]=false;}var isMe=(typeof userId!=='undefined'&&d.userId===userId);_addMsg(d.name||'Player',d.isAdmin?d.text:_filterIncomingChat(d.text||''),isMe,false,!!d.isAdmin,!!d.isRankAnnounce);});},function(err){console.warn('Chat:',err);});}
+  function _initChat(){if(_chatReady)return;if(typeof db==='undefined'||!db){setTimeout(_initChat,2000);return;}_chatReady=true;var box=document.getElementById('chat-messages');if(box)box.innerHTML='';onSnapshot(query(collection(db,'artifacts',appId,'public','data','voxeria_chat'),orderBy('ts','asc'),limitQuery(40)),function(snap){if(!snap||snap.empty)return;snap.docChanges().forEach(function(change){if(change.type!=='added')return;var d=change.doc.data();if(_bannedUids[d.userId])return;var uid=d.userId||'?';if(!d.isAdmin&&!d.isRankAnnounce){var now=Date.now();var hist=_incomingBurst[uid]||(_incomingBurst[uid]=[]);while(hist.length&&now-hist[0]>8000)hist.shift();hist.push(now);if(hist.length>5){if(!_burstWarned[uid]){_burstWarned[uid]=true;_addMsg('',(d.name||'A player')+' is sending messages too fast. Further messages are hidden briefly.',false,true);}return;}_burstWarned[uid]=false;}var isMe=(typeof userId!=='undefined'&&d.userId===userId);_addMsg(d.name||'Player',d.isAdmin?d.text:_filterIncomingChat(d.text||''),isMe,false,!!d.isAdmin,!!d.isRankAnnounce);});},function(err){console.warn('Chat:',err);});}
   // Feedback goes through showNotification (the always-visible toast), not
   // _addMsg — the chat log it writes to is hidden while World Chat is
   // disabled, so that would be silent. Backs the "/"-prefixed chat input
@@ -14003,7 +14020,7 @@ window.addEventListener('DOMContentLoaded', function(){
   </div>
 <div id="voxeriahub-modal">
   <h3>Visit Voxeria Hub?</h3>
-  <p>You are leaving the game and opening <strong>voxeriahub.com</strong> in a new tab — community seeds, leaderboards, and easy modding tools all in one place.</p>
+  <p>You are leaving the game and opening <strong>voxeriahub.com</strong> in a new tab. You will find community seeds, leaderboards, and easy modding tools all in one place.</p>
   <div class="vh-actions">
     <button id="voxeriahub-cancel" onclick="closeVoxeriaHub()">Cancel</button>
     <button id="voxeriahub-confirm" onclick="openVoxeriaHub()">Open</button>
