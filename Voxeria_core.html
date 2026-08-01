@@ -1573,8 +1573,8 @@
       <div id="forge-progress"><div id="fp-title">Forging…</div><div id="fp-track"><div id="fp-fill"></div></div></div>
       <div id="intro-hint-banner">
         <div id="ih-close" onclick="dismissIntroHint()">✕</div>
-        <div id="ih-title">🖱️ Left-click to mine · Right-click to place</div>
-        <div id="ih-sub">Mine some Wood &amp; Stone to get started — open the 📖 Portal Book anytime to see how to build each dimension's portal.</div>
+        <div id="ih-title">🖱️ Hold left mouse to mine · Hold right mouse to place</div>
+        <div id="ih-sub">Keep the button held down until the block breaks. Mine some Wood &amp; Stone to get started, and open the 📖 Portal Book anytime to see how to build each dimension's portal.</div>
       </div>
       <div id="tutorial-objective">
         <div id="to-title"></div>
@@ -5531,7 +5531,11 @@ function updateTutorialUI() {
   const panel = document.getElementById('tutorial-objective');
   const badge = document.getElementById('tutorial-badge');
   if (!panel) return;
-  if (!tutorialSite || tutorialState.step === 'done') {
+  // Also stays hidden during the intro's "Building world…" animation — the
+  // objective panel and badge used to sit on top of the loading screen telling
+  // the player to mine a block they can't even see yet. Re-called the moment
+  // gameState flips to PLAYING (see updateAndDrawIntro).
+  if (!tutorialSite || tutorialState.step === 'done' || gameState === 'INTRO') {
     panel.classList.remove('visible');
     if (badge) badge.classList.remove('visible');
     return;
@@ -5540,10 +5544,18 @@ function updateTutorialUI() {
   if (badge) badge.classList.add('visible');
   const titleEl = document.getElementById('to-title');
   const subEl = document.getElementById('to-sub');
+  // Mining and placing are HOLD actions on desktop (see updateMiningHold —
+  // Stone is hardness 2, i.e. a full 2-second hold), and tap / long-press on
+  // touch. The step texts have to name the real gesture: the objective used to
+  // say only WHAT to do, never HOW, so a new player would single-click the
+  // first Stone, watch the crack reset, and conclude the game was broken.
+  const isTouch = document.documentElement.classList.contains('touch-device');
+  const mineVerb = isTouch ? 'tap and hold' : 'hold the left mouse button';
+  const placeVerb = isTouch ? 'long-press' : 'hold the right mouse button';
   const texts = {
-    stone: ['⛏️ Mine the Stone', "Climb the steps — it's the grey block up top."],
-    leaves: ['🍃 Collect Leaves', tutorialState.leavesFound + '/4 found'],
-    build: ['🌀 Build the Portal', 'Stone in the middle, Leaves in a cross around it.']
+    stone: ['⛏️ Mine the Stone', 'Climb the steps, then ' + mineVerb + ' on the grey block until it breaks.'],
+    leaves: ['🍃 Collect Leaves', tutorialState.leavesFound + '/4 — ' + mineVerb + ' on the green leaves.'],
+    build: ['🌀 Build the Portal', 'Pick a block, then ' + placeVerb + ' to place it: Stone in the middle, Leaves in a cross around it.']
   };
   const t = texts[tutorialState.step] || ['', ''];
   if (titleEl) titleEl.textContent = t[0];
@@ -5585,7 +5597,24 @@ function _blockDuringTutorial() {
 if (tutorialSite) {
   updateTutorialUI();
   setTutorialWorldLock(true);
-  setTimeout(() => showHintOnce('tut_ramp', '👋 Welcome to Voxeria!', 'Climb the steps to your right.'), 1500);
+  // The welcome hint used to fire on a flat 1.5s timer, which lands in the
+  // middle of the intro's "Building world…" animation. showHintOnce is
+  // localStorage-gated to fire once per DEVICE and the banner self-dismisses
+  // after 10s, so a slow first load could burn the only onboarding hint a
+  // player will ever get without them seeing a single frame of it. Wait for
+  // the world to actually be on screen instead.
+  //
+  // It also has to explain HOW to move: showIntroHintIfNeeded (the banner that
+  // teaches the controls) deliberately bails out while the tutorial is active,
+  // so without this the guided tutorial never named a single control.
+  (function _tutorialWelcomeWhenReady() {
+    if (gameState !== 'PLAYING') { setTimeout(_tutorialWelcomeWhenReady, 200); return; }
+    const isTouch = document.documentElement.classList.contains('touch-device');
+    showHintOnce('tut_ramp', '👋 Welcome to Voxeria!',
+      isTouch
+        ? 'Walk and jump with the on-screen buttons. Climb the steps to your right.'
+        : 'Walk with A / D (or ← →), jump with Space. Climb the steps to your right.');
+  })();
 }
 
 let fallStartY = null;
@@ -9595,6 +9624,13 @@ function executePlace(wx, wy) {
         if (item.block === BLOCKS.LEAVES && !isLeafSupported(wx, wy)) {
           setBlock(wx, wy, BLOCKS.AIR);
           spawnFallingLeaf(wx, wy);
+          // Used to fail completely silently: the leaf just disappeared with no
+          // reason given anywhere. That is a genuine trap during the tutorial's
+          // build step (Leaves are 4 of the 5 portal blocks) — it reads as "the
+          // game won't let me finish" rather than "this spot has no trunk".
+          addJuiceText(wx*TILE+TILE/2, wy*TILE+TILE*0.9, 'needs a trunk!', '#7ed957');
+          showHintOnce('leaf_support', '🍃 Leaves need a tree nearby',
+            'A Leaves block only stays put with a Log or Wood block within about 5 blocks. Build closer to a trunk.');
         }
         checkPortal(wx,wy);
         if (item.count<=0) { inventory[selectedSlot] = null; }
@@ -11691,7 +11727,14 @@ function updateAndDrawIntro(ctx, dt) {
     if(allSettled) introPhase="FADING";
   } else if (introPhase==="FADING") {
     introAlpha-=0.01*dt;
-    if(introAlpha<=0){gameState="PLAYING";const elh=document.getElementById('early-loading-hint');if(elh)elh.remove();}
+    if(introAlpha<=0){
+      gameState="PLAYING";
+      const elh=document.getElementById('early-loading-hint');if(elh)elh.remove();
+      // The tutorial panel/badge are suppressed while gameState is "INTRO"
+      // (see updateTutorialUI) — now that the world is actually visible, let
+      // them appear.
+      if(typeof updateTutorialUI==='function') updateTutorialUI();
+    }
   }
 
   // Falling/settled blocks — a real highlight/shadow bevel per block (matches
@@ -12596,13 +12639,12 @@ function updateDefenseBadge() {
   el.classList.add('visible');
 }
 
-// Re-derives the shared movement/mining stats (and max health) from
-// currently EQUIPPED armor — replaces the old coin-shop's
-// applyCoinUpgradeBonuses(). Only ever CLAMPS health down if maxHealth
+// Re-derives the shared movement/mining stats (and max health) from the
+// currently EQUIPPED armor. Only ever CLAMPS health down if maxHealth
 // shrank (unequipping a piece), never heals up — otherwise toggling armor
 // mid-fight would be a free heal button. Callers that want a full heal
 // (world reset, cloud restore) explicitly set player.health after calling
-// this, same as the old function's callers did.
+// this.
 function applyArmorStatBonuses() {
   let luck = 0, health = 0, speed = 0, jump = 0, reach = 0;
   for (const dim in ARMOR_STATS) {
