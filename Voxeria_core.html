@@ -507,46 +507,8 @@
       pointer-events: none;
     }
     #luck-hud.active { display: block; }
-    /* .npb-recipe-row is also reused by the tutorial's own recipe diagram
-       (#to-recipe-row) — kept even though the always-on next-portal-box HUD
-       it originally styled was removed (it nagged players every session). */
     .npb-recipe-row { display: flex; align-items: center; gap: 8px; }
     #hud-side-actions { display: flex; gap: 8px; pointer-events: auto; }
-    /* ── First-time guided tutorial objective panel — top-left HUD card
-       showing the current tutorial step + live progress. ── */
-    #tutorial-objective {
-      display: none; position: absolute; top: 15px; left: 15px; z-index: 100;
-      min-width: 170px;
-      background: var(--hud-bg); backdrop-filter: blur(var(--hud-blur));
-      border: 1px solid var(--hud-border); border-radius: var(--hud-radius);
-      padding: 8px 14px; flex-direction: column; gap: 4px;
-      box-shadow: var(--hud-shadow); pointer-events: none;
-    }
-    #tutorial-objective.visible { display: flex; }
-    #to-title { color: #ffe9b0; font-size: 12.5px; font-weight: 800; letter-spacing: 0.3px; }
-    #to-sub { color: #e6d9ff; font-size: 11px; font-weight: 600; }
-    #to-recipe-row { display: none; margin-top: 2px; }
-    #to-recipe-row.visible { display: flex; }
-    #to-recipe-canvas { image-rendering: pixelated; flex-shrink: 0; }
-    #to-recipe-label { font-size: 11px; font-weight: 700; color: #e6d9ff; line-height: 1.3; }
-    /* ── Constant "you are in the tutorial" ribbon — separate from the
-       objective panel, so the guided site never reads as just some random
-       patch of world the player got dropped into. ── */
-    #tutorial-badge {
-      display: none; position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-      z-index: 100; pointer-events: none;
-      background: linear-gradient(135deg, #7b3fd4, #b565f5);
-      border: 1px solid rgba(255,255,255,0.35); border-radius: 999px;
-      padding: 5px 16px; font-size: 12px; font-weight: 800; letter-spacing: 0.6px;
-      color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-      box-shadow: 0 4px 18px rgba(123,63,212,0.55);
-      animation: tutorialBadgePulse 2.4s ease-in-out infinite;
-    }
-    #tutorial-badge.visible { display: block; }
-    @keyframes tutorialBadgePulse {
-      0%, 100% { box-shadow: 0 4px 18px rgba(123,63,212,0.55); }
-      50% { box-shadow: 0 4px 26px rgba(181,101,245,0.85); }
-    }
     .shop-subtitle {
       text-align: center; color: rgba(255,255,255,0.4); font-size: 11px; margin: -8px 0 2px;
       letter-spacing: 1.2px; text-transform: uppercase; font-weight: 600;
@@ -1583,15 +1545,6 @@
         <div id="ih-title">🖱️ Hold left mouse to mine · Hold right mouse to place</div>
         <div id="ih-sub">Keep the button held down until the block breaks. Mine some Wood &amp; Stone to get started, and open the 📖 Portal Book anytime to see how to build each dimension's portal.</div>
       </div>
-      <div id="tutorial-objective">
-        <div id="to-title"></div>
-        <div id="to-sub"></div>
-        <div id="to-recipe-row" class="npb-recipe-row">
-          <canvas id="to-recipe-canvas"></canvas>
-          <span id="to-recipe-label">Stone + Leaves</span>
-        </div>
-      </div>
-      <div id="tutorial-badge">📘 TUTORIAL</div>
       <div id="mod-creator-modal">
         <button id="close-mod-creator-top" onclick="toggleModCreator()">✕</button>
         <h2>🎨 Create your own Mod</h2>
@@ -1603,7 +1556,7 @@
         <button id="reskin-reset-btn" onclick="resetBlockReskin()">Reset all reskins</button>
 
         <h2 class="mc-section-heading">🐾 Creature Selection</h2>
-        <div class="shop-subtitle">Enable or disable which animals &amp; enemies spawn in your world</div>
+        <div class="shop-subtitle">Enable or disable which creatures spawn in your world</div>
         <div id="creature-toggle-list" class="mc-list"></div>
 
         <button id="close-mod-creator" onclick="toggleModCreator()">Close</button>
@@ -2209,7 +2162,6 @@ function renderRoomPanel() {
 }
 
 function joinWeeklyLobby() {
-  if (_blockDuringTutorial()) return;
   const input = document.getElementById('seed-input');
   if (input) input.value = getWeeklySeedString();
   applySeedFromUI();
@@ -2219,7 +2171,6 @@ function joinWeeklyLobby() {
 window.joinWeeklyLobby = joinWeeklyLobby;
 
 function createRoom() {
-  if (_blockDuringTutorial()) return;
   if (!isMultiplayerActive || !db || !userId) { showNotification('⚠️ Multiplayer is offline'); return; }
   let code = ROOM_PREFIX;
   for (let i = 0; i < 6; i++) code += 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)];
@@ -2240,7 +2191,6 @@ function createRoom() {
 window.createRoom = createRoom;
 
 function joinRoomFromInput() {
-  if (_blockDuringTutorial()) return;
   const field = document.getElementById('rp-join-input');
   if (!field) return;
   const code = field.value.trim().toUpperCase();
@@ -2298,7 +2248,6 @@ function openVoxeriaHub() {
 // that new seed to everyone else. Destructive enough (for you and possibly
 // the room) to earn a confirm step instead of firing on a single click.
 function openNewWorldConfirm() {
-  if (_blockDuringTutorial()) return;
   // Used to warn that this changes the world for everyone else too — that was
   // true back when a seed change broadcast to every connected player (see
   // voxeria-mp-overhaul memory). Now the seed IS the room: only you change
@@ -2312,7 +2261,6 @@ function closeNewWorldConfirm() {
 }
 function confirmNewWorld() {
   closeNewWorldConfirm();
-  if (_blockDuringTutorial()) return;
   applySeedFromUI();
 }
 // =========================================================
@@ -3251,16 +3199,8 @@ let surfaceSamples = []; // cached {wx, sy} of visible ground columns, refreshed
 
 let animals = [];
 let animalSpawnTick = 0;
-const MAX_ANIMALS = 16;
-const ANIMAL_LIMITS = { chicken: 3, parrot: 2, lizard: 4, butterfly: 6, sparrow: 4, seahorse: 4 };
-
-// =========================================================
-// ENEMIES — hostile mobs with red eyes, only spawn during Blood Moon nights
-// =========================================================
-let enemies = [];
-let enemySpawnTick = 0;
-const MAX_ENEMIES = 8;
-const ENEMY_LIMITS = { raccoon: 3, crocodile: 2, tick: 4 };
+const MAX_ANIMALS = 6;
+const ANIMAL_LIMITS = { butterfly: 6 };
 
 // Gold Dimension hazard: 3-5 bouncing "Gold Slime" balls per pocket run —
 // no damage on touch, just a flash-freeze (see player.goldFrozenTimer).
@@ -3280,10 +3220,15 @@ let isBloodMoon = false; // true only while dayPhase==='night' && bloodMoonActiv
 // =========================================================
 let blockReskin = {};
 try { blockReskin = JSON.parse(localStorage.getItem('voxeria_block_reskin') || '{}') || {}; } catch (e) { blockReskin = {}; }
-let creatureToggles = { chicken: true, parrot: true, lizard: true, butterfly: true, sparrow: true, seahorse: true, raccoon: true, crocodile: true, tick: true };
+let creatureToggles = { butterfly: true };
 try {
   const savedToggles = JSON.parse(localStorage.getItem('voxeria_creature_toggles') || 'null');
-  if (savedToggles) Object.assign(creatureToggles, savedToggles);
+  // Only merge keys that still exist — an old save from before other
+  // creatures were removed could otherwise resurrect a stray 'raccoon: false'
+  // entry that nothing reads anymore but the toggle panel would still list.
+  if (savedToggles) for (const k of Object.keys(creatureToggles)) {
+    if (k in savedToggles) creatureToggles[k] = savedToggles[k];
+  }
 } catch (e) {}
 function saveBlockReskin() { try { localStorage.setItem('voxeria_block_reskin', JSON.stringify(blockReskin)); } catch (e) {} }
 function saveCreatureToggles() { try { localStorage.setItem('voxeria_creature_toggles', JSON.stringify(creatureToggles)); } catch (e) {} }
@@ -3746,38 +3691,9 @@ function isWeeklyAutoSeed(seedRaw) {
   return /^WEEKLY-\d+$/.test(String(seedRaw));
 }
 
-// ── First-time tutorial state (read this early — it decides the seed below) ──
-const TUTORIAL_KEY = 'voxeria_tutorial';
-function loadTutorialState() {
-  try { const raw = localStorage.getItem(TUTORIAL_KEY); if (raw) return JSON.parse(raw); } catch (e) {}
-  // The ramp itself isn't a tracked step (there's no clean "reached the top"
-  // hook) — it's just the path to the Stone block, so the sequence starts
-  // there directly. 'stone' → 'leaves' → 'build' → 'done'.
-  return { step: 'stone', leavesFound: 0 };
-}
-function saveTutorialState() { try { localStorage.setItem(TUTORIAL_KEY, JSON.stringify(tutorialState)); } catch (e) {} }
-
-// A brand-new player who hasn't finished the tutorial gets a private random
-// seed instead of the shared weekly world — the tutorial stamps fixed terrain
-// at spawn, which the real shared world (already shaped by other players'
-// edits, live-synced via Firestore) would silently overwrite moments later.
-// Skipped entirely for anyone arriving via an explicit link (?room=/?seed=/?mod=).
-function _tutorialWantsPrivateSeed() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('room') || params.get('seed') || params.get('mod') || window._pendingUrlMod) return false;
-    return loadTutorialState().step !== 'done';
-  } catch (e) { return false; }
-}
-const _tutorialPrivateSeed = _tutorialWantsPrivateSeed();
-// Same lock a ?mod=/?seed= direct-play link gets (see applySeedFromUI) —
-// keeps any shared-state seed broadcast from yanking the tutorial's private
-// seed back to a shared one.
-if (_tutorialPrivateSeed) window._urlSeedLock = true;
-
 // Default world seed is the fixed weekly seed — everyone who hasn't picked an
 // explicit custom seed/invite room converges on the same world for the week.
-let rawSeedString = _tutorialPrivateSeed ? ('TUTORIAL-' + Date.now()) : getWeeklySeedString();
+let rawSeedString = getWeeklySeedString();
 let SEED = seedToNumber(rawSeedString);
 let activeMod = null;
 // Snapshot of the player's real inventory taken the moment a mod is entered;
@@ -5405,20 +5321,6 @@ function checkPortal(wx, wy) {
         return;
       }
     }
-    // ── Starter Portal (tutorial only): Stone center, Leaves cross — built
-    // from common blocks so a first-time player never needs rare ore just to
-    // learn the "block in the middle, 4 around it" mechanic. Gated to the
-    // tutorial's own build step so an ordinary stone wall next to a tree
-    // never accidentally "opens a portal" during normal play. It leads back
-    // to the Overworld (see doTeleport) — the real dimension portals above
-    // still require their real ore.
-    if (tutorialSite && tutorialState.step === 'build' && center === BLOCKS.STONE) {
-      if (getBlock(cx2-1,cy2) === BLOCKS.LEAVES && getBlock(cx2+1,cy2) === BLOCKS.LEAVES &&
-          getBlock(cx2,cy2-1) === BLOCKS.LEAVES && getBlock(cx2,cy2+1) === BLOCKS.LEAVES) {
-        activatePortal(cx2, cy2, 'OVERWORLD', '🌀 Portal built!');
-        return;
-      }
-    }
   }
 }
 
@@ -5431,15 +5333,8 @@ function activatePortal(cx2, cy2, targetDim, msg) {
   setBlockAndBroadcast(cx2+1, cy2, BLOCKS.PORTAL, targetDim);
   setBlockAndBroadcast(cx2, cy2-1, BLOCKS.PORTAL, targetDim);
   setBlockAndBroadcast(cx2, cy2+1, BLOCKS.PORTAL, targetDim);
-  // A brand-new player's very first (tutorial) portal gets an extra-large
-  // version of the same fanfare, plus flips the tutorial to 'done'. Not
-  // tied to a specific targetDim — the tutorial's own Stone+Leaves starter
-  // portal (targetDim 'OVERWORLD') is the normal case, but a player who
-  // wandered off and built a real Gold portal instead still completes it.
-  const isTutorialFirst = typeof tutorialState !== 'undefined' && tutorialState.step === 'build';
-  spawnPortalOpenBurst(cx2*TILE+TILE/2, cy2*TILE+TILE/2, PORTAL_BURST_COLORS[targetDim] || '#c99bff', isTutorialFirst);
+  spawnPortalOpenBurst(cx2*TILE+TILE/2, cy2*TILE+TILE/2, PORTAL_BURST_COLORS[targetDim] || '#c99bff', false);
   showNotification(msg); screenShake = 15;
-  if (isTutorialFirst) completeTutorial();
 }
 
 let initialSpawnX = findSafeSpawnX();
@@ -5452,187 +5347,6 @@ const player = {
   wetTimer: 0, frozenTimer: 0, goldFrozenTimer: 0,
   color: `hsl(${Math.floor(Math.random() * 360)}, 100%, 70%)`
 };
-
-// =========================================================
-// FIRST-TIME GUIDED TUTORIAL
-// A brand-new player's very first spawn gets a small hand-placed site (a
-// climbable ramp + 1 Stone block + a small tree for Leaves — deliberately
-// common blocks, not rare ore, since this portal is only meant to teach the
-// "block in the middle, 4 around it" mechanic) plus a guided step sequence
-// with its own beacon/UI, instead of a text-only tip. Gated on a dedicated
-// localStorage flag so it only ever runs once per device, and skipped
-// entirely when joining someone else's world via a link (?room=/?seed=/?mod=)
-// so a shared seed is never mutated for players who didn't ask for the
-// tutorial.
-// =========================================================
-// Stamps the fixed tutorial site relative to the player's spawn point, in the
-// same hand-placed spirit as placeMotherLode. Returns the exact world
-// coordinates of every landmark so the step machine/beacon never has to
-// recompute or guess positions.
-function stampTutorialSite(spawnX, spawnY) {
-  // 5-step ascending grass-capped dirt ramp — an easy first climb.
-  for (let k = 0; k < 5; k++) {
-    const c = spawnX + 3 + k, topY = spawnY - (k + 1);
-    localSetBlock(c, topY, BLOCKS.GRASS);
-    for (let yy = topY + 1; yy <= spawnY; yy++) localSetBlock(c, yy, BLOCKS.DIRT);
-    for (let yy = topY - 4; yy < topY; yy++) localSetBlock(c, yy, BLOCKS.AIR);
-  }
-  // A single Stone block exposed in a tiny air pocket just past the ramp's peak.
-  const stoneX = spawnX + 9, stoneY = spawnY - 5;
-  localSetBlock(stoneX - 1, stoneY, BLOCKS.AIR);
-  localSetBlock(stoneX, stoneY, BLOCKS.STONE);
-  localSetBlock(stoneX + 1, stoneY, BLOCKS.AIR);
-  localSetBlock(stoneX, stoneY - 1, BLOCKS.AIR);
-  localSetBlock(stoneX, stoneY + 1, BLOCKS.AIR);
-  // A small hand-placed tree next to the build site: it's the "mine 4 Leaves"
-  // source, and its trunk doubles as permanent support so Leaves placed at
-  // the (elevated, trunk-less) build site don't instantly fall — placing a
-  // Leaves block checks isLeafSupported(), which needs a LOG/WOOD within 5
-  // tiles. Kept 1 column clear of the build site's own 3x3 pocket below.
-  const trunkX = spawnX + 11, trunkBaseY = spawnY, trunkTopY = spawnY - 8;
-  for (let yy = trunkTopY; yy <= trunkBaseY; yy++) {
-    localSetBlock(trunkX - 1, yy, BLOCKS.AIR);
-    localSetBlock(trunkX, yy, BLOCKS.LOG);
-    localSetBlock(trunkX + 1, yy, BLOCKS.AIR);
-  }
-  const leafSpots = [];
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -2; dy <= 0; dy++) {
-    if (dx === 0 && dy === 0) continue; // top-center stays trunk
-    const lx = trunkX + dx, ly = trunkTopY + dy;
-    localSetBlock(lx, ly, BLOCKS.LEAVES);
-    leafSpots.push({ x: lx, y: ly });
-  }
-  // A clear 3x3 pocket in open air by the ramp's peak — the portal build site.
-  const bx = spawnX + 7, by = spawnY - 8;
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) localSetBlock(bx + dx, by + dy, BLOCKS.AIR);
-  return {
-    rampTop: { x: spawnX + 7, y: spawnY - 5 },
-    stoneBlock: { x: stoneX, y: stoneY },
-    leafSpots,
-    buildSite: { x: bx, y: by }
-  };
-}
-
-let tutorialState = loadTutorialState();
-// _tutorialPrivateSeed (decided before the world seed was picked, above)
-// already covers "not done" + "not an explicit join link" — reusing it here
-// keeps the seed choice and the terrain stamp from ever disagreeing.
-let tutorialSite = _tutorialPrivateSeed ? stampTutorialSite(initialSpawnX, spawnY) : null;
-
-function onTutorialBlockMined(b, wx, wy) {
-  if (!tutorialSite || tutorialState.step === 'done') return;
-  if (tutorialState.step === 'stone' && b === BLOCKS.STONE) {
-    tutorialState.step = 'leaves'; saveTutorialState();
-    spawnPortalOpenBurst((wx+0.5)*TILE, (wy+0.5)*TILE, '#bfbfbf', false);
-    showHintOnce('tut_leaves', '🍃 Now find some Leaves!', 'Mine 4 Leaves off the tree just ahead.');
-  } else if (tutorialState.step === 'leaves' && b === BLOCKS.LEAVES) {
-    tutorialState.leavesFound = Math.min(4, tutorialState.leavesFound + 1);
-    saveTutorialState();
-    spawnJuiceBurst((wx+0.5)*TILE, (wy+0.5)*TILE, '#7ed957', 20, 6);
-    if (tutorialState.leavesFound >= 4) {
-      tutorialState.step = 'build'; saveTutorialState();
-      showHintOnce('tut_build', '🌀 Build the portal!', 'See the glowing outline: Stone in the middle, Leaves in a cross around it.');
-    }
-  }
-  updateTutorialUI();
-}
-
-function completeTutorial() {
-  tutorialState.step = 'done'; saveTutorialState();
-  showHintOnce('tut_done', '🎉 First portal built!', 'This one just leads back here. Real dimension portals need rare ore. Check the 📖 Portal Book to see how. Welcome to Voxeria!');
-  updateTutorialUI();
-  setTutorialWorldLock(false);
-}
-
-function updateTutorialUI() {
-  const panel = document.getElementById('tutorial-objective');
-  const badge = document.getElementById('tutorial-badge');
-  if (!panel) return;
-  // Also stays hidden during the intro's "Building world…" animation — the
-  // objective panel and badge used to sit on top of the loading screen telling
-  // the player to mine a block they can't even see yet. Re-called the moment
-  // gameState flips to PLAYING (see updateAndDrawIntro).
-  if (!tutorialSite || tutorialState.step === 'done' || gameState === 'INTRO') {
-    panel.classList.remove('visible');
-    if (badge) badge.classList.remove('visible');
-    return;
-  }
-  panel.classList.add('visible');
-  if (badge) badge.classList.add('visible');
-  const titleEl = document.getElementById('to-title');
-  const subEl = document.getElementById('to-sub');
-  // Mining and placing are HOLD actions on desktop (see updateMiningHold —
-  // Stone is hardness 2, i.e. a full 2-second hold), and tap / long-press on
-  // touch. The step texts have to name the real gesture: the objective used to
-  // say only WHAT to do, never HOW, so a new player would single-click the
-  // first Stone, watch the crack reset, and conclude the game was broken.
-  const isTouch = document.documentElement.classList.contains('touch-device');
-  const mineVerb = isTouch ? 'tap and hold' : 'hold the left mouse button';
-  const placeVerb = isTouch ? 'long-press' : 'hold the right mouse button';
-  const texts = {
-    stone: ['⛏️ Mine the Stone', 'Climb the steps, then ' + mineVerb + ' on the grey block until it breaks.'],
-    leaves: ['🍃 Collect Leaves', tutorialState.leavesFound + '/4 · ' + mineVerb + ' on the green leaves.'],
-    build: ['🌀 Build the Portal', 'Pick a block, then ' + placeVerb + ' to place it: Stone in the middle, Leaves in a cross around it.']
-  };
-  const t = texts[tutorialState.step] || ['', ''];
-  if (titleEl) titleEl.textContent = t[0];
-  if (subEl) subEl.textContent = t[1];
-  // The build step gets an actual recipe diagram (same renderer as the
-  // always-on "Next Portal" HUD) instead of just describing the pattern in
-  // words — makes "like the diagram" a real diagram, not a dangling phrase.
-  const recipeRow = document.getElementById('to-recipe-row');
-  if (recipeRow) {
-    if (tutorialState.step === 'build') {
-      recipeRow.classList.add('visible');
-      const canvas = document.getElementById('to-recipe-canvas');
-      if (canvas) drawRecipePreview(canvas, BLOCKS.STONE, BLOCKS.LEAVES);
-    } else {
-      recipeRow.classList.remove('visible');
-    }
-  }
-}
-
-// While the tutorial is active, the player must not be able to leave the
-// hand-placed tutorial world behind by typing a new seed, starting a fresh
-// world, or joining/creating a multiplayer room — any of those would strand
-// the guided site (or drop the player into someone else's real world).
-// _blockDuringTutorial() is the functional guard called from those actions;
-// this just handles the seed-input field's visual/readonly state.
-function setTutorialWorldLock(locked) {
-  const input = document.getElementById('seed-input');
-  if (input) {
-    input.readOnly = locked;
-    input.title = locked ? 'Finish the tutorial to change worlds' : '';
-  }
-}
-function _blockDuringTutorial() {
-  if (!tutorialSite || tutorialState.step === 'done') return false;
-  showNotification('📘 Finish the tutorial first!');
-  return true;
-}
-
-if (tutorialSite) {
-  updateTutorialUI();
-  setTutorialWorldLock(true);
-  // The welcome hint used to fire on a flat 1.5s timer, which lands in the
-  // middle of the intro's "Building world…" animation. showHintOnce is
-  // localStorage-gated to fire once per DEVICE and the banner self-dismisses
-  // after 10s, so a slow first load could burn the only onboarding hint a
-  // player will ever get without them seeing a single frame of it. Wait for
-  // the world to actually be on screen instead.
-  //
-  // It also has to explain HOW to move: showIntroHintIfNeeded (the banner that
-  // teaches the controls) deliberately bails out while the tutorial is active,
-  // so without this the guided tutorial never named a single control.
-  (function _tutorialWelcomeWhenReady() {
-    if (gameState !== 'PLAYING') { setTimeout(_tutorialWelcomeWhenReady, 200); return; }
-    const isTouch = document.documentElement.classList.contains('touch-device');
-    showHintOnce('tut_ramp', '👋 Welcome to Voxeria!',
-      isTouch
-        ? 'Walk and jump with the on-screen buttons. Climb the steps to your right.'
-        : 'Walk with A / D (or ← →), jump with Space. Climb the steps to your right.');
-  })();
-}
 
 let fallStartY = null;
 const MIN_THUMP_FALL_BLOCKS = 3;
@@ -5840,9 +5554,7 @@ function legacyCopyFallback(text) {
 // CREATE-YOUR-OWN-MOD PANEL — block reskin + creature toggles UI
 // =========================================================
 const CREATURE_DISPLAY_NAMES = {
-  chicken: '🐔 Chicken (Forest)', parrot: '🦜 Parrot (Jungle)', lizard: '🦎 Lizard (Desert)',
-  butterfly: '🦋 Butterfly (Forest/Jungle)', sparrow: '🐦 Sparrow (Forest)', seahorse: '🪸 Seahorse (Ocean)',
-  raccoon: '🦝 Raccoon · Enemy (Blood Moon, Forest)', crocodile: '🐊 Crocodile · Enemy (Blood Moon, Jungle/Desert)', tick: '🕷️ Tick · Enemy (Blood Moon, Forest/Jungle)'
+  butterfly: '🦋 Butterfly (Forest/Jungle)'
 };
 
 function toggleModCreator() {
@@ -7927,11 +7639,7 @@ function canSpawnAnimalAt(wx, type) {
   const biome = getBiome(cx);
   const sy = getSurfaceYAt(wx, "OVERWORLD");
   const ground = getBlock(wx, sy);
-  if (type === 'chicken') { if (biome !== "FOREST" || ground !== BLOCKS.GRASS) return null; }
-  else if (type === 'parrot') { if (biome !== "JUNGLE") return null; if (![BLOCKS.GRASS, BLOCKS.LEAVES, BLOCKS.LOG].includes(ground)) return null; }
-  else if (type === 'lizard') { if (biome !== "DESERT" || ground !== BLOCKS.SAND) return null; }
-  else if (type === 'butterfly') { if (biome !== "FOREST" && biome !== "JUNGLE") return null; if (![BLOCKS.GRASS, BLOCKS.LEAVES, BLOCKS.LOG].includes(ground)) return null; }
-  else if (type === 'sparrow') { if (biome !== "FOREST" || ground !== BLOCKS.GRASS) return null; }
+  if (type === 'butterfly') { if (biome !== "FOREST" && biome !== "JUNGLE") return null; if (![BLOCKS.GRASS, BLOCKS.LEAVES, BLOCKS.LOG].includes(ground)) return null; }
   if (getBlock(wx, sy-1) !== BLOCKS.AIR || getBlock(wx, sy-2) !== BLOCKS.AIR) return null;
   return sy;
 }
@@ -7939,274 +7647,71 @@ function canSpawnAnimalAt(wx, type) {
 function countAnimals(type) { return animals.filter(a => a.type === type).length; }
 
 function createAnimal(type, wx, sy) {
-  if (type === 'seahorse') {
-    // sy is the actual water tile row here (not a "surface", unlike land animals)
-    return { type, x: wx*TILE+3, y: sy*TILE+3, vx:(Math.random()<0.5?-1:1)*(0.12+Math.random()*0.18), vy:0, dir: Math.random()<0.5?-1:1, hop:0, idle: Math.floor(Math.random()*100), blink: Math.floor(Math.random()*160), flap: Math.random()*Math.PI*2, scared:0, w:9, h:12, floatPhase: Math.random()*Math.PI*2, scaleX:1, scaleY:1, legPhase: Math.random()*Math.PI*2 };
-  }
-  const common = { type, x: wx*TILE+2, y: (sy-1)*TILE+4, vx: Math.random()<0.5?-0.35:0.35, vy: 0, dir: Math.random()<0.5?-1:1, hop: 0, idle: Math.floor(Math.random()*100), blink: Math.floor(Math.random()*160), flap: Math.random()*Math.PI*2, scared: 0, scaleX:1, scaleY:1, legPhase: Math.random()*Math.PI*2 };
-  if (type==='chicken') return {...common, w:15, h:14};
-  if (type==='parrot') return {...common, w:14, h:17, vx:common.dir*(0.25+Math.random()*0.35), colorSeed:Math.floor(Math.random()*3)};
-  if (type==='lizard') return {...common, w:18, h:8, vx:common.dir*(0.30+Math.random()*0.45)};
-  if (type==='butterfly') return {...common, w:8, h:6, y: common.y - 10 - Math.random()*18, vx:common.dir*(0.15+Math.random()*0.25), rainbow: Math.random()<0.05, floatPhase: Math.random()*Math.PI*2};
-  if (type==='sparrow') return {...common, w:10, h:9, vx:common.dir*(0.16+Math.random()*0.30)};
-  return common;
+  const dir = Math.random()<0.5?-1:1;
+  const y = (sy-1)*TILE+4 - 10 - Math.random()*18;
+  return {
+    type, x: wx*TILE+2, y, w:8, h:6, dir,
+    vx: dir*(0.15+Math.random()*0.25), vy: 0,
+    idle: Math.floor(Math.random()*100),
+    flap: Math.random()*Math.PI*2, scaleX:1, scaleY:1,
+    rainbow: Math.random()<0.05, floatPhase: Math.random()*Math.PI*2
+  };
 }
 
 function spawnAnimalNearPlayer() {
   if (animals.length >= MAX_ANIMALS || currentDim !== "OVERWORLD") return;
+  if (countAnimals('butterfly') >= ANIMAL_LIMITS.butterfly) return;
   const playerTileX = Math.floor(player.x / TILE);
-  const roll = Math.random();
-  const preferredTypes = roll<0.15 ? ['chicken','parrot','lizard','butterfly','sparrow']
-    : roll<0.35 ? ['butterfly','sparrow','chicken','parrot','lizard']
-    : roll<0.65 ? ['parrot','lizard','chicken','sparrow','butterfly']
-    : ['lizard','parrot','chicken','sparrow','butterfly'];
-  for (const type of preferredTypes) {
-    if (countAnimals(type) >= ANIMAL_LIMITS[type]) continue;
-    for (let tries=0; tries<22; tries++) {
-      const wx = playerTileX + Math.floor((Math.random()-0.5)*110);
-      if (Math.abs(wx-playerTileX) < 10) continue;
-      const sy = canSpawnAnimalAt(wx, type);
-      if (sy===null) continue;
-      if (animals.some(a => Math.abs(a.x/TILE-wx) < 6)) continue;
-      animals.push(createAnimal(type, wx, sy)); break;
-    }
-    break;
+  for (let tries=0; tries<22; tries++) {
+    const wx = playerTileX + Math.floor((Math.random()-0.5)*110);
+    if (Math.abs(wx-playerTileX) < 10) continue;
+    const sy = canSpawnAnimalAt(wx, 'butterfly');
+    if (sy===null) continue;
+    if (animals.some(a => Math.abs(a.x/TILE-wx) < 6)) continue;
+    animals.push(createAnimal('butterfly', wx, sy)); break;
   }
-}
-
-function canSpawnOceanAnimalAt(wx, wy, type) {
-  if (currentDim !== "OCEAN") return false;
-  if (creatureToggles[type] === false) return false;
-  const b = getBlock(wx, wy);
-  if (b !== BLOCKS.WATER && b !== BLOCKS.DEEP_WATER) return false;
-  return true;
-}
-
-function spawnOceanAnimalNearPlayer() {
-  // Ocean Depth stays free of animals and enemies
 }
 
 function updateAnimals(dt) {
   animalSpawnTick++;
   if (animalSpawnTick % 150 === 0) spawnAnimalNearPlayer();
-  if (animalSpawnTick % 130 === 0) spawnOceanAnimalNearPlayer();
   for (let i=animals.length-1; i>=0; i--) {
     const a = animals[i];
-    const homeDim = a.type === 'seahorse' ? "OCEAN" : "OVERWORLD";
-    if (Math.abs(a.x-player.x) > TILE*150 || currentDim !== homeDim) { animals.splice(i,1); continue; }
+    if (Math.abs(a.x-player.x) > TILE*150 || currentDim !== "OVERWORLD") { animals.splice(i,1); continue; }
 
-    updateCreatureBlink(a, dt);
     updateCreatureSquash(a, dt);
 
-    if (a.type === 'butterfly' || a.type === 'seahorse') {
-      a.floatPhase += (a.type==='butterfly'?0.06:0.035)*dt;
-      a.flap += (a.type==='butterfly'?0.3:0.15)*dt;
-      a.idle -= dt;
-      if (a.idle <= 0) {
-        a.dir = Math.random()<0.5?-1:1;
-        a.vx = a.dir*(a.type==='butterfly'?(0.15+Math.random()*0.25):(0.12+Math.random()*0.18));
-        a.idle = 70+Math.random()*160;
-      }
-      a.x += a.vx*dt;
-      a.y += Math.sin(a.floatPhase)*(a.type==='butterfly'?0.5:0.35)*dt;
-      if (a.type==='butterfly' && a.rainbow && Math.random()<0.15*dt) {
-        const hue=(frameCount*3)%360;
-        particles.push({x:a.x+a.w/2,y:a.y+a.h/2,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,color:`hsl(${hue},90%,70%)`,size:1.5+Math.random(),life:26,maxLife:26,type:'dust'});
-      }
-      continue; // floating creatures skip gravity/ground collision below
-    }
-
-    // Stride rate now tracks actual speed (idle shuffle vs. a brisk trot)
-    // instead of always cycling at the same fixed rate.
-    a.legPhase += (0.28 + Math.abs(a.vx) * 0.55) * dt;
-    const wasOnGround = a.onGround;
-    const distToPlayer = Math.abs((a.x+a.w/2) - (player.x+player.w/2));
-    if (a.type==='lizard' && distToPlayer < TILE*4 && a.scared<=0) {
-      a.scared=35; a.dir=a.x<player.x?-1:1; a.vx=a.dir*1.35;
-      a.scaleX=0.75; a.scaleY=1.3; // startled flinch — stretched tall for an instant
-    }
+    a.floatPhase += 0.06*dt;
+    a.flap += 0.3*dt;
     a.idle -= dt;
     if (a.idle <= 0) {
       a.dir = Math.random()<0.5?-1:1;
-      if (a.type==='chicken') a.vx=a.dir*(0.12+Math.random()*0.28);
-      else if (a.type==='parrot') a.vx=a.dir*(0.20+Math.random()*0.38);
-      else if (a.type==='lizard') a.vx=a.dir*(0.22+Math.random()*0.55);
-      else if (a.type==='sparrow') a.vx=a.dir*(0.16+Math.random()*0.30);
-      a.idle = 55+Math.random()*140;
-      if ((a.type==='chicken'||a.type==='parrot'||a.type==='sparrow') && Math.random()<0.35 && a.onGround) a.vy=a.type==='parrot'?-4.0:(a.type==='sparrow'?-3.6:-3.2);
+      a.vx = a.dir*(0.15+Math.random()*0.25);
+      a.idle = 70+Math.random()*160;
     }
-    if (a.scared>0) a.scared -= dt;
-    if (a.type==='parrot') a.flap += 0.22*dt;
-    a.vy += GRAVITY*(a.type==='parrot'?0.55:0.75)*dt;
-    if (a.vy>8) a.vy=8;
-    const nextX = a.x+a.vx*dt;
-    const footY = Math.floor((a.y+a.h-2)/TILE);
-    const sideX = Math.floor((nextX+(a.vx>0?a.w:0))/TILE);
-    const stepBlocked = isSolid(getBlock(sideX,footY));
-    const headBlocked = isSolid(getBlock(sideX,footY-1));
-    if (a.hopping) {
-      // Mid-hop: committed to clearing the step, so the wall check is
-      // suspended until landing. Without this, the very next frame (still
-      // rising, foot still below the step's top) would see the same
-      // stepBlocked=true with onGround now false and immediately reverse
-      // out of the jump it just started.
-      a.x = nextX;
-    } else if (stepBlocked || headBlocked) {
-      // A single-block step (solid at foot level, clear for two tiles above
-      // it) gets hopped instead of turned away from — this is what used to
-      // leave animals pacing back and forth forever at any 1-block ledge or
-      // stray block in their path instead of just walking over it.
-      const canHop = a.onGround && stepBlocked && !headBlocked && !isSolid(getBlock(sideX,footY-2));
-      if (canHop) {
-        a.vy = a.type==='lizard' ? -5.4 : (a.type==='parrot' ? -4.8 : (a.type==='sparrow' ? -4.6 : -5.0));
-        a.onGround = false;
-        a.hopping = true;
-        triggerHopSquash(a);
-        a.x = nextX;
-      } else { a.vx*=-1; a.dir*=-1; triggerTurnSquash(a); }
-    } else a.x=nextX;
-    a.y += a.vy*dt;
-    a.onGround = false;
-    const left=Math.floor((a.x+2)/TILE), right=Math.floor((a.x+a.w-2)/TILE), bottom=Math.floor((a.y+a.h)/TILE);
-    for (let tx=left; tx<=right; tx++) {
-      if (isSolid(getBlock(tx,bottom)) && a.vy>=0) { a.y=bottom*TILE-a.h; a.vy=0; a.onGround=true; break; }
-    }
-    if (!wasOnGround && a.onGround) {
-      a.hopping = false;
-      triggerLandingSquash(a);
-      if (Math.abs(a.vx) > 0.01) spawnDust(a.x+a.w/2, a.y+a.h);
-    }
-    if (a.onGround) {
-      const aheadX=Math.floor((a.x+a.w/2+a.dir*12)/TILE);
-      const aheadBelow=Math.floor((a.y+a.h+2)/TILE);
-      if (!isSolid(getBlock(aheadX,aheadBelow))) { a.vx*=-1; a.dir*=-1; triggerTurnSquash(a); }
+    a.x += a.vx*dt;
+    a.y += Math.sin(a.floatPhase)*0.5*dt;
+    if (a.rainbow && Math.random()<0.15*dt) {
+      const hue=(frameCount*3)%360;
+      particles.push({x:a.x+a.w/2,y:a.y+a.h/2,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,color:`hsl(${hue},90%,70%)`,size:1.5+Math.random(),life:26,maxLife:26,type:'dust'});
     }
   }
 }
 
 // =========================================================
-// SHARED CREATURE MICRO-ANIMATION HELPERS (animals + enemies)
-// Real eye-blinking (the `blink` timer already existed on every creature but
-// was never actually read anywhere) and a squash-and-stretch pop on landing
-// so movement reads as weighty/alive instead of sprites just sliding around.
+// SHARED CREATURE MICRO-ANIMATION HELPERS (animals + gold slimes)
+// A squash-and-stretch pop on landing/turning so movement reads as
+// weighty/alive instead of sprites just sliding around.
 // =========================================================
-function updateCreatureBlink(a, dt) {
-  a.blink -= dt;
-  if (a.blink <= 0) a.blink = 90 + Math.random() * 220;
-}
-function isCreatureBlinking(a) { return a.blink > 0 && a.blink < 6; }
-function drawCreatureEye(cx, cy, r, blinking, color) {
-  ctx.fillStyle = color || '#222';
-  if (blinking) { ctx.fillRect(cx - r, cy - Math.max(1, r * 0.3), r * 2, Math.max(1, r * 0.3)); }
-  else { ctx.fillRect(cx - r / 2, cy - r / 2, r, r); }
-}
 function triggerLandingSquash(a) { a.scaleX = 1.3; a.scaleY = 0.72; }
 // A quick horizontal squish fired when a creature bounces off a wall or
 // steps back from a ledge — sells the instant direction flip as a real
 // pivot instead of the sprite just silently mirroring in place.
 function triggerTurnSquash(a) { a.scaleX = 0.65; a.scaleY = 1.2; }
-// Launch-off stretch for the new step-hop — taller/thinner than the turn
-// squash so a deliberate hop over an obstacle reads differently from a
-// direction-flip bounce.
-function triggerHopSquash(a) { a.scaleX = 0.8; a.scaleY = 1.35; }
 function updateCreatureSquash(a, dt) {
   const ease = Math.min(1, dt * 0.3);
   a.scaleX += (1 - a.scaleX) * ease;
   a.scaleY += (1 - a.scaleY) * ease;
-}
-// A quick, snappy leg-swing driven by frameCount and how fast the creature
-// is actually moving (idle/stationary creatures don't twitch their legs).
-function legSwing(a, speedScale) {
-  const moveFrac = Math.min(1, Math.abs(a.vx) / (0.25 * (speedScale || 1)));
-  return Math.sin(a.legPhase) * moveFrac;
-}
-// Vertical companion to legSwing: how far this leg is lifted off the ground
-// right now (0 = planted, 1 = peak of its step). Two legs a half-cycle apart
-// (phaseOffset 0 and Math.PI) rise and fall in turn, so walking reads as an
-// actual alternating stride instead of legs sliding side to side in place.
-function legLift(a, phaseOffset, speedScale) {
-  const moveFrac = Math.min(1, Math.abs(a.vx) / (0.25 * (speedScale || 1)));
-  return Math.max(0, Math.sin(a.legPhase + (phaseOffset || 0))) * moveFrac;
-}
-// Nose-up while launching into a hop, nose-down while falling — grounded
-// creatures stay level. Sign is flipped by `face` so "nose up" always means
-// the same thing on screen regardless of which way the creature is walking
-// (the body sprite itself is already mirrored by `face` via ctx.scale, and
-// this rotation is applied outside that flip, so it needs its own correction).
-function airborneLean(a, face) {
-  if (a.onGround) return 0;
-  const amt = Math.max(-0.3, Math.min(0.3, -a.vy * 0.05));
-  return -face * amt;
-}
-
-function drawChicken(a) {
-  const sx=a.x-drawCamX, sy=a.y-drawCamY;
-  const bob=a.onGround?Math.sin(frameCount*0.18+a.x*0.02)*1.2:0;
-  const face=a.dir>=0?1:-1;
-  const swing=legSwing(a);
-  const liftL=legLift(a,0), liftR=legLift(a,Math.PI);
-  const blinking=isCreatureBlinking(a);
-  ctx.save(); ctx.translate(sx+a.w/2, sy+a.h/2+bob); ctx.rotate(airborneLean(a,face)); ctx.scale(face*a.scaleX,a.scaleY);
-  ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(0,9,8,3,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#d99022';
-  ctx.fillRect(-3+swing*2, 6-liftL*2.5, 2, 5-liftL*2);
-  ctx.fillRect(3-swing*2, 6-liftR*2.5, 2, 5-liftR*2);
-  ctx.fillStyle='#f7f7f2'; ctx.fillRect(-7,-4,12,10);
-  ctx.fillStyle='#ffffff'; ctx.fillRect(-5,-6,10,4);
-  ctx.fillStyle='#e8e8df'; ctx.fillRect(-7,4,12,2);
-  ctx.fillStyle='#ffffff'; ctx.fillRect(2,-10,8,8);
-  drawCreatureEye(8,-7,2,blinking);
-  ctx.fillStyle='#f2b233'; ctx.fillRect(10,-6,4,3);
-  ctx.fillStyle='#d92323'; ctx.fillRect(4,-13,2,3); ctx.fillRect(7,-14,2,4);
-  ctx.restore();
-}
-
-function drawParrot(a) {
-  const sx=a.x-drawCamX, sy=a.y-drawCamY;
-  const bob=Math.sin(frameCount*0.16+a.x*0.04)*1.4;
-  const wing=Math.sin(a.flap)*(a.onGround?1.5:4.5);
-  const face=a.dir>=0?1:-1;
-  const bodyColors=['#e63946','#2ecc71','#3498db'];
-  const wingColors=['#3498db','#f1c40f','#e84393'];
-  const blinking=isCreatureBlinking(a);
-  // Legs only actually step while grounded — tucked still in flight, same as a real bird.
-  const pSwing=a.onGround?legSwing(a):0;
-  const pLiftL=a.onGround?legLift(a,0):0, pLiftR=a.onGround?legLift(a,Math.PI):0;
-  ctx.save(); ctx.translate(sx+a.w/2, sy+a.h/2+bob); ctx.rotate(airborneLean(a,face)); ctx.scale(face*a.scaleX,a.scaleY);
-  ctx.fillStyle='rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.ellipse(0,10,7,2.5,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#2d3436';
-  ctx.fillRect(-3+pSwing*1.5, 7-pLiftL*2, 2, 5-pLiftL*1.5);
-  ctx.fillRect(3-pSwing*1.5, 7-pLiftR*2, 2, 5-pLiftR*1.5);
-  ctx.fillStyle=bodyColors[a.colorSeed%bodyColors.length]; ctx.fillRect(-5,-5,10,12);
-  ctx.save(); ctx.translate(-8,3); ctx.rotate(-wing*0.05);
-  ctx.fillStyle=wingColors[a.colorSeed%wingColors.length]; ctx.fillRect(0,-5+wing,5,9);
-  ctx.restore();
-  ctx.fillStyle='#ffd166'; ctx.fillRect(4,-10,7,7);
-  drawCreatureEye(9,-8,1.6,blinking);
-  ctx.fillStyle='#ff9f1c'; ctx.fillRect(11,-6,4,3);
-  ctx.restore();
-}
-
-function drawLizard(a) {
-  const sx=a.x-drawCamX, sy=a.y-drawCamY;
-  const scared=a.scared>0;
-  const wiggle=Math.sin(frameCount*(scared?0.7:0.35)+a.x*0.08)*(scared?3.5:2);
-  const face=a.dir>=0?1:-1;
-  const swing=legSwing(a,1.5);
-  const liftL=legLift(a,0,1.5), liftR=legLift(a,Math.PI,1.5);
-  const blinking=isCreatureBlinking(a) && !scared; // wide-eyed while startled, no blinking
-  ctx.save(); ctx.translate(sx+a.w/2, sy+a.h/2); ctx.rotate(airborneLean(a,face)); ctx.scale(face*a.scaleX,a.scaleY);
-  ctx.fillStyle='rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(0,7,10,2,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#2f7d32';
-  ctx.fillRect(-5+swing*2, 4-liftL*1.5, 3, 2);
-  ctx.fillRect(3-swing*2, 4-liftR*1.5, 3, 2);
-  ctx.fillStyle='#2f7d32'; ctx.fillRect(-13,0+Math.round(wiggle),6,3);
-  ctx.fillStyle='#44aa55'; ctx.fillRect(-8,-2,13,6);
-  ctx.fillStyle='#66cc66'; ctx.fillRect(-5,-4,9,3);
-  ctx.fillStyle='#55bb44'; ctx.fillRect(4,-3,6,5);
-  drawCreatureEye(8,-2,scared?2.6:1.6, blinking, scared?'#fff':'#111');
-  if (scared) { ctx.fillStyle='#111'; ctx.fillRect(7.5,-2.5,1,1); } // tiny pupil inside the wide startled eye
-  ctx.restore();
 }
 
 function drawButterfly(a) {
@@ -8229,248 +7734,11 @@ function drawButterfly(a) {
   ctx.restore();
 }
 
-function drawSparrow(a) {
-  const sx=a.x-drawCamX, sy=a.y-drawCamY;
-  const bob=a.onGround?Math.sin(frameCount*0.2+a.x*0.02)*1:0;
-  const face=a.dir>=0?1:-1;
-  const swing=legSwing(a);
-  const liftL=legLift(a,0), liftR=legLift(a,Math.PI);
-  const blinking=isCreatureBlinking(a);
-  const flit=!a.onGround?Math.sin(frameCount*0.5)*2:0; // quick wing-flit while airborne
-  ctx.save(); ctx.translate(sx+a.w/2, sy+a.h/2+bob); ctx.rotate(airborneLean(a,face)); ctx.scale(face*a.scaleX,a.scaleY);
-  ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(0,6,6,2,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#5a4632';
-  ctx.fillRect(-2+swing*1.5, 4-liftL*2, 2, 3-liftL*1.5);
-  ctx.fillRect(1-swing*1.5, 4-liftR*2, 2, 3-liftR*1.5);
-  ctx.fillStyle='#8b6b4a'; ctx.fillRect(-5,-3+flit,9,7);
-  ctx.fillStyle='#c9a876'; ctx.fillRect(-5,2,9,2);
-  ctx.fillStyle='#8b6b4a'; ctx.fillRect(3,-6,5,5);
-  drawCreatureEye(6,-4,1,blinking);
-  ctx.fillStyle='#e0a030'; ctx.fillRect(8,-3,2,2);
-  ctx.restore();
-}
-
-function drawSeahorse(a) {
-  const sx=a.x-drawCamX, sy=a.y-drawCamY;
-  const bob=Math.sin(a.floatPhase*2)*1.5;
-  const face=a.dir>=0?1:-1;
-  const finFlutter=Math.sin(a.floatPhase*4)*1.2;
-  const tailCurl=Math.sin(a.floatPhase*1.5)*2;
-  const blinking=isCreatureBlinking(a);
-  ctx.save(); ctx.translate(sx+a.w/2, sy+a.h/2+bob); ctx.scale(face,1);
-  ctx.fillStyle='rgba(0,60,120,0.2)'; ctx.beginPath(); ctx.ellipse(0,8,5,1.5,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='rgba(255,200,120,0.55)'; ctx.beginPath(); ctx.ellipse(-2,0,2.5,1.5+finFlutter*0.3,0.4,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#ffb347'; ctx.fillRect(-2,-6,5,10);
-  ctx.fillStyle='#ff9f1c'; ctx.fillRect(-3,-3,3,3);
-  ctx.fillStyle='#ffb347'; ctx.beginPath(); ctx.arc(0,-6,3,0,Math.PI*2); ctx.fill();
-  drawCreatureEye(1,-7,1,blinking);
-  ctx.strokeStyle='#ff9f1c'; ctx.lineWidth=2; ctx.beginPath();
-  ctx.moveTo(-1,4); ctx.quadraticCurveTo(3+tailCurl,6,0,9); ctx.stroke();
-  ctx.restore();
-}
-
 function drawAnimals() {
   for (const a of animals) {
-    if (a.type==='chicken') drawChicken(a);
-    else if (a.type==='parrot') drawParrot(a);
-    else if (a.type==='lizard') drawLizard(a);
-    else if (a.type==='butterfly') drawButterfly(a);
-    else if (a.type==='sparrow') drawSparrow(a);
-    else if (a.type==='seahorse') drawSeahorse(a);
+    if (a.type==='butterfly') drawButterfly(a);
   }
-  drawEnemies();
   drawGoldSlimes();
-}
-
-// =========================================================
-// ENEMIES — Waschbär, Krokodil, Zecke: hostile mobs with red eyes,
-// only spawn while a Blood Moon is active. Wander like normal animals,
-// but chase and bite the player within their aggro range.
-// =========================================================
-function canSpawnEnemyAt(wx, type) {
-  if (currentDim !== "OVERWORLD" || !isBloodMoon) return null;
-  if (creatureToggles[type] === false) return null;
-  const cx = Math.floor(wx / CHUNK_W);
-  const biome = getBiome(cx);
-  const sy = getSurfaceYAt(wx, "OVERWORLD");
-  const ground = getBlock(wx, sy);
-  if (type === 'raccoon') { if (biome !== "FOREST" || (ground !== BLOCKS.GRASS && ground !== BLOCKS.DIRT)) return null; }
-  else if (type === 'crocodile') {
-    if (biome === "JUNGLE") { if (![BLOCKS.GRASS, BLOCKS.LEAVES, BLOCKS.LOG].includes(ground)) return null; }
-    else if (biome === "DESERT") { if (ground !== BLOCKS.SAND) return null; }
-    else return null;
-  }
-  else if (type === 'tick') { if ((biome !== "FOREST" && biome !== "JUNGLE") || ![BLOCKS.GRASS, BLOCKS.DIRT, BLOCKS.LEAVES].includes(ground)) return null; }
-  if (getBlock(wx, sy-1) !== BLOCKS.AIR || getBlock(wx, sy-2) !== BLOCKS.AIR) return null;
-  return sy;
-}
-
-function countEnemies(type) { return enemies.filter(e => e.type === type).length; }
-
-function createEnemy(type, wx, sy) {
-  const common = { type, x: wx*TILE+2, y: (sy-1)*TILE+4, vx: Math.random()<0.5?-0.3:0.3, vy: 0, dir: Math.random()<0.5?-1:1, idle: Math.floor(Math.random()*100), biteTimer: 0, isBiting: false, eyeGlow: Math.random()*Math.PI*2, blink: Math.floor(Math.random()*160), scaleX:1, scaleY:1, legPhase: Math.random()*Math.PI*2 };
-  if (type === 'raccoon') return { ...common, w:16, h:13, dmg:3, aggroRange: TILE*6, speed: 1.1 };
-  if (type === 'crocodile') return { ...common, w:24, h:10, dmg:4, aggroRange: TILE*7, speed: 1.5 };
-  if (type === 'tick') return { ...common, w:8, h:7, dmg:2, aggroRange: TILE*3, speed: 1.6 };
-  return common;
-}
-
-function spawnEnemyNearPlayer() {
-  if (!isBloodMoon || enemies.length >= MAX_ENEMIES || currentDim !== "OVERWORLD") return;
-  const playerTileX = Math.floor(player.x / TILE);
-  const types = ['raccoon','crocodile','tick'].sort(() => Math.random()-0.5);
-  for (const type of types) {
-    if (countEnemies(type) >= ENEMY_LIMITS[type]) continue;
-    for (let tries=0; tries<24; tries++) {
-      const wx = playerTileX + Math.floor((Math.random()<0.5?-1:1) * (18+Math.random()*70));
-      const sy = canSpawnEnemyAt(wx, type);
-      if (sy===null) continue;
-      if (enemies.some(e => Math.abs(e.x/TILE-wx) < 8)) continue;
-      enemies.push(createEnemy(type, wx, sy));
-      showNotification(type==='raccoon' ? "🦝 A raccoon lurks in the forest..." : type==='crocodile' ? "🐊 A crocodile approaches..." : "🕷️ A tick has appeared...");
-      break;
-    }
-    break;
-  }
-}
-
-function updateEnemies(dt) {
-  enemySpawnTick++;
-  if (enemySpawnTick % 180 === 0) spawnEnemyNearPlayer();
-  for (let i=enemies.length-1; i>=0; i--) {
-    const e = enemies[i];
-    // Blood Moon ended, player wandered off, or dimension changed: enemies vanish
-    if (!isBloodMoon || Math.abs(e.x-player.x) > TILE*160 || currentDim !== "OVERWORLD") { enemies.splice(i,1); continue; }
-
-    e.eyeGlow += 0.15*dt;
-    updateCreatureBlink(e, dt);
-    updateCreatureSquash(e, dt);
-    // Stride rate tracks actual speed — an alert chase has a quicker, more
-    // frantic leg cycle than the lazy prowl while nothing's in aggro range.
-    e.legPhase += (0.28 + Math.abs(e.vx) * 0.55) * dt;
-    const wasOnGround = e.onGround;
-    if (e.biteTimer>0) e.biteTimer -= dt;
-    if (e.biteTimer<=0) e.isBiting = false;
-
-    const distToPlayer = Math.hypot((e.x+e.w/2)-(player.x+player.w/2), (e.y+e.h/2)-(player.y+player.h/2));
-    if (distToPlayer < e.aggroRange) {
-      e.dir = e.x < player.x ? 1 : -1;
-      e.vx = e.dir * e.speed;
-    } else {
-      e.idle -= dt;
-      if (e.idle <= 0) { e.dir = Math.random()<0.5?-1:1; e.vx = e.dir*(0.15+Math.random()*0.25); e.idle = 60+Math.random()*120; }
-    }
-
-    // Bite on contact — uses the shared global damageCooldown, so damage from
-    // different sources can't stack unfairly in the same instant.
-    const hit = player.x+player.w > e.x-4 && player.x < e.x+e.w+4 && player.y+player.h > e.y-4 && player.y < e.y+e.h+4;
-    if (hit && damageCooldown<=0) {
-      e.isBiting = true; e.biteTimer = 20;
-      e.scaleX = 1.3; e.scaleY = 0.75; // lunge/snap pop, same squash used for landings
-      playSound('bite'); takeDamage(e.dmg);
-      screenShake = Math.max(screenShake, 7);
-      spawnJuiceBurst(e.x+e.w/2, e.y+e.h/2, '#ff3344', 8, 4);
-      addJuiceText(e.x+e.w/2, e.y, e.type==='tick' ? 'BITE!' : 'ATTACK!', '#ff5566');
-    }
-
-    e.vy += GRAVITY*0.75*dt;
-    if (e.vy>8) e.vy=8;
-    const nextX = e.x+e.vx*dt;
-    const footY = Math.floor((e.y+e.h-2)/TILE);
-    const sideX = Math.floor((nextX+(e.vx>0?e.w:0))/TILE);
-    if (isSolid(getBlock(sideX,footY)) || isSolid(getBlock(sideX,footY-1))) { e.vx*=-1; e.dir*=-1; triggerTurnSquash(e); } else e.x=nextX;
-    e.y += e.vy*dt;
-    e.onGround = false;
-    const left=Math.floor((e.x+2)/TILE), right=Math.floor((e.x+e.w-2)/TILE), bottom=Math.floor((e.y+e.h)/TILE);
-    for (let tx=left; tx<=right; tx++) {
-      if (isSolid(getBlock(tx,bottom)) && e.vy>=0) { e.y=bottom*TILE-e.h; e.vy=0; e.onGround=true; break; }
-    }
-    if (!wasOnGround && e.onGround) {
-      triggerLandingSquash(e);
-      if (Math.abs(e.vx) > 0.01) spawnDust(e.x+e.w/2, e.y+e.h);
-    }
-    if (e.onGround && distToPlayer >= e.aggroRange) {
-      const aheadX=Math.floor((e.x+e.w/2+e.dir*12)/TILE);
-      const aheadBelow=Math.floor((e.y+e.h+2)/TILE);
-      if (!isSolid(getBlock(aheadX,aheadBelow))) { e.vx*=-1; e.dir*=-1; triggerTurnSquash(e); }
-    }
-  }
-}
-
-function drawRedEyes(offsets, glow) {
-  const pulse = 0.6 + Math.sin(glow)*0.4;
-  ctx.fillStyle = `rgba(255,0,0,${0.35+pulse*0.25})`;
-  for (const [ex, ey, r] of offsets) { ctx.beginPath(); ctx.arc(ex, ey, r*2.4, 0, Math.PI*2); ctx.fill(); }
-  ctx.fillStyle = `rgba(255,40,40,${0.85+pulse*0.15})`;
-  for (const [ex, ey, r] of offsets) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI*2); ctx.fill(); }
-}
-
-function drawRaccoon(e) {
-  const sx=e.x-drawCamX, sy=e.y-drawCamY;
-  const bob=e.onGround?Math.sin(frameCount*0.2+e.x*0.02)*1.2:0;
-  const face=e.dir>=0?1:-1;
-  const swing=legSwing(e,1.2);
-  const liftL=legLift(e,0,1.2), liftR=legLift(e,Math.PI,1.2);
-  const blinking=isCreatureBlinking(e) && !e.isBiting;
-  ctx.save(); ctx.translate(sx+e.w/2, sy+e.h/2+bob); ctx.scale(face*e.scaleX,e.scaleY);
-  ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(0,8,9,3,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#4a4a4a'; ctx.fillRect(-13,3+Math.round(Math.sin(frameCount*0.3)*1.5),6,3);
-  ctx.fillStyle='#555';
-  ctx.fillRect(-6+swing*2, 5-liftL*2, 3, 4-liftL*1.5);
-  ctx.fillRect(2-swing*2, 5-liftR*2, 3, 4-liftR*1.5);
-  ctx.fillStyle='#6b6b6b'; ctx.fillRect(-8,-3,14,10);
-  ctx.fillStyle='#e0e0e0'; ctx.fillRect(-8,3,14,3);
-  ctx.fillStyle='#6b6b6b'; ctx.fillRect(4,-9,7,7);
-  ctx.fillStyle='#333'; ctx.fillRect(4,-9,2,3); ctx.fillRect(9,-9,2,3);
-  ctx.fillStyle=e.isBiting?'#7a1a1a':'#1a1a1a'; ctx.fillRect(5,-5,6,e.isBiting?5:3);
-  drawRedEyes([[7,-5,1.3],[10,-5,1.3]], e.eyeGlow);
-  if (blinking) { ctx.fillStyle='#1a1a1a'; ctx.fillRect(6,-6,2,1); ctx.fillRect(9,-6,2,1); }
-  ctx.restore();
-}
-
-function drawCrocodile(e) {
-  const sx=e.x-drawCamX, sy=e.y-drawCamY;
-  const wiggle=Math.sin(frameCount*0.3+e.x*0.06)*2;
-  const face=e.dir>=0?1:-1;
-  const jaw=e.isBiting?4:0.5+Math.sin(frameCount*0.15)*0.5;
-  const blinking=isCreatureBlinking(e) && !e.isBiting;
-  ctx.save(); ctx.translate(sx+e.w/2, sy+e.h/2); ctx.scale(face*e.scaleX,e.scaleY);
-  ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(0,7,13,2.5,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#2f5a24'; ctx.fillRect(-17,0+Math.round(wiggle),8,4);
-  ctx.fillStyle='#3a6b2e'; ctx.fillRect(-11,-2,18,7);
-  ctx.fillStyle='#4d8a3d'; ctx.fillRect(-7,-4,11,3);
-  ctx.fillStyle='#3a6b2e'; ctx.fillRect(6,-3,8,5+jaw);
-  ctx.fillStyle=e.isBiting?'#7a1a1a':'#264d1e'; ctx.fillRect(10,-1+jaw,6,3);
-  if (blinking) { ctx.fillStyle='#264d1e'; ctx.fillRect(8,-4.5,2,1); ctx.fillRect(12,-4.5,2,1); }
-  else drawRedEyes([[9,-4,1.4],[13,-4,1.4]], e.eyeGlow);
-  ctx.restore();
-}
-
-function drawTick(e) {
-  const sx=e.x-drawCamX, sy=e.y-drawCamY;
-  // Idle jitter grows into a frantic scuttle once it's actually on the move
-  const scuttleAmt = 0.4 + Math.min(1, Math.abs(e.vx)/0.3) * 0.8;
-  const scuttle=Math.sin(frameCount*0.5+e.x*0.1)*scuttleAmt;
-  const face=e.dir>=0?1:-1;
-  const legFlick=e.isBiting?2:1;
-  ctx.save(); ctx.translate(sx+e.w/2, sy+e.h/2+scuttle); ctx.scale(face*e.scaleX,e.scaleY);
-  ctx.fillStyle='#3a1a1a'; ctx.beginPath(); ctx.ellipse(0,0,e.isBiting?5.5:4.5,3.5,0,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle='#1a0a0a'; ctx.lineWidth=1;
-  for (let l=-1;l<=1;l+=2) {
-    const flick=Math.sin(frameCount*0.6+l)*legFlick;
-    ctx.beginPath(); ctx.moveTo(l*2,-1); ctx.lineTo(l*5,-4+flick); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(l*2,1); ctx.lineTo(l*5,4+flick); ctx.stroke();
-  }
-  drawRedEyes([[1.5,-0.5,0.8]], e.eyeGlow);
-  ctx.restore();
-}
-
-function drawEnemies() {
-  for (const e of enemies) {
-    if (e.type==='raccoon') drawRaccoon(e);
-    else if (e.type==='crocodile') drawCrocodile(e);
-    else if (e.type==='tick') drawTick(e);
-  }
 }
 
 // =========================================================
@@ -8492,7 +7760,7 @@ function spawnGoldSlimes() {
       vx: (seededRandom('gs-dir', i) < 0.5 ? -1 : 1) * (0.6 + seededRandom('gs-spd', i) * 0.5),
       vy: 0, w: 30, h: 30, onGround: false,
       hopCooldown: 30 + seededInt(0, 60, 'gs-hop', i),
-      scaleX: 1, scaleY: 1, // squash/stretch, punched by triggerLandingSquash/triggerTurnSquash and eased by updateCreatureSquash — same shared juice helpers the animals/enemies use
+      scaleX: 1, scaleY: 1, // squash/stretch, punched by triggerLandingSquash/triggerTurnSquash and eased by updateCreatureSquash — same shared juice helpers the animals use
       blink: Math.floor(seededRandom('gs-blink', i) * 160) + 40
     });
   }
@@ -9107,47 +8375,6 @@ function spawnAmbientSparkles() {
   }
 }
 
-// =========================================================
-// BIRDS — distant silhouettes crossing the sky, purely decorative. Overworld
-// daytime only, thin out in bad weather (they'd be sheltering, not flying).
-// =========================================================
-const birds = [];
-function updateBirds(dt) {
-  if (currentDim !== "OVERWORLD" || dayPhase === 'night' || weather.intensity > 0.4) {
-    if (birds.length) birds.length = 0;
-    return;
-  }
-  if (birds.length < 3 && Math.random() < 0.004 * dt) {
-    const fromLeft = Math.random() < 0.5;
-    const y = 40 + Math.random() * 90;
-    birds.push({
-      x: fromLeft ? -30 : canvas.width + 30, y,
-      vx: (fromLeft ? 1 : -1) * (0.6 + Math.random() * 0.5),
-      vy: (Math.random() - 0.5) * 0.08,
-      flap: Math.random() * Math.PI * 2, size: 5 + Math.random() * 3
-    });
-  }
-  for (let i = birds.length - 1; i >= 0; i--) {
-    const b = birds[i];
-    b.x += b.vx * dt; b.y += b.vy * dt; b.flap += 0.25 * dt;
-    if (b.x < -50 || b.x > canvas.width + 50) birds.splice(i, 1);
-  }
-}
-function drawBirds() {
-  if (!birds.length) return;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(40,35,50,0.5)';
-  ctx.lineWidth = 1.6; ctx.lineCap = 'round';
-  for (const b of birds) {
-    const wingY = Math.sin(b.flap) * b.size * 0.55;
-    ctx.beginPath();
-    ctx.moveTo(b.x - b.size, b.y - wingY);
-    ctx.lineTo(b.x, b.y);
-    ctx.lineTo(b.x + b.size, b.y - wingY);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
 
 function drawHover() {
   if (mouseScreenX<0||mouseScreenY<0) return;
@@ -9169,106 +8396,6 @@ function drawHover() {
   ctx.strokeStyle=inRange?'#ffffff':'#ff0000';
   ctx.lineWidth=2.5;
   ctx.strokeRect(sx-boxScale, sy-boxScale, TILE+boxScale*2, TILE+boxScale*2);
-}
-
-// World-space waypoint for the guided tutorial: a pulsing ring + bobbing
-// chevron over whatever the current step's target is, plus (during the
-// build step) a faint ghost outline over each of the 5 cross-shaped cells
-// still needing a block. Positions are read live off the world (not cached
-// state) so it always reflects what's actually left to do.
-// Slow-drifting glowing column marking one edge of the tutorial footprint —
-// purely decorative (no collision), but a visible "the guided area is THIS
-// wide" boundary so the site reads as a staged tutorial room rather than an
-// arbitrary patch of the endless procedural world.
-function drawTutorialBoundaryPillar(wx) {
-  const groundY = getSurfaceYAt(wx, "OVERWORLD");
-  const sx = wx*TILE - drawCamX + TILE/2;
-  const by = groundY*TILE - drawCamY;
-  const ty = (groundY-10)*TILE - drawCamY;
-  const hue = (frameCount*1.5) % 360;
-  const g = ctx.createLinearGradient(sx, by, sx, ty);
-  g.addColorStop(0, `hsla(${hue},80%,70%,0.5)`);
-  g.addColorStop(1, `hsla(${hue},80%,70%,0)`);
-  ctx.fillStyle = g;
-  ctx.fillRect(sx-TILE*0.25, ty, TILE*0.5, by-ty);
-  if (Math.random() < 0.15) {
-    particles.push({ x: wx*TILE+(Math.random()-0.5)*TILE*0.4, y: groundY*TILE-Math.random()*20, vx:0, vy:-0.25-Math.random()*0.2, color:'#e6ccff', size:1.5+Math.random(), life:40+Math.random()*20, maxLife:60, type:'twinkle' });
-  }
-}
-
-function drawTutorialBeacon() {
-  if (!tutorialSite || tutorialState.step === 'done') return;
-  const pulse = Math.sin(frameCount*0.15)*0.15 + 0.55;
-  const bob = Math.sin(frameCount*0.08) * 4;
-
-  // Mark both edges of the guided site + a light ambient sparkle drifting
-  // somewhere across it, so the whole area feels quietly magical instead of
-  // "normal world plus a couple of extra ore blocks."
-  drawTutorialBoundaryPillar(initialSpawnX - 3);
-  drawTutorialBoundaryPillar(initialSpawnX + 25);
-  if (Math.random() < 0.12) {
-    const ax = initialSpawnX + Math.random()*24, ay = spawnY - Math.random()*10;
-    particles.push({ x: ax*TILE, y: ay*TILE, vx:(Math.random()-0.5)*0.15, vy:-0.3-Math.random()*0.3, color: Math.random()<0.5?'#d9b3ff':'#ffe27a', size:1.5+Math.random()*2, life:50+Math.random()*30, maxLife:80, type:'twinkle' });
-  }
-
-  function ringAt(wx, wy, color) {
-    const cx3 = wx*TILE - drawCamX + TILE/2, cy3 = wy*TILE - drawCamY + TILE/2;
-    // Persistent light beam — always visible (not fading like a particle),
-    // so the target reads as an unmistakable quest marker.
-    const beamH = TILE*7;
-    const bg = ctx.createLinearGradient(cx3, cy3, cx3, cy3-beamH);
-    bg.addColorStop(0, color); bg.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.globalAlpha = 0.35 + pulse*0.25; ctx.fillStyle = bg;
-    ctx.fillRect(cx3-TILE*0.35, cy3-beamH, TILE*0.7, beamH);
-    ctx.globalAlpha = 1;
-    ctx.globalAlpha = pulse;
-    ctx.strokeStyle = color; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(cx3, cy3, TILE*0.75, 0, Math.PI*2); ctx.stroke();
-    ctx.globalAlpha = 1;
-    for (let i=0; i<3; i++) {
-      const a = frameCount*0.04 + i*(Math.PI*2/3);
-      const ox = cx3 + Math.cos(a)*TILE*0.9, oy = cy3 + Math.sin(a)*TILE*0.5;
-      ctx.globalAlpha = 0.8; ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.arc(ox, oy, 2.2, 0, Math.PI*2); ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    ctx.save();
-    ctx.translate(cx3, cy3 - TILE*1.3 - bob);
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.moveTo(-8,-6); ctx.lineTo(8,-6); ctx.lineTo(0,8); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-  if (tutorialState.step === 'stone') {
-    if (getBlock(tutorialSite.stoneBlock.x, tutorialSite.stoneBlock.y) === BLOCKS.STONE) {
-      ringAt(tutorialSite.stoneBlock.x, tutorialSite.stoneBlock.y, 'rgba(190,190,190,0.9)');
-    }
-  } else if (tutorialState.step === 'leaves') {
-    const remaining = tutorialSite.leafSpots.filter(p => getBlock(p.x, p.y) === BLOCKS.LEAVES);
-    if (remaining.length) {
-      const px = player.x/TILE, py = player.y/TILE;
-      let nearest = remaining[0], best = Infinity;
-      for (const p of remaining) { const d = Math.hypot(p.x-px, p.y-py); if (d < best) { best = d; nearest = p; } }
-      ringAt(nearest.x, nearest.y, 'rgba(126,217,87,0.9)');
-    }
-  } else if (tutorialState.step === 'build') {
-    // Outline colors mirror the actual recipe blocks (grey Stone center,
-    // green Leaves cross) so the glowing hint always matches what's needed —
-    // this is the "diagram" the hint text points to.
-    const b = tutorialSite.buildSite;
-    const cells = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
-    for (const [dx,dy] of cells) {
-      const wx = b.x+dx, wy = b.y+dy;
-      if (getBlock(wx, wy) === BLOCKS.AIR) {
-        const gsx = wx*TILE - drawCamX, gsy = wy*TILE - drawCamY;
-        ctx.globalAlpha = pulse*0.7;
-        ctx.strokeStyle = (dx===0&&dy===0) ? 'rgba(190,190,190,0.9)' : 'rgba(126,217,87,0.9)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(gsx+3, gsy+3, TILE-6, TILE-6);
-        ctx.globalAlpha = 1;
-      }
-    }
-    ringAt(b.x, b.y-2, 'rgba(200,170,255,0.9)');
-  }
 }
 
 function drawHealth() {
@@ -9376,7 +8503,7 @@ function handlePlayerDeath() {
 }
 
 // Global post-hit invulnerability window, shared by EVERY damage source
-// (enemies, lava, heat, hazards) so damage from different sources can't stack
+// (lava, heat, other hazards) so damage from different sources can't stack
 // unfairly in the same instant. takeDamage sets it; updateDamageCooldown ticks
 // it back down once per frame from the game loop.
 let damageCooldown = 0;
@@ -9469,7 +8596,6 @@ function breakSingleBlock(wx, wy, isSuper) {
   if (!isInRange(wx,wy)) return;
   const b=getBlock(wx,wy);
   if (b!==BLOCKS.AIR && b!==BLOCKS.BEDROCK && b!==BLOCKS.PORTAL && b!==BLOCKS.WATER && b!==BLOCKS.DEEP_WATER) {
-    onTutorialBlockMined(b, wx, wy);
     delete blockDamage[wx+','+wy];
     // Carries the block type too: by the time the marker reaches another
     // client the tile is usually already AIR there, so the debris colour has
@@ -9642,9 +8768,9 @@ function executePlace(wx, wy) {
           setBlock(wx, wy, BLOCKS.AIR);
           spawnFallingLeaf(wx, wy);
           // Used to fail completely silently: the leaf just disappeared with no
-          // reason given anywhere. That is a genuine trap during the tutorial's
-          // build step (Leaves are 4 of the 5 portal blocks) — it reads as "the
-          // game won't let me finish" rather than "this spot has no trunk".
+          // reason given anywhere. That is a genuine trap when building a portal
+          // (Leaves are 4 of the 5 portal blocks) — it reads as "the game won't
+          // let me finish" rather than "this spot has no trunk".
           addJuiceText(wx*TILE+TILE/2, wy*TILE+TILE*0.9, 'needs a trunk!', '#7ed957');
           showHintOnce('leaf_support', '🍃 Leaves need a tree nearby',
             'A Leaves block only stays put with a Log or Wood block within about 5 blocks. Build closer to a trunk.');
@@ -10312,13 +9438,6 @@ function drawWaterfalls() {
 // DAY / NIGHT CYCLE + BLOOD MOON
 // =========================================================
 function updateDayNightCycle(dt) {
-  // The tutorial always looks like a bright, welcoming staged area — freeze
-  // it at a fixed daytime point instead of letting night/blood moons roll in
-  // partway through a brand-new player's first minute.
-  if (tutorialSite && tutorialState.step !== 'done') {
-    dayTime = DAY_LENGTH * 0.25; dayPhase = 'day'; bloodMoonActive = false; isBloodMoon = false;
-    return;
-  }
   const prevPhase = dayPhase;
   dayTime = (dayTime + dt) % DAY_LENGTH;
   const t = dayTime / DAY_LENGTH; // 0..1 across one full day+night
@@ -10329,7 +9448,7 @@ function updateDayNightCycle(dt) {
 
   if (dayPhase === 'night' && prevPhase !== 'night') {
     bloodMoonActive = Math.random() < 0.18;
-    showNotification(bloodMoonActive ? "🌕🩸 A Blood Moon rises... Danger!" : "🌙 Night is falling...");
+    showNotification(bloodMoonActive ? "🌕🩸 A Blood Moon rises..." : "🌙 Night is falling...");
   }
   if (dayPhase !== 'night') bloodMoonActive = false;
   isBloodMoon = dayPhase === 'night' && bloodMoonActive;
@@ -10685,10 +9804,6 @@ function rainDropUnderground(r) {
 }
 
 function updateWeather(dt) {
-  if (tutorialSite && tutorialState.step !== 'done') {
-    weather.type = 'clear'; weather.intensity = 0; weather.targetIntensity = 0;
-    return;
-  }
   if (currentDim!=="OVERWORLD") {
     weather.intensity=0; weather.overlay=0; rainDrops.length=0; snowFlakes.length=0;
     // Underground/other dims: dry out fast and drop any surface FX
@@ -11603,10 +10718,10 @@ function doTeleport() {
     currentDim = "OVERWORLD";
     showNotification("🌍 Back in the normal world!");
   } else if (targetDim === "OVERWORLD") {
-    // The tutorial's Stone+Leaves starter portal (and any copy of it, since
-    // the recipe stays valid after the tutorial too) — a real portal by
-    // mechanics, but it deliberately doesn't go anywhere. The actual Gold/
-    // Ocean/Lava/Void portals above still require their real ore.
+    // No longer buildable (the tutorial that created these was removed), but
+    // an old save or a shared/synced world can still have one standing from
+    // before — keep it a harmless no-op instead of leaving it to fall through
+    // to the dimension-entry branch below with an undefined dimension name.
     showNotification("🌀 Just a practice portal. It doesn't lead anywhere.");
   } else {
     currentDim = targetDim;
@@ -11747,10 +10862,6 @@ function updateAndDrawIntro(ctx, dt) {
     if(introAlpha<=0){
       gameState="PLAYING";
       const elh=document.getElementById('early-loading-hint');if(elh)elh.remove();
-      // The tutorial panel/badge are suppressed while gameState is "INTRO"
-      // (see updateTutorialUI) — now that the world is actually visible, let
-      // them appear.
-      if(typeof updateTutorialUI==='function') updateTutorialUI();
     }
   }
 
@@ -12052,8 +11163,8 @@ function _gameLoopInner(now) {
     if(dyn.timeLeft<=0){explodeDynamite(dyn.wx,dyn.wy);activeDynamites.splice(i,1);}
   }
 
-  updatePlayer(dt); updatePhysics(); updateFire(dt); updateAnimals(dt); updateDamageCooldown(dt); updateBirds(dt);
-  updateDayNightCycle(dt); updateEnemies(dt); updateGoldSlimes(dt);
+  updatePlayer(dt); updatePhysics(); updateFire(dt); updateAnimals(dt); updateDamageCooldown(dt);
+  updateDayNightCycle(dt); updateGoldSlimes(dt);
   updateWeather(dt); updateWaterfalls(dt); updateSplash(dt); updateItemDrops(dt); updateFallingLeaves(dt);
   updateDeathDrops(dt); updatePocketDimension(dt); updateDimForge(dt);
   // Living-world flora tick — self-throttled to once every 3s internally, so
@@ -12143,14 +11254,14 @@ function _gameLoopInner(now) {
   }
 
   spawnAmbientSparkles();
-  drawSky(); drawBirds(); drawBgHills(); drawCaveBackground(); drawWorld(); drawBlockCracks(); drawPlaceCharge(); drawWaterFluid(); drawAnimals(); drawOtherPlayers(dt); drawParticles(); drawWaterfalls(); drawSplash(); drawWeather(); drawDimForge(); drawDeathDrops(); drawPlayer(); drawUnderwaterOverlay(); drawDayNightOverlay(); drawLightingPass();
+  drawSky(); drawBgHills(); drawCaveBackground(); drawWorld(); drawBlockCracks(); drawPlaceCharge(); drawWaterFluid(); drawAnimals(); drawOtherPlayers(dt); drawParticles(); drawWaterfalls(); drawSplash(); drawWeather(); drawDimForge(); drawDeathDrops(); drawPlayer(); drawUnderwaterOverlay(); drawDayNightOverlay(); drawLightingPass();
   // The scene is complete here — sky, terrain, creatures, weather and lighting
   // have all landed. VibrantVox grades that finished image in one pass, which
   // is why it sits exactly at this seam: everything below is the informational
   // layer (damage numbers, pings, hover highlights) and deliberately stays
   // ungraded and crisp.
   VibrantVox.grade();
-  drawFloatingTexts(); drawItemDrops(); drawFallingLeaves(); drawPings(); drawHover(); drawTutorialBeacon();
+  drawFloatingTexts(); drawItemDrops(); drawFallingLeaves(); drawPings(); drawHover();
 
   // Draw dimension atmosphere overlay
   if (currentDim === "OCEAN") {
@@ -13343,7 +12454,6 @@ initFirebase(); drawHealth(); drawHotbar(); checkChatUnlockStatus(); updateDefen
 const INTRO_HINT_SEEN_KEY = 'voxeria_seen_intro_hint';
 let introHintTimer = null;
 function showIntroHintIfNeeded() {
-  if (tutorialSite) return; // the guided tutorial owns first-time onboarding now
   let seen = false;
   try { seen = localStorage.getItem(INTRO_HINT_SEEN_KEY) === '1'; } catch (e) {}
   if (seen) return;
