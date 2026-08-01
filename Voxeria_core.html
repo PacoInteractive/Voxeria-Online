@@ -3769,7 +3769,6 @@ let activeMod = null;
 // null whenever not inside a mod.
 let realInventorySnapshot = null;
 const burningBlocks = [];
-const piranhas = [];
 const portalDestinations = {}; // key: "wx,wy" -> targetDim string
 let lavaDamageTimer = 0; // for Lava Core environmental heat damage
 let voidGravityScale = 1.0; // reduced gravity in Blither
@@ -3997,7 +3996,6 @@ function resetGameAndWorld() {
   particles.length = 0;
   floatingTexts.length = 0;
   animals.length = 0;
-  piranhas.length = 0;
   damageCooldown = 0;
   lavaDamageTimer = 0;
   playerOxygen = OXYGEN_MAX; playerDrowning = false;
@@ -8234,183 +8232,8 @@ function drawAnimals() {
     else if (a.type==='sparrow') drawSparrow(a);
     else if (a.type==='seahorse') drawSeahorse(a);
   }
-  drawPiranhas();
   drawEnemies();
   drawGoldSlimes();
-}
-
-// =========================================================
-// PIRANHA PLANTS
-// Piranhas don't spawn in village areas or inside structures.
-// =========================================================
-function isInsideStructure(wx, wy) {
-  // Check if surrounding blocks suggest an enclosed structure (house/temple)
-  let solidNeighbors = 0;
-  const checkBlocks = [BLOCKS.PLANKS, BLOCKS.BG_PLANKS, BLOCKS.WOOD, BLOCKS.LOG, BLOCKS.YELLOW_LIMESTONE, BLOCKS.GOLD_BRICK];
-  for (let dx = -3; dx <= 3; dx++) {
-    for (let dy = -3; dy <= 3; dy++) {
-      if (checkBlocks.includes(getBlock(wx+dx, wy+dy))) solidNeighbors++;
-    }
-  }
-  return solidNeighbors >= 4;
-}
-
-function spawnPiranhaAt(wx, wy) {
-  if (getBlock(wx, wy) !== BLOCKS.AIR) return;
-  const below = getBlock(wx, wy+1);
-  if (below !== BLOCKS.GRASS && below !== BLOCKS.DIRT && below !== BLOCKS.SAND) return;
-  if (isInsideStructure(wx, wy)) return;
-  for (const p of piranhas) if (Math.abs(p.wx-wx) < 8) return;
-  piranhas.push({
-    wx, wy, phase: Math.random()*Math.PI*2, biteTimer: 0, isBiting: false, alive: true,
-    grow: 0, alert: 0, dying: false, dieTimer: 0,
-    leafPhase: Math.random()*Math.PI*2, sporeTimer: 60+Math.random()*60
-  });
-}
-
-function trySpawnPiranhasNearPlayer() {
-  if (Math.random() > 0.003) return;
-  const startX = Math.floor(camX/TILE) - 2;
-  const endX = startX + COLS + 4;
-  const wx = startX + Math.floor(Math.random()*(endX-startX));
-  for (let wy=2; wy<WORLD_H-2; wy++) {
-    if (getBlock(wx,wy)===BLOCKS.AIR && (getBlock(wx,wy+1)===BLOCKS.GRASS||getBlock(wx,wy+1)===BLOCKS.DIRT)) {
-      spawnPiranhaAt(wx, wy); break;
-    }
-  }
-}
-
-function fxEaseOutBack(t) {
-  const c = 1.70158;
-  return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
-}
-
-let damageCooldown = 0;
-
-function updatePiranhas(dt) {
-  if (damageCooldown>0) damageCooldown=Math.max(0,damageCooldown-dt);
-  trySpawnPiranhasNearPlayer();
-  for (let i=piranhas.length-1; i>=0; i--) {
-    const p = piranhas[i];
-    p.phase += 0.04*dt;
-    p.leafPhase += 0.05*dt;
-    if (p.grow < 1) p.grow = Math.min(1, p.grow + dt*0.06);
-    if (p.biteTimer>0) p.biteTimer -= dt;
-    if (p.biteTimer<=0) p.isBiting = false;
-
-    const pirX=p.wx*TILE+TILE/2;
-    const pirCenterY=p.wy*TILE+TILE/2;
-    const pirTopY=p.wy*TILE-6+(p.isBiting?4:0);
-    const pirBotY=(p.wy+1)*TILE;
-
-    // Anticipation: the plant "notices" the player before it actually bites
-    const dist = Math.hypot((player.x+player.w/2) - pirX, (player.y+player.h/2) - pirCenterY);
-    const wantAlert = dist < 85 ? 1 : 0;
-    p.alert += (wantAlert - p.alert) * Math.min(1, dt*0.15);
-
-    const hit = player.x+player.w > pirX-9 && player.x < pirX+9 && player.y+player.h > pirTopY && player.y < pirBotY;
-    if (hit && damageCooldown<=0 && !p.dying) {
-      p.isBiting=true; p.biteTimer=20;
-      playSound('bite'); takeDamage(2);
-      screenShake = Math.max(screenShake, 9);
-      spawnJuiceBurst(pirX, pirCenterY, '#ff3344', 10, 5);
-      spawnJuiceBurst(pirX, pirCenterY, '#3a9e28', 6, 4);
-      particles.push({x:pirX, y:pirCenterY, vx:0, vy:0, color:'', size:0, life:14, maxLife:14, type:'ring'});
-      addJuiceText(pirX, p.wy*TILE-4, 'CHOMP!', '#ff5566');
-    }
-
-    if (!p.dying) {
-      p.sporeTimer -= dt;
-      if (p.sporeTimer <= 0) {
-        p.sporeTimer = 90 + Math.random()*90;
-        particles.push({
-          x: pirX+(Math.random()-0.5)*8, y: p.wy*TILE+2, vx:(Math.random()-0.5)*0.3, vy:-0.5-Math.random()*0.4,
-          color: 'rgba(180,255,150,0.55)', size: 1+Math.random(), life: 40, maxLife: 40, type: 'dust'
-        });
-      }
-    }
-
-    const below=getBlock(p.wx, p.wy+1);
-    if (!p.dying && (below===BLOCKS.AIR||below===BLOCKS.WATER)) p.dying = true;
-    if (p.dying) {
-      p.dieTimer += dt;
-      if (p.dieTimer > 14) piranhas.splice(i,1);
-    }
-  }
-}
-
-function drawPiranhas() {
-  for (const p of piranhas) {
-    const sx=p.wx*TILE-drawCamX, sy=p.wy*TILE-drawCamY;
-    if (sx+TILE<-30||sx>canvas.width+30||sy+TILE<-30||sy>canvas.height+30) continue;
-
-    const growScale = p.grow < 1 ? Math.max(0, fxEaseOutBack(p.grow)) : 1;
-    const dieScale = p.dying ? Math.max(0, 1 - p.dieTimer/14) : 1;
-    const scale = growScale * dieScale;
-    if (scale <= 0.02) continue;
-
-    const bob=Math.sin(p.phase*1.5)*2*(1-p.alert*0.5);
-    const mouthOpen=p.isBiting?0.85:(0.18 + p.alert*0.35 + Math.abs(Math.sin(p.phase))*0.18);
-    const lean=p.alert * Math.sign((player.x+player.w/2)-(p.wx*TILE+TILE/2)) * 3;
-    const leafSway=Math.sin(p.leafPhase)*0.12;
-
-    ctx.save();
-    ctx.translate(sx+TILE/2, sy+TILE/2+bob);
-    ctx.scale(scale, scale);
-
-    // Red alert aura — telegraphs danger before the bite
-    if (p.alert > 0.05) {
-      const auraR = 16 + p.alert*8 + Math.sin(frameCount*0.3)*2;
-      const aura = ctx.createRadialGradient(0,-2,2, 0,-2, auraR);
-      aura.addColorStop(0, `rgba(255,60,60,${0.28*p.alert})`);
-      aura.addColorStop(1, 'rgba(255,60,60,0)');
-      ctx.fillStyle = aura;
-      ctx.beginPath(); ctx.arc(0,-2, auraR, 0, Math.PI*2); ctx.fill();
-    }
-
-    // stem
-    ctx.fillStyle='#2d7d1e'; ctx.fillRect(-3,4,6,12);
-    // swaying leaves
-    ctx.save(); ctx.rotate(-0.4+leafSway);
-    ctx.fillStyle='#3a9e28'; ctx.beginPath(); ctx.ellipse(-8,8,8,4,0,0,Math.PI*2); ctx.fill();
-    ctx.restore();
-    ctx.save(); ctx.rotate(0.4-leafSway);
-    ctx.fillStyle='#3a9e28'; ctx.beginPath(); ctx.ellipse(8,6,8,4,0,0,Math.PI*2); ctx.fill();
-    ctx.restore();
-
-    // bulb head (leans toward the player when alert)
-    ctx.fillStyle=p.isBiting?'#ff2222':'#e83333';
-    ctx.beginPath(); ctx.ellipse(lean,-4,9,10,0,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.ellipse(lean,-4,9,10,0,Math.PI*1.1,Math.PI*1.7); ctx.stroke();
-
-    ctx.fillStyle='rgba(255,255,255,0.4)';
-    ctx.beginPath(); ctx.arc(-3+lean,-6,2,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(4+lean,-2,1.5,0,Math.PI*2); ctx.fill();
-
-    const mouthH=mouthOpen*7;
-    ctx.fillStyle='#1a0000';
-    ctx.beginPath(); ctx.ellipse(lean,-2,7,mouthH,0,0,Math.PI*2); ctx.fill();
-    if (mouthOpen>0.2) {
-      ctx.fillStyle='#fff';
-      for (let t=-2;t<=2;t++) { ctx.beginPath(); ctx.moveTo(lean+t*2.5,-2-mouthH*0.3); ctx.lineTo(lean+t*2.5-1.2,-2+mouthH*0.5); ctx.lineTo(lean+t*2.5+1.2,-2+mouthH*0.5); ctx.fill(); }
-    }
-    if (p.isBiting) {
-      ctx.fillStyle='rgba(255,255,255,0.6)';
-      ctx.beginPath(); ctx.ellipse(lean-3, -2+mouthH*0.6, 1, 2, 0,0,Math.PI*2); ctx.fill();
-    }
-
-    // eyes track the player
-    const eyeDX = Math.max(-1.2, Math.min(1.2, ((player.x+player.w/2)-(p.wx*TILE+TILE/2))*0.02));
-    ctx.fillStyle='#fff';
-    ctx.beginPath(); ctx.arc(-4+lean,-9,3,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(4+lean,-9,3,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#111';
-    ctx.beginPath(); ctx.arc(-3.5+lean+eyeDX,-9,1.5,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(4.5+lean+eyeDX,-9,1.5,0,Math.PI*2); ctx.fill();
-
-    ctx.restore();
-  }
 }
 
 // =========================================================
@@ -8492,8 +8315,8 @@ function updateEnemies(dt) {
       if (e.idle <= 0) { e.dir = Math.random()<0.5?-1:1; e.vx = e.dir*(0.15+Math.random()*0.25); e.idle = 60+Math.random()*120; }
     }
 
-    // Bite on contact — same shared damageCooldown the piranha plants use, so
-    // damage from different sources can't stack unfairly in the same instant.
+    // Bite on contact — uses the shared global damageCooldown, so damage from
+    // different sources can't stack unfairly in the same instant.
     const hit = player.x+player.w > e.x-4 && player.x < e.x+e.w+4 && player.y+player.h > e.y-4 && player.y < e.y+e.h+4;
     if (hit && damageCooldown<=0) {
       e.isBiting = true; e.biteTimer = 20;
@@ -9504,6 +9327,15 @@ function handlePlayerDeath() {
     spawnRespawnBurst(player.x + player.w/2, player.y + player.h/2);
     deathPending=false;
   }, 2000);
+}
+
+// Global post-hit invulnerability window, shared by EVERY damage source
+// (enemies, lava, heat, hazards) so damage from different sources can't stack
+// unfairly in the same instant. takeDamage sets it; updateDamageCooldown ticks
+// it back down once per frame from the game loop.
+let damageCooldown = 0;
+function updateDamageCooldown(dt) {
+  if (damageCooldown > 0) damageCooldown = Math.max(0, damageCooldown - dt);
 }
 
 function takeDamage(amount) {
@@ -12160,7 +11992,7 @@ function _gameLoopInner(now) {
     if(dyn.timeLeft<=0){explodeDynamite(dyn.wx,dyn.wy);activeDynamites.splice(i,1);}
   }
 
-  updatePlayer(dt); updatePhysics(); updateFire(dt); updateAnimals(dt); updatePiranhas(dt); updateBirds(dt);
+  updatePlayer(dt); updatePhysics(); updateFire(dt); updateAnimals(dt); updateDamageCooldown(dt); updateBirds(dt);
   updateDayNightCycle(dt); updateEnemies(dt); updateGoldSlimes(dt);
   updateWeather(dt); updateWaterfalls(dt); updateSplash(dt); updateItemDrops(dt); updateFallingLeaves(dt);
   updateDeathDrops(dt); updatePocketDimension(dt); updateDimForge(dt);
