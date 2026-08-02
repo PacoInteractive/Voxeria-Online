@@ -251,7 +251,7 @@
          stretch into visibly blocky, jagged edges. Smooth scaling keeps it
          looking right at every rung of the ladder, and at VibrantVox's native
          rung there is no resampling to soften anything anyway. The small
-         per-item icon canvases (.slot canvas, .craft-ico-canvas, etc.) are
+         per-item icon canvases (.slot canvas, .pb-tile-img, etc.) are
          unrelated — those stay "pixelated" on purpose, rendered near 1:1. */
       display: block; cursor: crosshair; margin-bottom: 0;
       width: 100%; height: 100%; object-fit: contain;
@@ -480,7 +480,6 @@
       pointer-events: none;
     }
     #luck-hud.active { display: block; }
-    .npb-recipe-row { display: flex; align-items: center; gap: 8px; }
     #hud-side-actions { display: flex; gap: 8px; pointer-events: auto; }
     .shop-subtitle {
       text-align: center; color: rgba(255,255,255,0.4); font-size: 11px; margin: -8px 0 2px;
@@ -1149,139 +1148,68 @@
       display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;
     }
     #pb-close:hover { background: #ff4444; color: white; }
-    #pb-tabs { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
-    .pb-tab {
-      flex: 1; padding: 10px; text-align: center; cursor: pointer;
-      font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.4);
-      text-transform: uppercase; letter-spacing: 0.8px; transition: all 0.2s;
-      border-bottom: 2px solid transparent;
-    }
-    .pb-tab:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.03); }
-    .pb-tab.active { color: #c084fc; border-bottom-color: #c084fc; background: rgba(120,80,255,0.08); }
     #pb-body { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
     #pb-body::-webkit-scrollbar { width: 8px; }
     #pb-body::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
     #pb-body::-webkit-scrollbar-thumb { background: #a855f7; border-radius: 4px; }
     #pb-body::-webkit-scrollbar-thumb:hover { background: #e854dc; }
-    .portal-card {
-      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px; padding: 16px; display: flex; gap: 16px; align-items: flex-start;
-      transition: border-color 0.2s;
+    /* ── Portal Book: tile navigation ──
+       Three drill-down views (dimensions → one dimension → how to build its
+       armor) sharing one tile style, instead of tabs. Everything the player
+       clicks is the same object: an image on the left, a name on the right. */
+    .pb-tile {
+      display: flex; align-items: center; gap: 14px;
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 12px; padding: 12px 14px; transition: all 0.16s;
     }
-    .portal-card.unlocked { border-color: rgba(120,80,255,0.35); }
-    .portal-card.unlocked:hover { border-color: rgba(160,120,255,0.6); background: rgba(120,80,255,0.05); }
-    .portal-card.locked { opacity: 0.6; filter: saturate(0.3); }
-    .portal-card.mystery {
+    .pb-tile.clickable { cursor: pointer; }
+    .pb-tile.clickable:hover { background: rgba(120,80,255,0.08); border-color: rgba(160,120,255,0.55); transform: translateX(2px); }
+    .pb-tile.clickable:active { transform: scale(0.99); }
+    .pb-tile.locked {
       background: repeating-linear-gradient(45deg, #050507, #050507 10px, #0b0b10 10px, #0b0b10 20px);
-      border-color: rgba(255,255,255,0.06); justify-content: center; text-align: center;
-      min-height: 96px; align-items: center;
+      border-color: rgba(255,255,255,0.06);
     }
-    .pb-mystery { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; width: 100%; }
-    .pb-mystery-lock { font-size: 26px; filter: grayscale(1) brightness(0.7); }
-    .pb-mystery-title { font-size: 14px; font-weight: 800; color: rgba(255,255,255,0.32); letter-spacing: 1px; }
-    .pb-mystery-hint { font-size: 11px; color: rgba(255,255,255,0.22); font-style: italic; }
-    .pb-recipe { flex-shrink: 0; }
-    .pb-recipe canvas { display: block; image-rendering: pixelated; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
-    .pb-info { flex: 1; }
-    .pb-dim-name { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
-    .pb-dim-desc { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.5; margin-bottom: 8px; }
-    .pb-dim-recipe-label { font-size: 10px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-    .pb-dim-recipe-text { font-size: 12px; color: rgba(255,255,255,0.7); }
-    .pb-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-    .pb-badge.unlocked { background: rgba(80,220,100,0.2); color: #4ade80; border: 1px solid rgba(80,220,100,0.3); }
-    .pb-badge.locked { background: rgba(180,180,180,0.1); color: #888; border: 1px solid rgba(180,180,180,0.2); }
-    .pb-badge.active-dim { background: rgba(120,80,255,0.3); color: #c084fc; border: 1px solid rgba(120,80,255,0.5); }
-    .block-glossary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .block-entry { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s; }
-    .block-entry:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); }
-    .block-entry canvas { image-rendering: pixelated; }
-    .block-entry-name { font-size: 10px; color: rgba(255,255,255,0.6); text-align: center; font-weight: 600; }
-    .block-entry.buyable:hover { background: rgba(255,217,122,0.08); border-color: rgba(255,217,122,0.35); }
-    .block-entry.buyable:active { transform: scale(0.96); }
-    .block-entry-price { font-size: 10px; color: #ffd97a; font-weight: 700; }
-    .block-entry.unaffordable .block-entry-price { color: rgba(255,217,122,0.35); }
-    .block-entry.rank-locked .block-entry-price { color: #7fc9ff; }
-    /* ── Crafting tab ── */
-    .craft-wrap { display: flex; flex-direction: column; gap: 10px; }
-    .craft-section-head {
-      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-      margin: 6px 2px 2px; font-size: 14px; font-weight: 800; color: #e0aaff;
+    .pb-tile-img {
+      width: 52px; height: 52px; flex-shrink: 0; image-rendering: pixelated;
+      border-radius: 9px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.3);
     }
-    .craft-section-sub { font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,0.4); }
-    /* Manual nudge from the UI editor (Ctrl+Shift+E). Targets the FIRST
-       craft-section-head row and its title span — safe as a class-based
-       rule (unlike the raw nth-child selector the editor exports) since it
-       survives renderCraftingTab() rebuilding #pb-body's contents; it would
-       only become ambiguous if a second .craft-section-head is ever added
-       above this one. */
-    .craft-section-head { transform: translate(0px, -2px); }
-    .craft-section-head > span:first-child { transform: translate(-1px, 0px); }
-    .craft-card {
-      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 10px; padding: 10px 12px;
+    .pb-tile-lock { width: 52px; height: 52px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; filter: grayscale(1) brightness(0.7); }
+    .pb-tile-text { flex: 1; min-width: 0; }
+    .pb-tile-name { font-size: 15px; font-weight: 800; line-height: 1.3; }
+    .pb-tile-sub { font-size: 11px; color: rgba(255,255,255,0.42); margin-top: 2px; line-height: 1.4; }
+    .pb-tile-chev { flex-shrink: 0; color: rgba(255,255,255,0.3); font-size: 18px; }
+    .pb-back {
+      align-self: flex-start; display: flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+      color: rgba(255,255,255,0.75); border-radius: 8px; padding: 6px 12px;
+      font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s;
     }
-    .craft-ico { font-size: 26px; line-height: 1; flex-shrink: 0; width: 34px; text-align: center; }
-    .craft-ico-canvas { width: 60px; height: 60px; flex-shrink: 0; image-rendering: pixelated; border-radius: 10px; }
-    /* min-width:0 let this shrink to near-nothing before the card's flex-wrap
-       ever kicked in, since flex-basis has no floor to wrap against — the
-       craft-btn fix above needs this floor to actually take effect. */
-    .craft-info { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 3px; }
-    .craft-name { font-size: 13.5px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 6px; }
-    .craft-effect { font-size: 11px; color: rgba(255,255,255,0.55); line-height: 1.35; }
-    /* The altar diagram + "where to build it / do I carry enough" line. This
-       replaced the old material-chip checklist and craft button entirely —
-       the shape itself is the instruction now. */
-    .craft-build { display: flex; align-items: center; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
-    .craft-shape { image-rendering: pixelated; flex-shrink: 0; border-radius: 4px; }
-    .craft-where { font-size: 11px; color: rgba(255,255,255,0.55); line-height: 1.5; }
-    .craft-where b { color: #e0aaff; font-weight: 800; }
+    .pb-back:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    .pb-detail-head { display: flex; align-items: center; gap: 12px; }
+    .pb-detail-name { font-size: 18px; font-weight: 800; }
+    .pb-label { font-size: 10px; color: rgba(255,255,255,0.32); text-transform: uppercase; letter-spacing: 1.2px; }
+    .pb-panel {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 12px; padding: 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .pb-panel canvas { image-rendering: pixelated; flex-shrink: 0; border-radius: 6px; }
+    .pb-panel-text { flex: 1; min-width: 150px; font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.55; }
+    .pb-panel-text b { color: #e0aaff; font-weight: 800; }
+    .pb-desc { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.55; }
     .cm-ok { color: #a3ffce; font-weight: 700; }
     .cm-short { color: #ffb3b3; font-weight: 700; }
     .craft-btn {
-      flex-shrink: 0; align-self: center; border: none; border-radius: 8px; cursor: pointer;
+      align-self: flex-start; border: none; border-radius: 8px; cursor: pointer;
       padding: 9px 16px; font-size: 13px; font-weight: 800;
-      max-width: 160px; white-space: normal; line-height: 1.25; text-align: center;
       background: linear-gradient(135deg, #e854dc, #a855f7); color: #fff;
       box-shadow: 0 3px 12px rgba(168,85,247,0.4); transition: transform 0.12s, filter 0.2s;
     }
-    .craft-btn:hover:not(:disabled) { filter: brightness(1.15); transform: translateY(-1px); }
-    .craft-btn:active:not(:disabled) { transform: scale(0.96); }
+    .craft-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+    .craft-btn:active { transform: scale(0.96); }
     .craft-btn.equipped { background: rgba(74,222,128,0.15); color: #4ade80; box-shadow: none; border: 1px solid rgba(74,222,128,0.4); }
     .craft-btn.equipped:hover { background: rgba(255,90,90,0.12); color: #ffb3b3; border-color: rgba(255,90,90,0.35); }
     .craft-btn.stowed { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6); box-shadow: none; border: 1px solid rgba(255,255,255,0.15); }
     .craft-btn.stowed:hover { background: rgba(74,222,128,0.12); color: #a3ffce; border-color: rgba(74,222,128,0.35); }
-    /* ── Block Atlas: Look Up / Buy popover ──
-       Fixed-position (not a child of the scrolling pb-body) so it always
-       anchors correctly to the clicked block entry regardless of scroll
-       offset, and floats above the Portal Book modal's own z-index. */
-    #block-action-popover {
-      display: none; position: fixed; z-index: 100010;
-      background: rgba(10,8,20,0.98); backdrop-filter: blur(10px);
-      border: 1.5px solid rgba(160,100,255,0.4); border-radius: 10px;
-      padding: 10px; min-width: 190px; max-width: 260px;
-      box-shadow: 0 10px 34px rgba(0,0,0,0.7);
-      font-family: var(--font-ui); color: #fff;
-    }
-    #block-action-popover.open { display: block; }
-    .bap-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .bap-header canvas { image-rendering: pixelated; flex-shrink: 0; }
-    .bap-title { font-size: 13px; font-weight: 800; color: #e0aaff; }
-    .bap-actions { display: flex; flex-direction: column; gap: 6px; }
-    .bap-btn {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: #fff;
-      border-radius: 7px; padding: 7px 10px; font-size: 12.5px; font-weight: 700; cursor: pointer;
-      transition: all 0.15s;
-    }
-    .bap-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); }
-    .bap-btn.bap-buy { background: rgba(255,217,122,0.12); border-color: rgba(255,217,122,0.4); color: #ffd97a; }
-    .bap-btn.bap-buy:hover { background: rgba(255,217,122,0.2); }
-    .bap-btn.bap-locked { background: rgba(127,201,255,0.1); border-color: rgba(127,201,255,0.3); color: #7fc9ff; cursor: not-allowed; }
-    .bap-btn.bap-locked:hover { background: rgba(127,201,255,0.1); }
-    .bap-desc { font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.75); margin-bottom: 8px; }
-    .bap-back { font-size: 11px; color: rgba(255,255,255,0.4); cursor: pointer; text-align: right; }
-    .bap-back:hover { color: rgba(255,255,255,0.75); }
     #chat-wrap{position:absolute;bottom:14px;left:14px;z-index:300;width:300px;max-width:calc(100vw - 28px);display:none;flex-direction:column;pointer-events:none;}
     #chat-wrap.open{display:flex;pointer-events:auto;}
     #unlock-chat-btn.chat-locked{animation:chatBtnGlow 1.6s ease-in-out infinite;}
@@ -1662,14 +1590,8 @@
           </div>
           <div id="pb-close" onclick="togglePortalBook()">✕</div>
         </div>
-        <div id="pb-tabs">
-          <div class="pb-tab active" onclick="showPBTab('portals',this)">🌀 Portals</div>
-          <div class="pb-tab" onclick="showPBTab('crafting',this)">🔨 Crafting</div>
-          <div class="pb-tab" onclick="showPBTab('blocks',this)">🧱 Block Guide</div>
-        </div>
         <div id="pb-body"></div>
       </div>
-      <div id="block-action-popover"></div>
       <div id="touch-controls">
         <div class="tc-group">
             <button id="tc-left" class="tc-btn">◀</button>
@@ -3313,66 +3235,6 @@ const blockNames = {
   46:'Volcanic Rock', 47:'Ash Dirt', 48:'Lava Pool', 49:'Sulfur Ore', 50:'Cinder Block',
   51:'Mystic Earth', 52:'Glowshroom', 53:'Crystal Flower', 54:'Hazelnut Wood', 55:'Hazelnut Shell',
   56:'Mystic Ore'
-};
-
-// Short, one-line "Look up" descriptions shown in the Block Atlas popover.
-// Grounded in what each block actually does elsewhere in the game (growth
-// system, crafting recipes, portal recipes, biomes) rather than generic
-// flavor text, so it reads as documentation, not filler.
-const blockDescriptions = {
-  1: 'The living topsoil of the Overworld. Spreads onto bare dirt exposed to open sky.',
-  2: 'Common, soft earth. Breaks fast and turns up almost everywhere.',
-  3: "The Overworld's filler stone: sturdy, common, and everywhere underground.",
-  4: 'Harvested straight from trees, and one of the first real crafting materials you find.',
-  5: 'Rustles atop trees. Breaks easily and drops nothing rare.',
-  6: 'Loose desert terrain. Cacti take root here and slowly grow upward.',
-  7: "Flows and pools naturally. Can't be mined, only displaced or built around.",
-  8: 'The first real ore tier, common enough to build an early stockpile.',
-  9: 'A dependable mid-tier ore, tougher to find than Coal but still common.',
-  10: 'Rarer than Iron, and the cross material in the Gold Dimension portal recipe.',
-  11: 'Indestructible world floor. Marks the bottom of every dimension you dig into.',
-  12: 'Freshly cut tree trunk, one step before it becomes Planks.',
-  13: 'Transparent and fragile-looking, crafted for windows and light-friendly builds.',
-  14: 'Processed Wood, smooth and stackable, the backbone of most player-built structures.',
-  15: 'Placeable light source. Pushes back the dark in caves and at night.',
-  16: "One of the rarest Overworld ores, a genuine 'stop and celebrate' find.",
-  19: 'Decorative. Has a small chance to seed itself onto nearby grass over time.',
-  20: 'A tool, not a block. Sets flammable materials like Wood ablaze.',
-  21: "Background wall planks: walkable, not minable, marks 'behind' the play space.",
-  22: 'Coats the ground in the Snow biome. Purely cosmetic terrain dressing.',
-  23: 'Grows on Sand up to 3 blocks tall whenever there is open air above it.',
-  24: 'Frozen water: slick, and the center material in the Ocean Depth portal recipe.',
-  25: 'The rarest Overworld ore by far, with shifting hues. A real trophy find.',
-  26: "Not minable. The gateway itself, built from a dimension's own recipe.",
-  27: 'A pale stone variant found in certain Overworld biomes.',
-  28: 'Placeable explosive. Clears a wide crater once lit with a Lighter.',
-  29: 'A refined Gold product, the cross material in the Lava Core portal recipe.',
-  31: 'The Ocean Depth seafloor. Coral and Kelp anchor and spread across it.',
-  32: 'Colonizes Ocean Stone seafloor over time, spreading sideways once submerged.',
-  33: 'Grows upward through open water above Ocean Stone, like real underwater algae.',
-  34: "Ocean Depth's own Water: deeper, darker, and far more dangerous to swim.",
-  35: 'A glowing block that lights up the murky Ocean Depth.',
-  36: 'The base terrain of Lava Core. Solid, but always one step from danger.',
-  37: 'Deals heavy contact damage and passive heat damage unless you\'re protected.',
-  38: 'Forms near lava, and the main ingredient in the Obsidian Heat Suit.',
-  39: 'A Lava Core specialty ore, also scattered through a few other dimensions.',
-  40: 'A rare Lava Core crystal that pulses with heat, used in Fireproof Draughts.',
-  41: 'The floating-island terrain of the Blither, used in Void Walker Boots.',
-  42: 'The rarest resource in the Blither, a true endgame trophy.',
-  43: 'A shimmering Blither material, and a key ingredient for Void Walker Boots.',
-  44: "Grows on the Blither's floating islands, glowing with unstable energy.",
-  45: 'A translucent, void-touched glass variant found only in the Blither.',
-  46: "The Volcano biome's base terrain, right at home near Lava Pools.",
-  47: "Scorched, grey soil found around the Volcano biome's slopes.",
-  48: 'An Overworld hazard. Deals damage on contact even outside Lava Core.',
-  49: 'A Volcano biome ore with a distinct sulfur-yellow tint.',
-  50: 'A charred building material native to the Volcano biome.',
-  51: "The purple-tinted soil of the Mystic biome's underground caves.",
-  52: 'A bioluminescent fungus that slowly spreads across Mystic Earth and Stone in the dark.',
-  53: 'A glowing mystic bloom, and a key ingredient in Health Tonics.',
-  54: 'A distinct tree wood found only in the Mystic biome.',
-  55: 'The cracked shell byproduct of Hazelnut trees in the Mystic biome.',
-  56: "A rare ore hidden within the Mystic biome's purple caverns.",
 };
 
 // =========================================================
@@ -11354,26 +11216,89 @@ function markDimVisited(dim) {
   }
 }
 
-let pbCurrentTab = 'portals';
+// Portal Book navigation — a three-level drill-down instead of tabs, so the
+// book only ever shows one thing at a time:
+//   'dims'  → the four dimension tiles
+//   'dim'   → one dimension: how to open its portal + the armor it builds
+//   'armor' → how to build that armor
+// pbViewDim is which dimension the 'dim'/'armor' views are about.
+let pbView = 'dims';
+let pbViewDim = null;
 
 function togglePortalBook() {
   const modal = document.getElementById('portal-book-modal');
   modal.classList.toggle('open');
-  if (modal.classList.contains('open')) renderPortalBook();
-  // The Look Up/Buy popover is a fixed sibling element (so it can float above
-  // the modal and anchor correctly regardless of scroll), which means closing
-  // the Portal Book does NOT automatically hide it — close it explicitly so
-  // it can't get left floating on screen after the book itself is gone.
-  else closeBlockActionPopover();
+  // Always reopen at the top level — coming back to a book still buried three
+  // levels deep in a dimension you looked at ten minutes ago reads as broken.
+  if (modal.classList.contains('open')) { pbView = 'dims'; pbViewDim = null; renderPortalBook(); }
 }
 
-function showPBTab(tab, el) {
-  pbCurrentTab = tab;
-  document.querySelectorAll('.pb-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
+function pbGoto(view, dimId) {
+  pbView = view;
+  if (dimId !== undefined) pbViewDim = dimId;
   renderPortalBook();
-  closeBlockActionPopover(); // its anchor entry no longer exists once pb-body is re-rendered
 }
+
+// One tile shape for everything the player clicks in this book: image on the
+// left, name (plus an optional sub-line) on the right.
+function _pbTile(opts) {
+  const tile = document.createElement('div');
+  tile.className = 'pb-tile' + (opts.onClick ? ' clickable' : '') + (opts.locked ? ' locked' : '');
+  if (opts.lockGlyph) {
+    const l = document.createElement('div');
+    l.className = 'pb-tile-lock';
+    l.textContent = opts.lockGlyph;
+    tile.appendChild(l);
+  } else if (opts.img) {
+    opts.img.className = 'pb-tile-img';
+    tile.appendChild(opts.img);
+  }
+  const txt = document.createElement('div');
+  txt.className = 'pb-tile-text';
+  const nm = document.createElement('div');
+  nm.className = 'pb-tile-name';
+  nm.textContent = opts.name;
+  if (opts.nameColor) nm.style.color = opts.nameColor;
+  txt.appendChild(nm);
+  if (opts.sub) {
+    const s = document.createElement('div');
+    s.className = 'pb-tile-sub';
+    s.textContent = opts.sub;
+    txt.appendChild(s);
+  }
+  tile.appendChild(txt);
+  if (opts.onClick) {
+    const chev = document.createElement('div');
+    chev.className = 'pb-tile-chev';
+    chev.textContent = '›';
+    tile.appendChild(chev);
+    tile.onclick = opts.onClick;
+  }
+  return tile;
+}
+
+function _pbBack(label, onClick) {
+  const b = document.createElement('button');
+  b.className = 'pb-back';
+  b.textContent = '‹ ' + label;
+  b.onclick = onClick;
+  return b;
+}
+
+function _pbLabel(text) {
+  const el = document.createElement('div');
+  el.className = 'pb-label';
+  el.textContent = text;
+  return el;
+}
+
+// The block that stands in as each dimension's thumbnail — its signature
+// terrain/material, drawn with the game's own block art so the tile previews
+// what the place actually looks like.
+const PB_DIM_ICON_BLOCK = {
+  GOLD: BLOCKS.GOLD_BRICK, LAVA: BLOCKS.MAGMA,
+  OCEAN: BLOCKS.CORAL, VOID: BLOCKS.VOID_STONE
+};
 
 // Renders any rectangular recipe grid (0 = empty cell) into a canvas. Shared by
 // the portal recipes (3x3 plus-shape) and the armor altars (5x3), so both read
@@ -11481,228 +11406,136 @@ function drawBlockMini(canvas, btype) {
 function renderPortalBook() {
   const body = document.getElementById('pb-body');
   body.innerHTML = '';
+  if (pbView === 'armor' && pbViewDim) { _pbRenderArmor(body, pbViewDim); return; }
+  if (pbView === 'dim' && pbViewDim) { _pbRenderDim(body, pbViewDim); return; }
+  _pbRenderDims(body);
+}
 
-  if (pbCurrentTab === 'portals') {
-    PORTAL_DEFS.forEach(def => {
-      const revealed = isDimRevealed(def.id);
-      const isActive = currentDim === def.id;
-      const card = document.createElement('div');
+// Level 1 — one tile per dimension. Undiscovered ones stay blacked out; you
+// uncover them by entering the dimension before them in the chain.
+function _pbRenderDims(body) {
+  PORTAL_DEFS.forEach(def => {
+    if (!isDimRevealed(def.id)) {
+      body.appendChild(_pbTile({
+        lockGlyph: '🔒', locked: true,
+        name: '??? Undiscovered',
+        sub: 'Discover the dimension before this one to reveal it.'
+      }));
+      return;
+    }
+    const img = document.createElement('canvas');
+    drawBlockMini(img, PB_DIM_ICON_BLOCK[def.id] || BLOCKS.STONE);
+    body.appendChild(_pbTile({
+      img, name: def.name, nameColor: def.color,
+      sub: currentDim === def.id ? '◉ You are here' : null,
+      onClick: () => pbGoto('dim', def.id)
+    }));
+  });
+}
 
-      // Undiscovered dimension: a blacked-out card that hides the name, recipe
-      // and resources entirely. The player uncovers it by entering the previous
-      // dimension in the chain (GOLD → OCEAN → LAVA → VOID).
-      if (!revealed) {
-        card.className = 'portal-card mystery';
-        const cover = document.createElement('div');
-        cover.className = 'pb-mystery';
-        const lock = document.createElement('div');
-        lock.className = 'pb-mystery-lock';
-        lock.textContent = '🔒';
-        const title = document.createElement('div');
-        title.className = 'pb-mystery-title';
-        title.textContent = '??? · Undiscovered Dimension';
-        const hint = document.createElement('div');
-        hint.className = 'pb-mystery-hint';
-        hint.textContent = 'Discover the dimension before it to reveal this portal.';
-        cover.appendChild(lock); cover.appendChild(title); cover.appendChild(hint);
-        card.appendChild(cover);
-        body.appendChild(card);
-        return;
-      }
+// Level 2 — one dimension: how to open its portal, then the armor it builds.
+function _pbRenderDim(body, dimId) {
+  const def = PORTAL_DEFS.find(d => d.id === dimId);
+  if (!def) { pbGoto('dims'); return; }
+  body.appendChild(_pbBack('All dimensions', () => pbGoto('dims')));
 
-      card.className = 'portal-card unlocked';
-      card.style.borderColor = def.glow.replace('0.3', '0.5');
+  const head = document.createElement('div');
+  head.className = 'pb-detail-head';
+  const nm = document.createElement('div');
+  nm.className = 'pb-detail-name';
+  nm.textContent = def.name;
+  nm.style.color = def.color;
+  head.appendChild(nm);
+  body.appendChild(head);
 
-      // Recipe preview canvas
-      const recipeDiv = document.createElement('div');
-      recipeDiv.className = 'pb-recipe';
-      const recipeCanvas = document.createElement('canvas');
-      recipeCanvas.style.width = '72px'; recipeCanvas.style.height = '72px';
-      drawRecipePreview(recipeCanvas, def.recipe.center, def.recipe.cross);
-      recipeDiv.appendChild(recipeCanvas);
+  const desc = document.createElement('div');
+  desc.className = 'pb-desc';
+  desc.textContent = def.desc;
+  body.appendChild(desc);
 
-      // Info
-      const info = document.createElement('div');
-      info.className = 'pb-info';
+  body.appendChild(_pbLabel('Portal Recipe'));
+  const panel = document.createElement('div');
+  panel.className = 'pb-panel';
+  const rc = document.createElement('canvas');
+  drawRecipePreview(rc, def.recipe.center, def.recipe.cross);
+  const ptxt = document.createElement('div');
+  ptxt.className = 'pb-panel-text';
+  ptxt.innerHTML = 'Center: <b>' + escapeHtml(def.centerLabel) + '</b><br>' +
+                   'Cross: <b>' + escapeHtml(def.crossLabel) + '</b>';
+  panel.appendChild(rc); panel.appendChild(ptxt);
+  body.appendChild(panel);
 
-      const badge = document.createElement('div');
-      badge.className = 'pb-badge ' + (isActive ? 'active-dim' : def.unlocked ? 'unlocked' : 'locked');
-      badge.textContent = isActive ? '◉ CURRENT' : def.unlocked ? '✓ UNLOCKED' : '🔒 LOCKED';
-
-      const name = document.createElement('div');
-      name.className = 'pb-dim-name';
-      name.style.color = def.color;
-      name.textContent = def.name;
-
-      const desc = document.createElement('div');
-      desc.className = 'pb-dim-desc';
-      desc.textContent = def.desc;
-
-      const recLabel = document.createElement('div');
-      recLabel.className = 'pb-dim-recipe-label';
-      recLabel.textContent = 'Portal Recipe';
-
-      const recText = document.createElement('div');
-      recText.className = 'pb-dim-recipe-text';
-      recText.textContent = `Center: ${def.centerLabel}  ·  Cross: ${def.crossLabel}`;
-
-      const rwLabel = document.createElement('div');
-      rwLabel.className = 'pb-dim-recipe-label';
-      rwLabel.style.marginTop = '6px';
-      rwLabel.textContent = 'Unique Resources';
-
-      const rwText = document.createElement('div');
-      rwText.className = 'pb-dim-recipe-text';
-      rwText.style.color = def.color;
-      rwText.textContent = def.rewards;
-
-      info.appendChild(badge); info.appendChild(name); info.appendChild(desc);
-      info.appendChild(recLabel); info.appendChild(recText);
-      info.appendChild(rwLabel); info.appendChild(rwText);
-
-      card.appendChild(recipeDiv); card.appendChild(info);
-      body.appendChild(card);
-    });
-
-  } else if (pbCurrentTab === 'crafting') {
-    renderCraftingTab(body);
-
-  } else {
-    // Block glossary
-    const glossary = document.createElement('div');
-    glossary.className = 'block-glossary';
-
-    const allBlocks = Object.entries(blockNames).map(([id, name]) => ({ id: parseInt(id), name }));
-    const portalDimNames = { 26: '🌀 Portal (all dimensions)' };
-    allBlocks.forEach(({ id, name }) => {
-      if (id === 0) return; // skip air only
-      const entry = document.createElement('div');
-      entry.className = 'block-entry';
-      const mini = document.createElement('canvas');
-      mini.width = 36; mini.height = 36;
-      if (id === 26) {
-        // Draw animated-style portal preview
-        const pc = mini.getContext('2d');
-        pc.fillStyle = 'hsl(180,100%,55%)'; pc.fillRect(2,2,32,32);
-        pc.strokeStyle = 'hsl(0,100%,70%)'; pc.lineWidth = 2; pc.strokeRect(4,4,28,28);
-        pc.fillStyle = 'rgba(255,255,255,0.5)'; pc.fillRect(14,14,8,8);
-      } else {
-        drawBlockMini(mini, id);
-      }
-      const label = document.createElement('div');
-      label.className = 'block-entry-name';
-      label.textContent = portalDimNames[id] || name;
-      entry.appendChild(mini); entry.appendChild(label);
-
-      // Every entry opens the Look Up popover — a pure glossary lookup.
-      entry.onclick = () => openBlockActionPopover(id, entry, portalDimNames[id] || name);
-      glossary.appendChild(entry);
-    });
-    body.appendChild(glossary);
+  // The armor this realm makes (FORGE_OUTPUT: always the piece you need for the
+  // NEXT dimension, which is why it's found one realm early).
+  const recId = FORGE_OUTPUT[dimId];
+  const r = recId ? CRAFTING_RECIPES.find(x => x.id === recId) : null;
+  if (r) {
+    body.appendChild(_pbLabel('Armor built here'));
+    const img = document.createElement('canvas');
+    img.width = 60; img.height = 60;
+    drawArmorPreview(img, r.dim);
+    body.appendChild(_pbTile({
+      img, name: r.name,
+      sub: craftedArmor.has(r.dim) ? '✓ Already built' : 'Not built yet',
+      onClick: () => pbGoto('armor', dimId)
+    }));
   }
 }
 
-// ── Block Guide: Look Up popover ────────────────────────────────────────────
-// Clicking any block in the Block Guide opens this popover showing its
-// description — a pure glossary lookup, always available.
-let _bapBlockId = null;
+// Level 3 — how to build one armor piece: the altar shape, nothing else.
+function _pbRenderArmor(body, dimId) {
+  const recId = FORGE_OUTPUT[dimId];
+  const r = recId ? CRAFTING_RECIPES.find(x => x.id === recId) : null;
+  const def = PORTAL_DEFS.find(d => d.id === dimId);
+  if (!r) { pbGoto('dim', dimId); return; }
+  body.appendChild(_pbBack(def ? def.name : 'Back', () => pbGoto('dim', dimId)));
 
-function _positionBlockActionPopover(anchorEl) {
-  const pop = document.getElementById('block-action-popover');
-  const r = anchorEl.getBoundingClientRect();
-  const pw = pop.offsetWidth || 210, ph = pop.offsetHeight || 100;
-  // Prefer opening below-right of the clicked entry; flip to stay on-screen
-  // near the Portal Book modal's own edges instead of spilling off it.
-  let left = r.left;
-  let top = r.bottom + 6;
-  if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
-  if (top + ph > window.innerHeight - 12) top = r.top - ph - 6;
-  pop.style.left = Math.max(8, left) + 'px';
-  pop.style.top = Math.max(8, top) + 'px';
+  const head = document.createElement('div');
+  head.className = 'pb-detail-head';
+  const ico = document.createElement('canvas');
+  ico.width = 60; ico.height = 60;
+  ico.className = 'pb-tile-img';
+  drawArmorPreview(ico, r.dim);
+  const nm = document.createElement('div');
+  nm.className = 'pb-detail-name';
+  nm.textContent = r.name;
+  head.appendChild(ico); head.appendChild(nm);
+  body.appendChild(head);
+
+  const eff = document.createElement('div');
+  eff.className = 'pb-desc';
+  eff.textContent = r.effect + ' (-' + Math.round(ARMOR_DEFENSE[r.dim] * 100) + '% DMG while equipped)';
+  body.appendChild(eff);
+
+  body.appendChild(_pbLabel('How to build it'));
+  const panel = document.createElement('div');
+  panel.className = 'pb-panel';
+  const shape = document.createElement('canvas');
+  drawAltarPreview(shape, r.base, r.core);
+  const txt = document.createElement('div');
+  txt.className = 'pb-panel-text';
+  const haveBase = countInInventory(r.base), haveCore = countInInventory(r.core);
+  const needBase = r.mats[r.base], needCore = r.mats[r.core];
+  txt.innerHTML =
+    'Place the blocks in exactly this shape while you are in the <b>' + escapeHtml(r.forge.dim) + '</b> Dimension. They turn into the armor on the spot.<br>' +
+    '<span class="' + (haveBase >= needBase ? 'cm-ok' : 'cm-short') + '">' +
+      escapeHtml(blockNames[r.base] || 'Block') + ' ' + Math.min(haveBase, needBase) + '/' + needBase + '</span> · ' +
+    '<span class="' + (haveCore >= needCore ? 'cm-ok' : 'cm-short') + '">' +
+      escapeHtml(blockNames[r.core] || 'Block') + ' ' + Math.min(haveCore, needCore) + '/' + needCore + ' (core)</span>';
+  panel.appendChild(shape); panel.appendChild(txt);
+  body.appendChild(panel);
+
+  // Wearing it is the only thing there's still a button for.
+  if (craftedArmor.has(r.dim)) {
+    const btn = document.createElement('button');
+    btn.className = 'craft-btn';
+    const equipped = equippedArmor.has(r.dim);
+    btn.classList.add(equipped ? 'equipped' : 'stowed');
+    btn.textContent = equipped ? '🛡️ Equipped (click to remove)' : '👕 Stowed (click to wear)';
+    btn.onclick = () => toggleArmorEquip(r.dim);
+    body.appendChild(btn);
+  }
 }
-
-function openBlockActionPopover(blockId, anchorEl, displayName) {
-  _bapBlockId = blockId;
-  const pop = document.getElementById('block-action-popover');
-
-  const mini = document.createElement('canvas');
-  drawBlockMini(mini, blockId);
-  mini.style.width = '28px'; mini.style.height = '28px';
-
-  pop.innerHTML = '';
-  const header = document.createElement('div');
-  header.className = 'bap-header';
-  const title = document.createElement('div');
-  title.className = 'bap-title';
-  title.textContent = displayName;
-  header.appendChild(mini); header.appendChild(title);
-
-  const actions = document.createElement('div');
-  actions.className = 'bap-actions';
-
-  const lookupBtn = document.createElement('button');
-  lookupBtn.className = 'bap-btn';
-  lookupBtn.textContent = '🔍 Look up';
-  // stopPropagation is essential here: showBlockLookupView() replaces
-  // pop.innerHTML synchronously, which detaches THIS button from the DOM
-  // before the click event finishes bubbling. Without stopping it, the
-  // document-level "click outside closes the popover" listener below would
-  // see pop.contains(e.target) come back false (the button is no longer
-  // inside pop — it's detached) and immediately close the popover it was
-  // just told to open, so the description would flash and vanish in the
-  // same tick instead of staying visible.
-  lookupBtn.onclick = (e) => { e.stopPropagation(); showBlockLookupView(blockId, displayName); };
-  actions.appendChild(lookupBtn);
-
-  pop.appendChild(header);
-  pop.appendChild(actions);
-  pop.classList.add('open');
-  _positionBlockActionPopover(anchorEl);
-}
-
-function showBlockLookupView(blockId, displayName) {
-  const pop = document.getElementById('block-action-popover');
-  const mini = document.createElement('canvas');
-  drawBlockMini(mini, blockId);
-  mini.style.width = '28px'; mini.style.height = '28px';
-
-  pop.innerHTML = '';
-  const header = document.createElement('div');
-  header.className = 'bap-header';
-  const title = document.createElement('div');
-  title.className = 'bap-title';
-  title.textContent = displayName;
-  header.appendChild(mini); header.appendChild(title);
-
-  const desc = document.createElement('div');
-  desc.className = 'bap-desc';
-  desc.textContent = blockDescriptions[blockId] || 'No further information recorded for this block yet.';
-
-  const back = document.createElement('div');
-  back.className = 'bap-back';
-  back.textContent = '✕ Close';
-  back.onclick = (e) => { e.stopPropagation(); closeBlockActionPopover(); };
-
-  pop.appendChild(header);
-  pop.appendChild(desc);
-  pop.appendChild(back);
-}
-
-function closeBlockActionPopover() {
-  const pop = document.getElementById('block-action-popover');
-  pop.classList.remove('open');
-  _bapBlockId = null;
-}
-
-// Click-outside-to-close, same pattern as other lightweight popovers in the
-// game — ignores clicks on the block entries themselves so opening a
-// DIFFERENT block's popover doesn't first close-then-immediately-reopen.
-document.addEventListener('click', (e) => {
-  const pop = document.getElementById('block-action-popover');
-  if (!pop.classList.contains('open')) return;
-  if (pop.contains(e.target) || e.target.closest('.block-entry')) return;
-  closeBlockActionPopover();
-});
 
 
 // =========================================================
@@ -11816,7 +11649,10 @@ function toggleArmorEquip(dim) {
   drawHotbar();
   updateDefenseBadge();
   applyArmorStatBonuses();
-  if (document.getElementById('portal-book-modal').classList.contains('open') && pbCurrentTab === 'crafting') renderPortalBook();
+  // Armor state shows up on every level of the book (the "already built"
+  // sub-line on a dimension tile, the equip button on the armor view), so
+  // refresh whichever view happens to be open.
+  if (document.getElementById('portal-book-modal').classList.contains('open')) renderPortalBook();
 }
 
 // recipe.mats: { blockId: amount, ... }. type 'armor' grants dimension armor
@@ -11999,7 +11835,10 @@ function completeArmorAltar(r, cx, cy) {
   };
   impactFlashColor = ARMOR_FLASH[r.dim] || '255,217,122';
   showNotification(ARMOR_MSG[r.dim] || ('✨ ' + r.dim + '-RESISTENZ FREIGESCHALTET!'));
-  if (document.getElementById('portal-book-modal').classList.contains('open') && pbCurrentTab === 'crafting') renderPortalBook();
+  // Armor state shows up on every level of the book (the "already built"
+  // sub-line on a dimension tile, the equip button on the armor view), so
+  // refresh whichever view happens to be open.
+  if (document.getElementById('portal-book-modal').classList.contains('open')) renderPortalBook();
 }
 
 // Ambient trickle of themed particles drifting up off an un-forged structure,
@@ -12251,103 +12090,12 @@ function updateDimForge(dt) {
   }
 }
 
-// Renders the Portal Book's Crafting tab: armor recipes, each with a live
-// material checklist and a context-aware button.
-function renderCraftingTab(body) {
-  const wrap = document.createElement('div');
-  wrap.className = 'craft-wrap';
-
-  const section = (title, sub, recipes) => {
-    const h = document.createElement('div');
-    h.className = 'craft-section-head';
-    h.innerHTML = '<span>' + title + '</span>' + (sub ? '<span class="craft-section-sub">' + sub + '</span>' : '');
-    wrap.appendChild(h);
-    recipes.forEach(r => wrap.appendChild(craftCard(r)));
-  };
-
-  section('🛡️ Survival Armor', '', CRAFTING_RECIPES.filter(r => r.type === 'armor'));
-
-  body.appendChild(wrap);
-}
-
-function craftCard(r) {
-  const card = document.createElement('div');
-  card.className = 'craft-card';
-  const owned = recipeOwned(r);
-
-  // Icon — armor recipes get a real pixel-art preview of the piece (the exact
-  // accent art worn in-game), everything else keeps the plain emoji.
-  let ico;
-  if (r.type === 'armor') {
-    ico = document.createElement('canvas');
-    ico.className = 'craft-ico-canvas';
-    ico.width = 60; ico.height = 60;
-    drawArmorPreview(ico, r.dim);
-  } else {
-    ico = document.createElement('div');
-    ico.className = 'craft-ico';
-    ico.textContent = r.icon;
-  }
-
-  // Info column
-  const info = document.createElement('div');
-  info.className = 'craft-info';
-  const name = document.createElement('div');
-  name.className = 'craft-name';
-  name.textContent = r.name;
-  const eff = document.createElement('div');
-  eff.className = 'craft-effect';
-  eff.textContent = r.effect + (r.type === 'armor' ? ' (-' + Math.round(ARMOR_DEFENSE[r.dim] * 100) + '% DMG while equipped)' : '');
-
-  // The altar diagram IS the instruction — there is no craft button anywhere,
-  // because armor is only ever made by building this shape in the world. A live
-  // "do you carry enough" readout sits under it so the player can tell at a
-  // glance whether they can start building.
-  const build = document.createElement('div');
-  build.className = 'craft-build';
-  const shape = document.createElement('canvas');
-  shape.className = 'craft-shape';
-  drawAltarPreview(shape, r.base, r.core);
-  const where = document.createElement('div');
-  where.className = 'craft-where';
-  const haveBase = countInInventory(r.base), haveCore = countInInventory(r.core);
-  const needBase = r.mats[r.base], needCore = r.mats[r.core];
-  where.innerHTML =
-    'Build in the <b>' + escapeHtml(r.forge.dim) + '</b> Dimension<br>' +
-    '<span class="' + (haveBase >= needBase ? 'cm-ok' : 'cm-short') + '">' +
-      escapeHtml(blockNames[r.base] || 'Block') + ' ' + Math.min(haveBase, needBase) + '/' + needBase + '</span>' +
-    ' · ' +
-    '<span class="' + (haveCore >= needCore ? 'cm-ok' : 'cm-short') + '">' +
-      escapeHtml(blockNames[r.core] || 'Block') + ' ' + Math.min(haveCore, needCore) + '/' + needCore + ' (core)</span>';
-  build.appendChild(shape); build.appendChild(where);
-
-  info.appendChild(name); info.appendChild(eff); info.appendChild(build);
-
-  card.appendChild(ico); card.appendChild(info);
-
-  // The ONLY button left: wearing what you already built. Crafting it is
-  // permanent, but wearing it is a choice you can change any time (affects both
-  // the visual and whether that dimension's hazards can hurt you, see
-  // isHazardProtected()).
-  if (owned && r.type === 'armor') {
-    const btn = document.createElement('button');
-    btn.className = 'craft-btn';
-    const equipped = equippedArmor.has(r.dim);
-    btn.classList.add(equipped ? 'equipped' : 'stowed');
-    btn.textContent = equipped ? '🛡️ Equipped (click to remove)' : '👕 Stowed (click to wear)';
-    btn.onclick = () => toggleArmorEquip(r.dim);
-    card.appendChild(btn);
-  }
-  return card;
-}
-
 
 function escapeHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 window.togglePortalBook = togglePortalBook;
-window.showPBTab = showPBTab;
 
 window.applySeedFromUI=applySeedFromUI;
 
