@@ -744,6 +744,23 @@
     #my-mod-btn:hover, #discord-btn:hover, #unlock-chat-btn:hover {
       filter: brightness(1.15); transform: translateY(-1px); border-color: var(--accent);
     }
+    /* ── Custom icon set (replaces raw Unicode emoji in the game's own chrome) ──
+       Emoji render differently per OS/font (Windows/macOS/Linux each ship a
+       different emoji set), so the exact same button looked different on every
+       player's machine — genuinely outside the game's control, not just a
+       style preference. These are drawn once at load (see _initVxIcons) with
+       the game's own flat pixel-art style, so they look identical everywhere
+       and read as part of one designed set instead of borrowed glyphs. Emoji
+       stay exactly where they were in casual text — chat, notifications, the
+       admin panel — where a little inconsistency doesn't hurt anything.
+       Canvas draws at a fixed internal resolution (see each drawIcon* below);
+       these classes only set the DISPLAYED size, scaled crisply via
+       image-rendering:pixelated same as every other in-game icon canvas. */
+    canvas.vx-icon { image-rendering: pixelated; vertical-align: -5px; flex-shrink: 0; }
+    .vx-icon-menu { width: 17px; height: 17px; margin-right: 7px; vertical-align: -4px; }
+    .vx-icon-settings { width: 19px; height: 19px; vertical-align: middle; }
+    .vx-icon-sd { width: 13px; height: 13px; margin-right: 5px; vertical-align: -2px; }
+    .vx-icon-luck { width: 14px; height: 14px; margin-right: 3px; vertical-align: -2px; }
     /* Privacy & Terms / FPS Test used to be a tiny fixed-position footer
        pinned to the top-left corner — harmless on the old padded layout,
        but once #game-wrapper went edge-to-edge for the fullscreen canvas
@@ -1332,7 +1349,7 @@
   <div id="ui">
     <div id="info-bar">
       <div id="health"></div>
-      <div id="defense-badge" title="Total damage reduction from equipped armor"></div>
+      <div id="defense-badge" title="Total damage reduction from equipped armor"><canvas class="vx-icon vx-icon-sd" data-icon="shield"></canvas><span class="db-text"></span></div>
       <div id="seed-container">
         <span style="color: #aaa; font-size: 11px; font-weight: bold; text-transform: uppercase;">Seed:</span>
         <input type="text" id="seed-input" placeholder="Random" autocomplete="off" spellcheck="false">
@@ -1341,7 +1358,7 @@
       <div id="pos-info">X: 0  Y: 0 | Biome: FOREST</div>
       <div id="weekly-timer" title="The shared default world resets on a fixed weekly schedule, same time for every player.">🗓️ New Seed in …</div>
       <div id="mp-status" onclick="toggleRoomPanel()" title="Open the multiplayer room panel">Waiting for multiplayer...</div>
-      <div id="game-menu-btn" onclick="toggleGameMenu()">☰ Menu</div>
+      <div id="game-menu-btn" onclick="toggleGameMenu()"><canvas class="vx-icon vx-icon-menu" data-icon="menu"></canvas>Menu</div>
     </div>
     <!-- Lives outside #info-bar on purpose: #info-bar has backdrop-filter,
          which creates its own stacking context and traps any z-index inside
@@ -1349,12 +1366,12 @@
          render on top and eat all clicks). Same reason #settings-popover
          sits out here instead of inside #top-right-hud. -->
     <div id="game-menu-panel">
-      <div id="portal-book-btn" onclick="toggleGameMenu(false); togglePortalBook()">📖 Portal Book</div>
-      <div id="unlock-chat-btn" class="chat-locked" onclick="toggleGameMenu(false); onChatBtnClick()">🛡️ Unlock Chat (13+)</div>
-      <div id="mod-creator-btn" onclick="toggleGameMenu(false); toggleModBuilder()">🧩 Create Mods</div>
-      <div id="my-mod-btn" onclick="toggleGameMenu(false); toggleModCreator()">🎨 Create Your Own Mod</div>
-      <div id="voxeriahub-btn" onclick="toggleGameMenu(false); confirmVoxeriaHub()">🌐 Voxeria Hub</div>
-      <div id="discord-btn" onclick="toggleGameMenu(false); window.open('https://discord.gg/jGyyntKFJ', '_blank', 'noopener,noreferrer')">💬 Join Discord</div>
+      <div id="portal-book-btn" onclick="toggleGameMenu(false); togglePortalBook()"><canvas class="vx-icon vx-icon-menu" data-icon="book"></canvas>Portal Book</div>
+      <div id="unlock-chat-btn" class="chat-locked" onclick="toggleGameMenu(false); onChatBtnClick()"><canvas class="vx-icon vx-icon-menu" data-icon="shield"></canvas>Unlock Chat (13+)</div>
+      <div id="mod-creator-btn" onclick="toggleGameMenu(false); toggleModBuilder()"><canvas class="vx-icon vx-icon-menu" data-icon="puzzle"></canvas>Create Mods</div>
+      <div id="my-mod-btn" onclick="toggleGameMenu(false); toggleModCreator()"><canvas class="vx-icon vx-icon-menu" data-icon="palette"></canvas>Create Your Own Mod</div>
+      <div id="voxeriahub-btn" onclick="toggleGameMenu(false); confirmVoxeriaHub()"><canvas class="vx-icon vx-icon-menu" data-icon="globe"></canvas>Voxeria Hub</div>
+      <div id="discord-btn" onclick="toggleGameMenu(false); window.open('https://discord.gg/jGyyntKFJ', '_blank', 'noopener,noreferrer')"><canvas class="vx-icon vx-icon-menu" data-icon="chat"></canvas>Join Discord</div>
       <div id="game-menu-footer">
         <div id="privacy-menu-item" onclick="toggleGameMenu(false); openPolicyModal()">Privacy &amp; Terms</div>
         <div id="fps-menu-item" onclick="toggleGameMenu(false); toggleFPS()">FPS Test</div>
@@ -1427,18 +1444,18 @@
 
       <div id="canvas-wrapper">
       <div id="top-right-hud">
-        <div id="luck-hud" title="Temporary mining yield boost from the Lucky Brew">🍀 <span id="luck-hud-time">0:00</span></div>
+        <div id="luck-hud" title="Temporary mining yield boost from the Lucky Brew"><canvas class="vx-icon vx-icon-luck" data-icon="clover"></canvas> <span id="luck-hud-time">0:00</span></div>
         <div id="hud-side-actions">
-          <div id="settings-btn" onclick="toggleSettingsPopover()" title="Settings">⚙️</div>
+          <div id="settings-btn" onclick="toggleSettingsPopover()" title="Settings"><canvas class="vx-icon vx-icon-settings" data-icon="gear"></canvas></div>
         </div>
       </div>
       <div id="settings-popover">
         <div id="settings-popover-header">
-          <h4><span class="settings-header-icon">⚙️</span> Settings</h4>
+          <h4><span class="settings-header-icon"><canvas class="vx-icon vx-icon-settings" data-icon="gear"></canvas></span> Settings</h4>
           <button id="settings-close-btn" onclick="toggleSettingsPopover()" title="Close" aria-label="Close settings">✕</button>
         </div>
         <div class="settings-section">
-          <div class="settings-row settings-divider"><span class="sd-icon">🔊</span>Audio</div>
+          <div class="settings-row settings-divider"><span class="sd-icon"><canvas class="vx-icon vx-icon-sd" data-icon="speaker"></canvas></span>Audio</div>
           <div class="settings-row">
             <label for="volume-slider">Volume</label>
             <div class="settings-slider-wrap">
@@ -1448,7 +1465,7 @@
           </div>
         </div>
         <div class="settings-section">
-          <div class="settings-row settings-divider"><span class="sd-icon">🖼️</span>Graphics</div>
+          <div class="settings-row settings-divider"><span class="sd-icon"><canvas class="vx-icon vx-icon-sd" data-icon="picture"></canvas></span>Graphics</div>
           <div class="settings-row">
             <label for="vibrantvox-mode">Quality</label>
             <select id="vibrantvox-mode" onchange="VibrantVox.setMode(this.value)" title="How much detail to render. Auto keeps frame rate smooth by adjusting automatically.">
@@ -1469,7 +1486,7 @@
           <div class="settings-row" id="vibrantvox-readout-row"><span id="vibrantvox-readout">—</span></div>
         </div>
         <div class="settings-section">
-          <div class="settings-row settings-divider"><span class="sd-icon">🎮</span>Controls</div>
+          <div class="settings-row settings-divider"><span class="sd-icon"><canvas class="vx-icon vx-icon-sd" data-icon="gamepad"></canvas></span>Controls</div>
           <div class="settings-row">
             <label>Move Left</label>
             <button class="rebind-btn" id="rebind-left" onclick="startRebind('left')"></button>
@@ -1493,11 +1510,11 @@
       <div id="intro-hint-banner">
         <div id="ih-close" onclick="dismissIntroHint()">✕</div>
         <div id="ih-title">🖱️ Hold left mouse to mine · Hold right mouse to place</div>
-        <div id="ih-sub">Keep the button held down until the block breaks. Mine some Wood &amp; Stone to get started, and open the 📖 Portal Book anytime to see how to build each dimension's portal.</div>
+        <div id="ih-sub">Keep the button held down until the block breaks. Mine some Wood &amp; Stone to get started, and open the Portal Book anytime to see how to build each dimension's portal.</div>
       </div>
       <div id="mod-creator-modal">
         <button id="close-mod-creator-top" onclick="toggleModCreator()">✕</button>
-        <h2>🎨 Create your own Mod</h2>
+        <h2><canvas class="vx-icon vx-icon-settings" data-icon="palette"></canvas> Create your own Mod</h2>
         <div id="mod-creator-subtitle">Replace blocks with your own look &amp; decide which creatures appear in your world. Saved automatically.</div>
 
         <h2 class="mc-section-heading">🧱 Block Reskin</h2>
@@ -1513,7 +1530,7 @@
       </div>
       <div id="mod-builder-modal">
         <button id="close-mod-builder-top" onclick="toggleModBuilder()">✕</button>
-        <h2>🧩 Create &amp; Publish a Mod</h2>
+        <h2><canvas class="vx-icon vx-icon-settings" data-icon="puzzle"></canvas> Create &amp; Publish a Mod</h2>
         <div id="mod-builder-subtitle">Build a shareable mod code with a custom world, perks &amp; starting gear. Play it via the code or a direct-play link, right from the game, no website needed.</div>
 
         <h2 class="mc-section-heading">📝 Basic Info</h2>
@@ -1602,7 +1619,7 @@
         <div class="mb-inv-list" id="mb-inv-list"></div>
 
         <div class="mb-actions">
-          <button type="button" class="mb-btn-primary" id="mb-generate-btn">🧩 Generate mod code</button>
+          <button type="button" class="mb-btn-primary" id="mb-generate-btn">Generate mod code</button>
         </div>
 
         <div class="mb-result-card" id="mb-result-card" style="display:none;">
@@ -1636,7 +1653,7 @@
       <div id="portal-book-modal">
         <div id="pb-header">
           <div>
-            <h2>📖 Portal Book</h2>
+            <h2><canvas class="vx-icon vx-icon-settings" data-icon="book"></canvas> Portal Book</h2>
             <div class="pb-subtitle">Discover all dimension (essential for progress)</div>
           </div>
           <div id="pb-close" onclick="togglePortalBook()">✕</div>
@@ -11211,15 +11228,15 @@ function _gameLoopInner(now) {
 // =========================================================
 const PORTAL_DEFS = [
   {
-    id: 'GOLD', name: '🌟 Gold Dimension', unlocked: true,
+    id: 'GOLD', name: 'Gold Dimension', unlocked: true,
     color: '#f1c40f', glow: 'rgba(255,215,0,0.3)',
-    desc: 'The safe starting dimension, with no hazard of its own. This is where the Obsidian Heat Suit you need to survive the Lava Core is built. Mine its Obsidian & Ember Ore veins, then build the altar shape shown in the Crafting tab.',
+    desc: 'The safe starting dimension, with no hazard of its own. This is where the Obsidian Heat Suit you need to survive the Lava Core is built. Mine its Obsidian & Ember Ore veins, then build the altar shape shown on its armor page.',
     recipe: { center: BLOCKS.RAINBOW_ORE, cross: BLOCKS.GOLD_ORE },
     centerLabel: 'Rainbow Ore', crossLabel: 'Gold Ore',
     rewards: 'Obsidian, Ember Ore, Rainbow Ore, Gold Bricks'
   },
   {
-    id: 'LAVA', name: '🔥 Lava Core', unlocked: true,
+    id: 'LAVA', name: 'Lava Core', unlocked: true,
     color: '#ff4400', glow: 'rgba(255,80,0,0.3)',
     desc: 'The molten heart of the world. Obsidian pillars rise from rivers of lava, and Fire Crystals pulse with dangerous energy. Heat damages you over time, so bring the Obsidian Heat Suit forged back in the Gold Dimension.',
     recipe: { center: BLOCKS.COAL_ORE, cross: BLOCKS.GOLD_BRICK },
@@ -11227,7 +11244,7 @@ const PORTAL_DEFS = [
     rewards: 'Obsidian, Ember Ore, Fire Crystal, Magma Rock'
   },
   {
-    id: 'OCEAN', name: '🌊 Ocean Depth', unlocked: true,
+    id: 'OCEAN', name: 'Ocean Depth', unlocked: true,
     color: '#4fc3f7', glow: 'rgba(80,180,255,0.3)',
     desc: 'An endless underwater world of coral reefs, kelp forests, and crushing deep-water pressure. Sea Lanterns light the murky depths. Bring the Pressure Diving Suit forged back in the Lava Core.',
     recipe: { center: BLOCKS.ICE, cross: BLOCKS.DIAMOND_ORE },
@@ -11235,7 +11252,7 @@ const PORTAL_DEFS = [
     rewards: 'Coral, Kelp, Sea Lantern, Ember Ore'
   },
   {
-    id: 'VOID', name: '🌌 Blither', unlocked: true,
+    id: 'VOID', name: 'Blither', unlocked: true,
     color: '#9966ff', glow: 'rgba(120,60,255,0.3)',
     desc: 'Blither, a realm of floating islands drifting through infinite space. The deadly fall is survived only with the Void Walker Boots forged back in Ocean Depth. Its Ur-Altar forges the prestige Golden Aegis from Void Ore & Star Dust.',
     recipe: { center: BLOCKS.DIAMOND_ORE, cross: BLOCKS.RAINBOW_ORE },
@@ -11699,12 +11716,163 @@ function _pbRenderArmor(body, dimId) {
     btn.className = 'craft-btn';
     const equipped = equippedArmor.has(r.dim);
     btn.classList.add(equipped ? 'equipped' : 'stowed');
-    btn.textContent = equipped ? '🛡️ Equipped (click to remove)' : '👕 Stowed (click to wear)';
+    btn.textContent = equipped ? 'Equipped (click to remove)' : 'Stowed (click to wear)';
     btn.onclick = () => toggleArmorEquip(r.dim);
     body.appendChild(btn);
   }
 }
 
+// =========================================================
+// CUSTOM ICON SET — replaces the raw Unicode emoji that used to sit in the
+// game's own chrome (main menu, settings, luck HUD). See the .vx-icon CSS
+// comment for why: emoji render differently per OS, these don't. Each drawIcon*
+// function owns its canvas's native resolution (set here, not in HTML) so it
+// stays crisp at whatever size the CSS class displays it — the game's usual
+// pattern (see drawBlockMini/drawDimScene). Flat rectangles + the occasional
+// arc, same restrained two/three-tone style as the rest of the UI, so the set
+// reads as one designed family instead of a sticker sheet.
+// =========================================================
+const VX_ICON_LINE = 'rgba(232,232,240,0.94)';   // the shared "ink" colour
+const VX_ICON_DIM   = 'rgba(232,232,240,0.55)';
+
+function drawIconMenu(cv) {
+  cv.width = 20; cv.height = 20;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.fillRect(2, 4, 16, 3); c.fillRect(2, 9, 16, 3); c.fillRect(2, 14, 16, 3);
+}
+function drawIconBook(cv) {
+  cv.width = 20; cv.height = 20;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.fillRect(2, 3, 8, 15); c.fillRect(10, 3, 8, 15);
+  c.fillStyle = 'rgba(15,14,25,0.55)';
+  c.fillRect(3, 5, 6, 1); c.fillRect(3, 7, 6, 1); c.fillRect(3, 9, 6, 1);
+  c.fillRect(11, 5, 6, 1); c.fillRect(11, 7, 6, 1); c.fillRect(11, 9, 6, 1);
+  c.fillStyle = '#c084fc'; // matches --accent; canvas fillStyle can't read CSS vars directly
+  c.fillRect(9, 3, 2, 15); // spine
+}
+function drawIconShield(cv) {
+  cv.width = 20; cv.height = 20;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath();
+  c.moveTo(10, 2); c.lineTo(17, 5); c.lineTo(17, 10);
+  c.quadraticCurveTo(17, 16, 10, 19);
+  c.quadraticCurveTo(3, 16, 3, 10); c.lineTo(3, 5);
+  c.closePath(); c.fill();
+  c.fillStyle = '#7fc9ff';
+  c.fillRect(8, 7, 4, 6);
+}
+function drawIconPuzzle(cv) {
+  cv.width = 20; cv.height = 20;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.fillRect(3, 3, 6, 6); c.fillRect(11, 3, 6, 6);
+  c.fillRect(3, 11, 6, 6); c.fillRect(11, 11, 6, 6);
+  c.fillStyle = 'rgba(15,14,25,0.75)';
+  c.fillRect(8, 8, 4, 4); // notch where the four pieces meet
+}
+function drawIconPalette(cv) {
+  cv.width = 20; cv.height = 20;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath(); c.ellipse(10, 10, 8.5, 7, -0.15, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(15,14,25,0.7)';
+  c.beginPath(); c.ellipse(11.5, 12, 2.6, 2.2, 0, 0, Math.PI * 2); c.fill();
+  const dots = [['#ff6b6b', 6, 7], ['#ffd166', 11, 5], ['#6bc86b', 15, 8], ['#5fb0ff', 6, 13]];
+  for (const [col, x, y] of dots) { c.fillStyle = col; c.beginPath(); c.arc(x, y, 1.6, 0, Math.PI * 2); c.fill(); }
+}
+function drawIconGlobe(cv) {
+  cv.width = 20; cv.height = 20;
+  const c = cv.getContext('2d');
+  c.strokeStyle = VX_ICON_LINE; c.lineWidth = 1.6;
+  c.beginPath(); c.arc(10, 10, 7.5, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.ellipse(10, 10, 3.2, 7.5, 0, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.moveTo(2.6, 10); c.lineTo(17.4, 10); c.stroke();
+  c.beginPath(); c.moveTo(3.8, 5.7); c.lineTo(16.2, 5.7); c.stroke();
+  c.beginPath(); c.moveTo(3.8, 14.3); c.lineTo(16.2, 14.3); c.stroke();
+}
+function drawIconChat(cv) {
+  cv.width = 20; cv.height = 20;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath();
+  if (c.roundRect) c.roundRect(2, 3, 16, 11, 3); else c.rect(2, 3, 16, 11);
+  c.fill();
+  c.beginPath(); c.moveTo(6, 14); c.lineTo(6, 18); c.lineTo(10, 14); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(15,14,25,0.7)';
+  c.fillRect(5, 7, 2, 2); c.fillRect(9, 7, 2, 2); c.fillRect(13, 7, 2, 2); // "..." typing dots
+}
+function drawIconGear(cv) {
+  cv.width = 20; cv.height = 20;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.save(); c.translate(10, 10);
+  for (let i = 0; i < 8; i++) { c.save(); c.rotate(i * Math.PI / 4); c.fillRect(-2, -9, 4, 4); c.restore(); }
+  c.beginPath(); c.arc(0, 0, 6.5, 0, Math.PI * 2); c.fill();
+  c.restore();
+  c.fillStyle = 'rgba(15,14,25,0.75)';
+  c.beginPath(); c.arc(10, 10, 3, 0, Math.PI * 2); c.fill();
+}
+function drawIconClover(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#5fd06a';
+  const leaves = [[6, 6], [10, 6], [8, 9]];
+  for (const [x, y] of leaves) { c.beginPath(); c.arc(x, y, 3.1, 0, Math.PI * 2); c.fill(); }
+  c.fillStyle = '#3a9e42';
+  c.fillRect(7, 10, 2, 5);
+}
+function drawIconSpeaker(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath();
+  c.moveTo(2, 6); c.lineTo(5, 6); c.lineTo(9, 3); c.lineTo(9, 13); c.lineTo(5, 10); c.lineTo(2, 10);
+  c.closePath(); c.fill();
+  c.strokeStyle = VX_ICON_DIM; c.lineWidth = 1.3;
+  c.beginPath(); c.arc(9, 8, 4, -0.6, 0.6); c.stroke();
+  c.beginPath(); c.arc(9, 8, 6.4, -0.7, 0.7); c.stroke();
+}
+function drawIconPicture(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.strokeStyle = VX_ICON_LINE; c.lineWidth = 1.5;
+  c.strokeRect(2, 2.5, 12, 11);
+  c.fillStyle = '#ffd166'; c.beginPath(); c.arc(5.5, 6, 1.6, 0, Math.PI * 2); c.fill();
+  c.fillStyle = VX_ICON_DIM;
+  c.beginPath(); c.moveTo(2.5, 13); c.lineTo(6.5, 8) ; c.lineTo(9.5, 11); c.lineTo(12, 8.5); c.lineTo(13.5, 13); c.closePath(); c.fill();
+}
+function drawIconGamepad(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath();
+  if (c.roundRect) c.roundRect(1.5, 5, 13, 7, 3); else c.rect(1.5, 5, 13, 7);
+  c.fill();
+  c.fillStyle = 'rgba(15,14,25,0.75)';
+  c.fillRect(3.5, 7.5, 3, 1); c.fillRect(4.5, 6.5, 1, 3); // d-pad cross
+  c.fillStyle = '#7fc9ff';
+  c.beginPath(); c.arc(12, 7, 1, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.arc(10, 9, 1, 0, Math.PI * 2); c.fill();
+}
+
+const VX_ICONS = {
+  menu: drawIconMenu, book: drawIconBook, shield: drawIconShield,
+  puzzle: drawIconPuzzle, palette: drawIconPalette, globe: drawIconGlobe,
+  chat: drawIconChat, gear: drawIconGear, clover: drawIconClover,
+  speaker: drawIconSpeaker, picture: drawIconPicture, gamepad: drawIconGamepad
+};
+// Runs once at load — these are all static HTML buttons (unlike the Portal
+// Book's canvases, which redraw themselves every render), so a single pass
+// over every canvas.vx-icon[data-icon] is all that's ever needed.
+function _initVxIcons() {
+  document.querySelectorAll('canvas.vx-icon[data-icon]').forEach(cv => {
+    const fn = VX_ICONS[cv.dataset.icon];
+    if (fn) fn(cv);
+  });
+}
 
 // =========================================================
 // CRAFTING — survival armor
@@ -11763,7 +11931,10 @@ function updateDefenseBadge() {
   const pct = Math.round((1 - armorDamageMultiplier()) * 100);
   if (pct <= 0) { el.classList.remove('visible'); return; }
   const full = [...ARMOR_DIMS].every(dim => equippedArmor.has(dim));
-  el.textContent = '🛡️ -' + pct + '% DMG' + (full ? ' (Full Set)' : '');
+  // The icon canvas is a permanent child (see the HTML), so this only ever
+  // touches the text node after it — rebuilding with textContent would wipe
+  // the icon the same way the old chat-unlock button used to.
+  el.querySelector('.db-text').textContent = '-' + pct + '% DMG' + (full ? ' (Full Set)' : '');
   el.classList.add('visible');
 }
 
@@ -11847,22 +12018,22 @@ function toggleArmorEquip(dim) {
 // those counts so the Portal Book can still show "do you carry enough".
 const CRAFTING_RECIPES = [
   // ── Survival armor ──
-  { id: 'armor_lava',  type: 'armor', dim: 'LAVA',  icon: '🔥',
+  { id: 'armor_lava',  type: 'armor', dim: 'LAVA',
     name: 'Obsidian Heat Suit', effect: 'Built in the Gold Dimension from Obsidian with an Ember Ore core. Negates Lava Core heat & lava-contact damage.',
     base: BLOCKS.OBSIDIAN, core: BLOCKS.EMBER_ORE,
     mats: { [BLOCKS.OBSIDIAN]: 8, [BLOCKS.EMBER_ORE]: 1 },
     forge: { dim: 'GOLD', name: 'Vulcan-Schmiede' } },
-  { id: 'armor_ocean', type: 'armor', dim: 'OCEAN', icon: '🌊',
+  { id: 'armor_ocean', type: 'armor', dim: 'OCEAN',
     name: 'Pressure Diving Suit', effect: 'Built in the Lava Core from Ember Ore with a Fire Crystal core. Drastically slows Ocean Depth oxygen loss (not full immunity, you can still drown eventually).',
     base: BLOCKS.EMBER_ORE, core: BLOCKS.FIRE_CRYSTAL,
     mats: { [BLOCKS.EMBER_ORE]: 8, [BLOCKS.FIRE_CRYSTAL]: 1 },
     forge: { dim: 'LAVA', name: 'Flut-Altar' } },
-  { id: 'armor_void',  type: 'armor', dim: 'VOID',  icon: '🌌',
+  { id: 'armor_void',  type: 'armor', dim: 'VOID',
     name: 'Void Walker Boots', effect: 'Built in Ocean Depth from Coral with a Kelp core. Saves you from the deadly fall in the Blither.',
     base: BLOCKS.CORAL, core: BLOCKS.KELP,
     mats: { [BLOCKS.CORAL]: 8, [BLOCKS.KELP]: 1 },
     forge: { dim: 'OCEAN', name: 'Abgrund-Altar' } },
-  { id: 'armor_gold',  type: 'armor', dim: 'GOLD',  icon: '✨',
+  { id: 'armor_gold',  type: 'armor', dim: 'GOLD',
     name: 'Golden Aegis', effect: 'Built in the Blither from Void Ore with a Star Dust core. Pure damage resistance, the prestige capstone of the chain.',
     base: BLOCKS.VOID_ORE, core: BLOCKS.STAR_DUST,
     mats: { [BLOCKS.VOID_ORE]: 8, [BLOCKS.STAR_DUST]: 1 },
@@ -12268,6 +12439,13 @@ window.togglePortalBook = togglePortalBook;
 window.applySeedFromUI=applySeedFromUI;
 
 initFirebase(); drawHealth(); drawHotbar(); checkChatUnlockStatus(); updateDefenseBadge(); VibrantVox.syncSelect(); requestAnimationFrame(gameLoop);
+// Deferred to DOMContentLoaded rather than called inline here: this script
+// runs partway through the body, but some icon-bearing elements (the age
+// gate modal, deep in the COPPA/chat block) sit further DOWN the page and
+// don't exist in the DOM yet at this point — querySelectorAll would just
+// silently skip them. DOMContentLoaded guarantees the whole document,
+// including everything below this line, has been parsed first.
+window.addEventListener('DOMContentLoaded', _initVxIcons);
 
 // ── Game Start (video intro removed — it was a 5MB+ inline base64 clip that
 // blocked interaction behind a black overlay for up to 10s; cut for load time) ──
@@ -12459,7 +12637,9 @@ function _escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 // =========================================================
 // CHAT AGE GATE (COPPA / Kinderschutz)
 // =========================================================
-function _setChatBtnUnlocked(){var btn=document.getElementById('unlock-chat-btn');if(!btn)return;btn.classList.remove('chat-locked');btn.textContent='📝 Open Chat';btn.onclick=toggleChatWrap;}
+// Keeps the button's own icon canvas (textContent='...' would silently wipe
+// it, since the canvas is a child node, not text) and only swaps the label.
+function _setChatBtnUnlocked(){var btn=document.getElementById('unlock-chat-btn');if(!btn)return;btn.classList.remove('chat-locked');var ic=btn.querySelector('canvas.vx-icon');btn.innerHTML='';if(ic)btn.appendChild(ic);btn.appendChild(document.createTextNode('Open Chat'));btn.onclick=toggleChatWrap;}
 function toggleChatWrap(){var wrap=document.getElementById('chat-wrap');if(wrap)wrap.classList.toggle('open');}
 function onChatBtnClick(){if(localStorage.getItem('voxeria_chat_unlocked')==='true'){toggleChatWrap();}else{openAgeGate();}}
 function checkChatUnlockStatus(){if(localStorage.getItem('voxeria_chat_unlocked')==='true')_setChatBtnUnlocked();}
@@ -12913,7 +13093,7 @@ window.addEventListener('DOMContentLoaded', function(){
 
 </script>
   <div id="chat-wrap"><div id="chat-messages"><div class="chat-msg sys"><span class="chat-txt">World Chat loading...</span></div></div><div id="chat-input-row"><input id="chat-input" maxlength="80" placeholder="Chat with all players..." autocomplete="off" /><button id="chat-send">&gt;</button></div></div>
-  <div id="age-gate-modal"><h3>🛡️ Unlock World Chat</h3><p>Chatting with other players is only available for ages 13 and up. Please enter your age:</p><input type="number" id="age-gate-input" placeholder="Your age" min="0" max="120"><div id="age-gate-btns"><button id="age-gate-cancel" onclick="closeAgeGate()">Cancel</button><button id="age-gate-confirm" onclick="confirmAgeGate()">Confirm</button></div></div>
+  <div id="age-gate-modal"><h3><canvas class="vx-icon vx-icon-settings" data-icon="shield"></canvas> Unlock World Chat</h3><p>Chatting with other players is only available for ages 13 and up. Please enter your age:</p><input type="number" id="age-gate-input" placeholder="Your age" min="0" max="120"><div id="age-gate-btns"><button id="age-gate-cancel" onclick="closeAgeGate()">Cancel</button><button id="age-gate-confirm" onclick="confirmAgeGate()">Confirm</button></div></div>
   <div id="admin-login-modal">
     <h3>🔒 Owner Access</h3>
     <p style="font-size:12px;color:rgba(255,255,255,.6);">Enter the admin serial number or load your key file.</p>
