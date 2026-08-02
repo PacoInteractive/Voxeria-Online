@@ -1238,6 +1238,14 @@
       margin: 6px 2px 2px; font-size: 14px; font-weight: 800; color: #e0aaff;
     }
     .craft-section-sub { font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,0.4); }
+    /* Manual nudge from the UI editor (Ctrl+Shift+E). Targets the FIRST
+       craft-section-head row and its title span — safe as a class-based
+       rule (unlike the raw nth-child selector the editor exports) since it
+       survives renderCraftingTab() rebuilding #pb-body's contents; it would
+       only become ambiguous if a second .craft-section-head is ever added
+       above this one. */
+    .craft-section-head { transform: translate(0px, -2px); }
+    .craft-section-head > span:first-child { transform: translate(-1px, 0px); }
     .craft-card {
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
       background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
@@ -1687,7 +1695,7 @@
         <div id="pb-header">
           <div>
             <h2>📖 Portal Book</h2>
-            <div class="pb-subtitle">Discover all dimensions & their secrets</div>
+            <div class="pb-subtitle">Discover all dimension (essential for progress)</div>
           </div>
           <div id="pb-close" onclick="togglePortalBook()">✕</div>
         </div>
@@ -12329,12 +12337,12 @@ function renderCraftingTab(body) {
   const section = (title, sub, recipes) => {
     const h = document.createElement('div');
     h.className = 'craft-section-head';
-    h.innerHTML = '<span>' + title + '</span><span class="craft-section-sub">' + sub + '</span>';
+    h.innerHTML = '<span>' + title + '</span>' + (sub ? '<span class="craft-section-sub">' + sub + '</span>' : '');
     wrap.appendChild(h);
     recipes.forEach(r => wrap.appendChild(craftCard(r)));
   };
 
-  section('🛡️ Survival Armor', 'Permanent. Stacks global damage reduction while equipped, and wearing all 4 gives a set bonus. 🔒 pieces are forged in-world, not here.', CRAFTING_RECIPES.filter(r => r.type === 'armor'));
+  section('🛡️ Survival Armor', '', CRAFTING_RECIPES.filter(r => r.type === 'armor'));
 
   body.appendChild(wrap);
 }
