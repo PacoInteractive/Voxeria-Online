@@ -13168,5 +13168,408 @@ function _maybeShowModTip() {
   }, 1800);
 }
 </script>
+
+<!-- =========================================================
+     HIDDEN DEV TOOL — UI LAYOUT & TEXT EDITOR
+     Ctrl+Shift+E toggles it. Lets you drag ANY on-screen UI element to a
+     new position and edit ANY element's visible text in place, then export
+     the result as paste-back-in CSS/JS. Never appears during normal play,
+     costs nothing when inactive. Self-contained on purpose — do not fold
+     this into the main game script, and do not treat it as a "mechanic
+     that doesn't belong": it is a build-time tool for the developer, not
+     part of the shipped game experience.
+
+     LIMITATION (read before use): this edits the live DOM, not the source
+     file. Static labels/titles/buttons stay edited until you export and
+     paste the result back into this file. Anything the game re-renders
+     itself every frame or on state change (health hearts, hotbar counts,
+     the X/Y position readout, chat messages, notifications) will snap
+     back to its normal value — a text edit on those is just visual until
+     the next re-render, and won't survive being exported meaningfully.
+     Position (drag) changes don't have this problem — they persist as a
+     CSS transform that any future re-render still respects.
+     ========================================================= -->
+<style>
+  .vxed-hover-outline { outline: 2px dashed #ff5fd6 !important; outline-offset: 1px !important; cursor: move !important; }
+  .vxed-text-outline { outline: 2px dashed #5fc9ff !important; outline-offset: 1px !important; cursor: text !important; }
+  .vxed-moved { box-shadow: 0 0 0 1px rgba(255,95,214,0.6) !important; }
+  #vxed-panel {
+    position: fixed; top: 12px; right: 12px; z-index: 2000000;
+    background: rgba(20,20,30,0.95); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px;
+    padding: 10px 12px; font: 12px 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #fff;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5); user-select: none; cursor: default;
+    min-width: 220px;
+  }
+  #vxed-panel .vxed-title { font-weight: 800; font-size: 13px; color: #ff8fe0; margin-bottom: 6px; cursor: move; }
+  #vxed-panel .vxed-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 4px; color: rgba(255,255,255,0.75); }
+  #vxed-panel button {
+    width: 100%; margin-top: 6px; padding: 6px 8px; border: none; border-radius: 6px;
+    background: linear-gradient(135deg,#a855f7,#7b3fd4); color: #fff; font-weight: 700; font-size: 12px; cursor: pointer;
+  }
+  #vxed-panel button.vxed-secondary { background: rgba(255,255,255,0.1); }
+  #vxed-export-modal {
+    position: fixed; inset: 0; z-index: 2000001; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6);
+  }
+  #vxed-export-modal .vxed-box {
+    background: #17171f; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 18px;
+    width: min(700px, 92vw); max-height: 82vh; display: flex; flex-direction: column; gap: 10px;
+    font: 13px 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #fff;
+  }
+  #vxed-export-modal textarea {
+    flex: 1; min-height: 280px; background: #0c0c12; color: #d6e6ff; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 10px; font: 11.5px ui-monospace, Consolas, monospace; resize: vertical;
+  }
+  #vxed-export-modal .vxed-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  #vxed-export-modal button {
+    padding: 8px 14px; border: none; border-radius: 7px; font-weight: 700; font-size: 12.5px; cursor: pointer;
+    background: linear-gradient(135deg,#a855f7,#7b3fd4); color: #fff;
+  }
+  #vxed-export-modal button.vxed-secondary { background: rgba(255,255,255,0.12); }
+</style>
+<script>
+(function () {
+  var STORAGE_KEY = 'voxeria_ui_editor_draft';
+  var active = false;
+  var panel = null;
+  var moved = {};   // selector -> {dx, dy}
+  var edited = {};  // selector -> text
+  var hovered = null;
+  var editingEl = null;
+  var editingOriginalText = '';
+  var drag = null;  // {el, selector, startX, startY, baseDx, baseDy, moved:boolean}
+  var DRAG_THRESHOLD = 4;
+
+  function isOwnUI(el) { return !!(el && el.closest && el.closest('.vxed-own')); }
+  function isCanvas(el) { return el && el.id === 'canvas'; }
+
+  // Elements not worth ever targeting: the <html>/<body>/top-level layout
+  // shells. Everything else — however deeply nested — is fair game, since
+  // "every UI element" means exactly that.
+  function isTooRoot(el) {
+    return !el || el === document.body || el === document.documentElement;
+  }
+
+  function getSelector(el) {
+    if (el.id) return '#' + CSS.escape(el.id);
+    var parts = [];
+    var node = el;
+    while (node && node.nodeType === 1 && node !== document.body) {
+      if (node.id) { parts.unshift('#' + CSS.escape(node.id)); break; }
+      var parent = node.parentElement;
+      if (!parent) break;
+      var idx = Array.prototype.indexOf.call(parent.children, node) + 1;
+      parts.unshift(node.tagName.toLowerCase() + ':nth-child(' + idx + ')');
+      node = parent;
+    }
+    return parts.join(' > ');
+  }
+
+  function parseTranslate(el) {
+    var m = /translate\(\s*(-?[\d.]+)px\s*,\s*(-?[\d.]+)px\s*\)/.exec(el.style.transform || '');
+    return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
+  }
+
+  function isDirectTextTarget(el) {
+    if (!el || el.children.length > 0) return false;
+    return el.textContent.trim().length > 0;
+  }
+
+  // ---- persistence: re-apply a saved draft so work-in-progress survives reloads ----
+  function saveDraft() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ moved: moved, edited: edited })); } catch (e) {}
+  }
+  function loadDraftAndApply() {
+    var raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+    if (!raw) return;
+    var data;
+    try { data = JSON.parse(raw); } catch (e) { return; }
+    moved = data.moved || {};
+    edited = data.edited || {};
+    applyAll();
+  }
+  function applyAll() {
+    Object.keys(moved).forEach(function (sel) {
+      try {
+        var el = document.querySelector(sel);
+        if (el) el.style.transform = 'translate(' + moved[sel].x + 'px,' + moved[sel].y + 'px)';
+      } catch (e) {}
+    });
+    Object.keys(edited).forEach(function (sel) {
+      try {
+        var el = document.querySelector(sel);
+        if (el) el.textContent = edited[sel];
+      } catch (e) {}
+    });
+  }
+  // Some panels render their contents lazily (only once opened, or once
+  // Firebase data arrives), so a single pass on load can miss them. Retry a
+  // few times over the first several seconds instead of polling forever.
+  var _reapplyTries = 0;
+  function scheduleReapply() {
+    if (_reapplyTries++ > 20) return;
+    setTimeout(function () { applyAll(); scheduleReapply(); }, 500);
+  }
+
+  // ---- panel ----
+  function buildPanel() {
+    panel = document.createElement('div');
+    panel.id = 'vxed-panel';
+    panel.className = 'vxed-own';
+    panel.innerHTML =
+      '<div class="vxed-title">🛠 UI-Editor <span style="float:right;opacity:.6;font-weight:400;">Strg+Shift+E</span></div>' +
+      '<div class="vxed-row"><span>Verschoben</span><span id="vxed-count-moved">0</span></div>' +
+      '<div class="vxed-row"><span>Text geändert</span><span id="vxed-count-edited">0</span></div>' +
+      '<div class="vxed-row" style="opacity:.6;">Ziehen = verschieben · Klick = Text bearbeiten</div>' +
+      '<button id="vxed-export-btn">Code exportieren</button>' +
+      '<button id="vxed-reset-btn" class="vxed-secondary">Alles zurücksetzen</button>' +
+      '<button id="vxed-close-btn" class="vxed-secondary">Editor schließen</button>';
+    document.body.appendChild(panel);
+    document.getElementById('vxed-export-btn').addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    document.getElementById('vxed-export-btn').addEventListener('click', function (e) { e.stopPropagation(); if (editingEl) commitEdit(); openExportModal(); });
+    document.getElementById('vxed-reset-btn').addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    document.getElementById('vxed-reset-btn').addEventListener('click', function (e) { e.stopPropagation(); if (editingEl) commitEdit(); resetAll(); });
+    document.getElementById('vxed-close-btn').addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    document.getElementById('vxed-close-btn').addEventListener('click', function (e) { e.stopPropagation(); toggleEditor(); });
+    makePanelDraggable();
+    refreshPanelCounts();
+  }
+  function makePanelDraggable() {
+    var title = panel.querySelector('.vxed-title');
+    var pd = null;
+    title.addEventListener('mousedown', function (e) {
+      e.stopPropagation();
+      var rect = panel.getBoundingClientRect();
+      pd = { startX: e.clientX, startY: e.clientY, left: rect.left, top: rect.top };
+      panel.style.right = 'auto';
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!pd) return;
+      panel.style.left = (pd.left + (e.clientX - pd.startX)) + 'px';
+      panel.style.top = (pd.top + (e.clientY - pd.startY)) + 'px';
+    });
+    document.addEventListener('mouseup', function () { pd = null; });
+  }
+  function refreshPanelCounts() {
+    if (!panel) return;
+    document.getElementById('vxed-count-moved').textContent = Object.keys(moved).length;
+    document.getElementById('vxed-count-edited').textContent = Object.keys(edited).length;
+  }
+  function resetAll() {
+    if (!confirm('Wirklich alle Verschiebungen und Textänderungen zurücksetzen? Das gilt nur für diesen Editor-Entwurf, nicht für bereits exportierten/eingefügten Code.')) return;
+    Object.keys(moved).forEach(function (sel) { try { var el = document.querySelector(sel); if (el) el.style.transform = ''; } catch (e) {} });
+    Object.keys(edited).forEach(function (sel) { try { var el = document.querySelector(sel); if (el) el.classList.remove('vxed-moved'); } catch (e) {} });
+    moved = {}; edited = {};
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    refreshPanelCounts();
+  }
+
+  // ---- export ----
+  function escapeJsString(s) { return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n'); }
+  function buildExportText() {
+    var cssLines = [];
+    Object.keys(moved).forEach(function (sel) {
+      var d = moved[sel];
+      cssLines.push(sel + ' { transform: translate(' + Math.round(d.x) + 'px, ' + Math.round(d.y) + 'px); }');
+    });
+    var jsLines = [];
+    Object.keys(edited).forEach(function (sel) {
+      jsLines.push('  { var el = document.querySelector("' + sel.replace(/"/g, '\\"') + '"); if (el) el.textContent = "' + escapeJsString(edited[sel]) + '"; }');
+    });
+    var out = '';
+    out += '/* ---- UI-Editor Export ----\n';
+    out += '   Positionen: fuege diesen <style>-Block irgendwo vor </head> ein.\n';
+    out += '   Texte: fuege den <script>-Block irgendwo vor </body> ein (oder in\n';
+    out += '   den bestehenden Haupt-Script-Block).\n';
+    out += '   Achtung: Text-Aenderungen an Elementen, die das Spiel selbst laufend\n';
+    out += '   neu rendert (Herzen, Hotbar-Mengen, X/Y-Anzeige, Chat, Benach-\n';
+    out += '   richtigungen), werden vom naechsten Re-Render wieder ueberschrieben -\n';
+    out += '   diese muessen stattdessen im Quellcode selbst geaendert werden. */\n\n';
+    if (cssLines.length) {
+      out += '<style>\n' + cssLines.map(function (l) { return '  ' + l; }).join('\n') + '\n</style>\n\n';
+    } else {
+      out += '<!-- keine Positions-Aenderungen -->\n\n';
+    }
+    if (jsLines.length) {
+      out += '<script>\ndocument.addEventListener("DOMContentLoaded", function () {\n' + jsLines.join('\n') + '\n});\n</' + 'script>\n';
+    } else {
+      out += '<!-- keine Text-Aenderungen -->\n';
+    }
+    return out;
+  }
+  function openExportModal() {
+    var modal = document.createElement('div');
+    modal.id = 'vxed-export-modal';
+    modal.className = 'vxed-own';
+    var text = buildExportText();
+    modal.innerHTML =
+      '<div class="vxed-box">' +
+        '<div style="font-weight:800;font-size:15px;">🛠 Code-Export</div>' +
+        '<textarea readonly></textarea>' +
+        '<div class="vxed-actions">' +
+          '<button class="vxed-secondary" id="vxed-dl">Als Datei herunterladen</button>' +
+          '<button id="vxed-copy">In Zwischenablage kopieren</button>' +
+          '<button class="vxed-secondary" id="vxed-close-modal">Schließen</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    modal.querySelector('textarea').value = text;
+    modal.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    modal.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.getElementById('vxed-copy').onclick = function () {
+      navigator.clipboard.writeText(text).catch(function () {
+        var ta = modal.querySelector('textarea'); ta.focus(); ta.select(); document.execCommand('copy');
+      });
+    };
+    document.getElementById('vxed-dl').onclick = function () {
+      var blob = new Blob([text], { type: 'text/plain' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'voxeria-ui-export.txt';
+      a.click();
+    };
+    document.getElementById('vxed-close-modal').onclick = function () { modal.remove(); };
+  }
+
+  // ---- interaction (capture phase, so it always wins over game handlers while active) ----
+  function onMouseOver(e) {
+    if (isOwnUI(e.target) || isCanvas(e.target) || isTooRoot(e.target)) return;
+    if (hovered && hovered !== e.target) clearHover();
+    hovered = e.target;
+    hovered.classList.add(isDirectTextTarget(hovered) ? 'vxed-text-outline' : 'vxed-hover-outline');
+  }
+  function clearHover() {
+    if (hovered) { hovered.classList.remove('vxed-hover-outline', 'vxed-text-outline'); hovered = null; }
+  }
+  function onMouseDown(e) {
+    if (isOwnUI(e.target)) return; // let the panel/modal's own handlers run
+    e.preventDefault(); e.stopPropagation();
+    if (isCanvas(e.target) || isTooRoot(e.target)) return;
+    var el = e.target;
+    var base = parseTranslate(el);
+    drag = { el: el, selector: getSelector(el), startX: e.clientX, startY: e.clientY, baseDx: base.x, baseDy: base.y, moved: false };
+  }
+  function onMouseMove(e) {
+    if (!drag) return;
+    e.preventDefault(); e.stopPropagation();
+    var dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+    if (!drag.moved && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) drag.moved = true;
+    if (drag.moved) {
+      var nx = drag.baseDx + dx, ny = drag.baseDy + dy;
+      drag.el.style.transform = 'translate(' + nx + 'px,' + ny + 'px)';
+    }
+  }
+  function onMouseUp(e) {
+    if (!drag) return;
+    e.preventDefault(); e.stopPropagation();
+    if (drag.moved) {
+      var t = parseTranslate(drag.el);
+      moved[drag.selector] = t;
+      drag.el.classList.add('vxed-moved');
+      refreshPanelCounts();
+      saveDraft();
+    } else {
+      // No real drag happened — treat it as a click: edit text if this
+      // element directly carries its own text.
+      if (isDirectTextTarget(drag.el)) startEdit(drag.el);
+    }
+    drag = null;
+  }
+  function startEdit(el) {
+    clearHover();
+    editingEl = el;
+    editingOriginalText = el.textContent;
+    el.contentEditable = 'true';
+    el.classList.add('vxed-text-outline');
+    // blur is the ONE reliable signal that editing ended, no matter how focus
+    // left (Tab, clicking the panel, clicking a totally unrelated element,
+    // the browser losing focus). Relying on "did mousedown hit a different
+    // target" instead used to miss the case of clicking a panel button while
+    // mid-edit — e.g. hitting "Code exportieren" straight after typing would
+    // silently drop the edit because nothing ever committed it.
+    el.addEventListener('blur', onEditBlur);
+    el.focus();
+    document.execCommand('selectAll', false, null);
+  }
+  function onEditBlur() { commitEdit(); }
+  function commitEdit() {
+    if (!editingEl) return;
+    var el = editingEl;
+    el.removeEventListener('blur', onEditBlur);
+    el.contentEditable = 'false';
+    el.classList.remove('vxed-text-outline');
+    if (el.textContent !== editingOriginalText) {
+      edited[getSelector(el)] = el.textContent;
+      el.classList.add('vxed-moved');
+      refreshPanelCounts();
+      saveDraft();
+    }
+    editingEl = null;
+  }
+  function cancelEdit() {
+    if (!editingEl) return;
+    var el = editingEl;
+    el.removeEventListener('blur', onEditBlur);
+    el.textContent = editingOriginalText;
+    el.contentEditable = 'false';
+    el.classList.remove('vxed-text-outline');
+    editingEl = null;
+    el.blur();
+  }
+  function onKeyDown(e) {
+    if (editingEl) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+      e.stopPropagation();
+    }
+  }
+  function onClickCapture(e) {
+    // Swallow every click while active EXCEPT clicks on the editor's own
+    // panel/modal — otherwise a "click to edit text" would also fire the
+    // real button underneath it (opening a modal, changing world, etc.).
+    if (isOwnUI(e.target)) return;
+    e.preventDefault(); e.stopPropagation();
+  }
+
+  function toggleEditor() {
+    active = !active;
+    if (active) {
+      if (editingEl) commitEdit();
+      buildPanel();
+      document.addEventListener('mouseover', onMouseOver, true);
+      document.addEventListener('mousedown', onMouseDown, true);
+      document.addEventListener('mousemove', onMouseMove, true);
+      document.addEventListener('mouseup', onMouseUp, true);
+      document.addEventListener('keydown', onKeyDown, true);
+      document.addEventListener('click', onClickCapture, true);
+    } else {
+      if (editingEl) commitEdit();
+      clearHover();
+      document.removeEventListener('mouseover', onMouseOver, true);
+      document.removeEventListener('mousedown', onMouseDown, true);
+      document.removeEventListener('mousemove', onMouseMove, true);
+      document.removeEventListener('mouseup', onMouseUp, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('click', onClickCapture, true);
+      if (panel) { panel.remove(); panel = null; }
+      var modal = document.getElementById('vxed-export-modal');
+      if (modal) modal.remove();
+    }
+  }
+
+  window.addEventListener('keydown', function (e) {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      toggleEditor();
+    }
+  });
+
+  // Re-apply any saved draft on load, regardless of whether the editor is
+  // currently toggled on — a customized layout should stick around.
+  loadDraftAndApply();
+  scheduleReapply();
+})();
+</script>
 </body>
 </html>
