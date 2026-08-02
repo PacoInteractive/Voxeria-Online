@@ -1387,7 +1387,7 @@
         <button id="seed-btn" onclick="openNewWorldConfirm()">New World</button>
       </div>
       <div id="pos-info">X: 0  Y: 0 | Biome: FOREST</div>
-      <div id="weekly-timer" title="The shared default world resets on a fixed weekly schedule, same time for every player.">🗓️ New world in …</div>
+      <div id="weekly-timer" title="The shared default world resets on a fixed weekly schedule, same time for every player.">🗓️ New Seed in …</div>
       <div id="mp-status" onclick="toggleRoomPanel()" title="Open the multiplayer room panel">Waiting for multiplayer...</div>
       <div id="game-menu-btn" onclick="toggleGameMenu()">☰ Menu</div>
     </div>
@@ -1713,7 +1713,7 @@
       <div id="hotbar"></div>
       <div id="block-tooltip"></div>
     </div>
-    <div id="controls-hint">Alpha Version · Goal: Explore and mine blocks · 4 Dimensions to discover. Open the 📖 Portal Book to learn how to build each portal!</div>
+    <div id="controls-hint">Voxeria v.1.2</div>
     <div id="fps-counter">-- FPS</div>
   </div>
 </div>
@@ -10965,7 +10965,7 @@ function updateWeeklyCountdown() {
   const days = Math.floor(totalMin / 1440);
   const hours = Math.floor((totalMin % 1440) / 60);
   const mins = totalMin % 60;
-  el.textContent = `🗓️ New world in ${days}d ${hours}h ${mins}m`;
+  el.textContent = `🗓️ New Seed in ${days}d ${hours}h ${mins}m`;
 }
 setInterval(updateWeeklyCountdown, 30000);
 updateWeeklyCountdown();
