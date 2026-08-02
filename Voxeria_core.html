@@ -444,33 +444,6 @@
     }
     #ocean-oxygen-bar.danger { border-color: #ff3b3b; animation: ptDanger 0.6s ease-in-out infinite; }
     #ocean-oxygen-bar.danger #ocean-oxygen-fill { background: linear-gradient(90deg, #2196f3, #ff3b3b); }
-    /* ── GOLD FORGES — "go find it" nudge + live hold-to-craft progress ── */
-    #forge-hint {
-      position: absolute; top: 66px; left: 50%; transform: translate(-50%, -14px) scale(0.95);
-      min-width: 220px; max-width: 360px; text-align: center;
-      background: var(--hud-bg); backdrop-filter: blur(var(--hud-blur));
-      border: 1px solid var(--hud-border); border-radius: var(--hud-radius); padding: 8px 18px;
-      box-shadow: var(--hud-shadow); color: #ffd7b0; font-weight: 800; font-size: 12.5px; letter-spacing: 0.3px;
-      opacity: 0; pointer-events: none; z-index: 101;
-      transition: opacity 0.3s, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    #forge-hint.show { opacity: 1; transform: translate(-50%, 0) scale(1); animation: forgeHintPulse 1.1s ease-in-out infinite; }
-    @keyframes forgeHintPulse {
-      0%, 100% { box-shadow: var(--hud-shadow); }
-      50% { box-shadow: 0 0 26px rgba(255,255,255,0.3); }
-    }
-    #forge-progress {
-      position: absolute; top: 66px; left: 50%; transform: translate(-50%, -14px) scale(0.95);
-      min-width: 240px; background: var(--hud-bg); backdrop-filter: blur(var(--hud-blur));
-      border: 1px solid var(--hud-border); border-radius: var(--hud-radius); padding: 9px 18px;
-      box-shadow: var(--hud-shadow);
-      opacity: 0; pointer-events: none; z-index: 102;
-      transition: opacity 0.2s, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    #forge-progress.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
-    #fp-title { font-size: 12px; font-weight: 800; color: #ffd7b0; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-bottom: 6px; white-space: nowrap; }
-    #fp-track { height: 8px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
-    #fp-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff6a3d, #ffd97a); border-radius: 4px; transition: width 0.05s linear; }
     /* ── FIRST-TIME INTRO HINT — shown once ever, light-touch onboarding ── */
     #intro-hint-banner {
       position: absolute; top: 150px; left: 50%;
@@ -731,9 +704,6 @@
     /* Only meaningful next to a dimension forge — hidden the rest of the
        time so it doesn't clutter the touch controls everywhere else (see
        updateDimForge, which toggles this class based on nearestDimForge). */
-    .tc-interact { display: none; background: rgba(255,140,60,0.3); border-color: rgba(255,180,110,0.8); }
-    .tc-interact.visible { display: flex; }
-    .tc-interact:active { background: rgba(255,140,60,0.55); }
     #rotate-overlay {
       display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: #111118; z-index: 9999; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: white;
@@ -1259,29 +1229,24 @@
     .craft-info { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 3px; }
     .craft-name { font-size: 13.5px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 6px; }
     .craft-effect { font-size: 11px; color: rgba(255,255,255,0.55); line-height: 1.35; }
-    .craft-mats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
-    .craft-mat {
-      display: flex; align-items: center; gap: 5px; padding: 2px 8px 2px 4px; border-radius: 14px;
-      font-size: 11px; border: 1px solid transparent;
-    }
-    .craft-mat.ok { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.3); color: #a3ffce; }
-    .craft-mat.short { background: rgba(255,90,90,0.08); border-color: rgba(255,90,90,0.25); color: #ffb3b3; }
-    .craft-mat-ico { width: 18px; height: 18px; image-rendering: pixelated; border-radius: 3px; }
-    .craft-mat b { font-weight: 800; }
+    /* The altar diagram + "where to build it / do I carry enough" line. This
+       replaced the old material-chip checklist and craft button entirely —
+       the shape itself is the instruction now. */
+    .craft-build { display: flex; align-items: center; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
+    .craft-shape { image-rendering: pixelated; flex-shrink: 0; border-radius: 4px; }
+    .craft-where { font-size: 11px; color: rgba(255,255,255,0.55); line-height: 1.5; }
+    .craft-where b { color: #e0aaff; font-weight: 800; }
+    .cm-ok { color: #a3ffce; font-weight: 700; }
+    .cm-short { color: #ffb3b3; font-weight: 700; }
     .craft-btn {
       flex-shrink: 0; align-self: center; border: none; border-radius: 8px; cursor: pointer;
       padding: 9px 16px; font-size: 13px; font-weight: 800;
-      /* The "🔒 Only at the [Forge Name] ([Dimension])" locked-state label can
-         run long — without a cap it forced the button to its full intrinsic
-         width and squeezed .craft-info down to almost nothing next to it. */
       max-width: 160px; white-space: normal; line-height: 1.25; text-align: center;
       background: linear-gradient(135deg, #e854dc, #a855f7); color: #fff;
       box-shadow: 0 3px 12px rgba(168,85,247,0.4); transition: transform 0.12s, filter 0.2s;
     }
     .craft-btn:hover:not(:disabled) { filter: brightness(1.15); transform: translateY(-1px); }
     .craft-btn:active:not(:disabled) { transform: scale(0.96); }
-    .craft-btn.done { background: rgba(74,222,128,0.15); color: #4ade80; box-shadow: none; cursor: default; }
-    .craft-btn.locked { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.35); box-shadow: none; cursor: not-allowed; }
     .craft-btn.equipped { background: rgba(74,222,128,0.15); color: #4ade80; box-shadow: none; border: 1px solid rgba(74,222,128,0.4); }
     .craft-btn.equipped:hover { background: rgba(255,90,90,0.12); color: #ffb3b3; border-color: rgba(255,90,90,0.35); }
     .craft-btn.stowed { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6); box-shadow: none; border: 1px solid rgba(255,255,255,0.15); }
@@ -1546,8 +1511,6 @@
       <div id="notification">Block Unlocked!</div>
       <div id="pocket-timer"><span id="pt-icon">⏳</span><div><div id="pt-label">Collapse in</div><div id="pt-time">3:00</div></div></div>
       <div id="ocean-oxygen-bar"><div id="ocean-oxygen-label"><span>💧 Oxygen</span><span id="ocean-oxygen-pct">100%</span></div><div id="ocean-oxygen-track"><div id="ocean-oxygen-fill"></div></div></div>
-      <div id="forge-hint"></div>
-      <div id="forge-progress"><div id="fp-title">Forging…</div><div id="fp-track"><div id="fp-fill"></div></div></div>
       <div id="intro-hint-banner">
         <div id="ih-close" onclick="dismissIntroHint()">✕</div>
         <div id="ih-title">🖱️ Hold left mouse to mine · Hold right mouse to place</div>
@@ -1713,7 +1676,6 @@
             <button id="tc-right" class="tc-btn">▶</button>
         </div>
         <div class="tc-group">
-            <button id="tc-interact" class="tc-btn tc-interact">✋</button>
             <button id="tc-place" class="tc-btn">🧱</button>
             <button id="tc-jump" class="tc-btn">▲</button>
         </div>
@@ -3747,8 +3709,8 @@ let pocketLandmarkX = 0;         // world-X anchor of this run's single guarante
 // beside its landmark (see buildPocketLandmark). It crafts the armor for the
 // NEXT dimension in the survival chain (see FORGE_OUTPUT): you can only survive
 // dimension N+1 by first forging its armor in dimension N. Null whenever not
-// inside a live pocket run. Position is the exact block players stand near and
-// hold E at (see nearestDimForge/updateDimForge).
+// inside a live pocket run. Position is purely where the monument stands — it
+// marks the realm, it isn't interacted with (see updateDimForge).
 let dimForgeX = null, dimForgeY = null;
 let pocketEntryInventory = null; // inventory snapshot restored on collapse/death (this-run loot is the delta that gets lost)
 let pocketReturn = { x: 0, y: 0 };// overworld position to drop the player back at on exit
@@ -4310,10 +4272,11 @@ function decoratePocketChunk(cx) {
 
 // Stamps a small 3-wide altar (the dimension's forge) at column fx, resting on
 // groundY, and records it as this run's single forge (dimForgeX/dimForgeY). The
-// core block on top is the visual "brazier" the hologram floats above; players
-// stand next to it and hold E (see updateDimForge). Which armor it produces is
-// decided purely by the current dimension (see FORGE_OUTPUT), not by anything
-// built here.
+// core block on top is the visual "brazier" the hologram floats above, showing
+// which piece this realm makes. It is a landmark only — the armor itself is
+// built by placing the altar pattern anywhere in the dimension (see
+// ARMOR_PATTERN). Which armor that is depends purely on the current dimension
+// (see FORGE_OUTPUT), not on anything built here.
 function _stampDimForge(fx, groundY, dim, baseBlock, coreBlock, glowBlock) {
   localSetBlock(fx-1, groundY,   baseBlock, dim);
   localSetBlock(fx,   groundY,   baseBlock, dim);
@@ -8784,6 +8747,9 @@ function executePlace(wx, wy) {
             'A Leaves block only stays put with a Log or Wood block within about 5 blocks. Build closer to a trunk.');
         }
         checkPortal(wx,wy);
+        // Armor is built the same way portals are: the block you just placed
+        // may have completed an altar. Gated to the right dimension inside.
+        checkArmorAltar(wx,wy);
         if (item.count<=0) { inventory[selectedSlot] = null; }
         drawHotbar();      }
     }
@@ -9111,7 +9077,7 @@ const bindTouch=(id,key)=>{
   el.addEventListener('touchstart',(e)=>{e.preventDefault();e.stopPropagation();keys[key]=true;},{passive:false});
   el.addEventListener('touchend',(e)=>{e.preventDefault();e.stopPropagation();keys[key]=false;},{passive:false});
 };
-bindTouch('tc-left','a'); bindTouch('tc-right','d'); bindTouch('tc-jump',' '); bindTouch('tc-interact','e');
+bindTouch('tc-left','a'); bindTouch('tc-right','d'); bindTouch('tc-jump',' ');
 document.getElementById('tc-place').addEventListener('touchstart',(e)=>{e.preventDefault();e.stopPropagation();const{wx,wy}=getMouseWorldCoords();executePlace(wx,wy);},{passive:false});
 
 document.addEventListener('keydown',(e)=>{
@@ -10323,7 +10289,6 @@ function beginPocketRun(preX, preY) {
   // Reset — buildPocketLandmark() re-stamps this run's single forge for the
   // dimension being entered (see _stampDimForge).
   dimForgeX = null; dimForgeY = null;
-  forgeHoldProgress = 0; forgeHoldActiveId = null;
   pocketActive = true;
   pocketCollapsing = false;
   pocketCollapseTimer = 0;
@@ -11335,7 +11300,7 @@ const PORTAL_DEFS = [
   {
     id: 'GOLD', name: '🌟 Gold Dimension', unlocked: true,
     color: '#f1c40f', glow: 'rgba(255,215,0,0.3)',
-    desc: 'The safe starting dimension, with no hazard of its own. Its Vulcan-Schmiede forges the Obsidian Heat Suit you need to survive the Lava Core. Mine its Obsidian & Ember Ore veins, then hold E at the forge.',
+    desc: 'The safe starting dimension, with no hazard of its own. This is where the Obsidian Heat Suit you need to survive the Lava Core is built. Mine its Obsidian & Ember Ore veins, then build the altar shape shown in the Crafting tab.',
     recipe: { center: BLOCKS.RAINBOW_ORE, cross: BLOCKS.GOLD_ORE },
     centerLabel: 'Rainbow Ore', crossLabel: 'Gold Ore',
     rewards: 'Obsidian, Ember Ore, Rainbow Ore, Gold Bricks'
@@ -11410,22 +11375,21 @@ function showPBTab(tab, el) {
   closeBlockActionPopover(); // its anchor entry no longer exists once pb-body is re-rendered
 }
 
-function drawRecipePreview(canvas, centerBlock, crossBlock) {
+// Renders any rectangular recipe grid (0 = empty cell) into a canvas. Shared by
+// the portal recipes (3x3 plus-shape) and the armor altars (5x3), so both read
+// as the same kind of diagram instead of two different visual languages.
+function _drawRecipeGrid(canvas, grid) {
   const rc = canvas.getContext('2d');
   const S = 16; // cell size
   const PAD = 4;
-  canvas.width = S * 3 + PAD * 4;
-  canvas.height = S * 3 + PAD * 4;
+  const rows = grid.length, cols0 = grid[0].length;
+  canvas.width = S * cols0 + PAD * (cols0 + 1);
+  canvas.height = S * rows + PAD * (rows + 1);
   rc.fillStyle = 'rgba(0,0,0,0.4)';
   rc.fillRect(0, 0, canvas.width, canvas.height);
 
-  const grid = [
-    [0, crossBlock, 0],
-    [crossBlock, centerBlock, crossBlock],
-    [0, crossBlock, 0]
-  ];
-  for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 3; col++) {
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols0; col++) {
       const btype = grid[row][col];
       const bx = PAD + col * (S + PAD);
       const by = PAD + row * (S + PAD);
@@ -11454,6 +11418,33 @@ function drawRecipePreview(canvas, centerBlock, crossBlock) {
       rc.strokeStyle = 'rgba(255,255,255,0.15)'; rc.lineWidth = 0.5; rc.strokeRect(bx, by, S, S);
     }
   }
+}
+
+function drawRecipePreview(canvas, centerBlock, crossBlock) {
+  _drawRecipeGrid(canvas, [
+    [0, crossBlock, 0],
+    [crossBlock, centerBlock, crossBlock],
+    [0, crossBlock, 0]
+  ]);
+}
+
+// The armor altar. The grid is DERIVED from ARMOR_PATTERN rather than written
+// out again, so the diagram the player is asked to copy can never drift out of
+// sync with the shape checkArmorAltar actually looks for.
+function drawAltarPreview(canvas, baseBlock, coreBlock) {
+  const xs = ARMOR_PATTERN.map(p => p[0]).concat(0);
+  const ys = ARMOR_PATTERN.map(p => p[1]).concat(0);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const grid = [];
+  for (let y = minY; y <= maxY; y++) {
+    const row = [];
+    for (let x = minX; x <= maxX; x++) row.push(0);
+    grid.push(row);
+  }
+  for (const [ox, oy] of ARMOR_PATTERN) grid[oy - minY][ox - minX] = baseBlock;
+  grid[0 - minY][0 - minX] = coreBlock;
+  _drawRecipeGrid(canvas, grid);
 }
 
 function drawBlockMini(canvas, btype) {
@@ -11736,7 +11727,7 @@ document.addEventListener('click', (e) => {
 // equipped armor is drawn on the body and only equipped armor grants hazard
 // protection, so taking a piece off is a real choice (you look different,
 // and you lose that dimension's protection), not just a cosmetic no-op.
-// Newly crafted armor auto-equips (see craftItem) since you'd want to wear
+// Newly built armor auto-equips (see completeArmorAltar) since you'd want to wear
 // what you just made — nothing is ever equipped that isn't also owned.
 const ARMOR_DIMS = new Set(['GOLD', 'LAVA', 'OCEAN', 'VOID']);
 let craftedArmor = new Set();          // dimension ids whose armor is owned forever (persisted)
@@ -11832,8 +11823,9 @@ function toggleArmorEquip(dim) {
 // (dim = the dimension it protects).
 // EVERY armor now carries a `forge` field and is therefore never craftable from
 // a button in this book — the Crafting tab shows it purely as information
-// (materials + location). Armor is only ever forged in-world by holding the
-// interact key at its forge (see updateDimForge/forgeCraftComplete).
+// (the altar shape + its two materials + which realm builds it). Armor is only
+// ever made in-world by placing the altar pattern (see ARMOR_PATTERN /
+// checkArmorAltar / completeArmorAltar).
 //
 // SURVIVAL CHAIN (see FORGE_OUTPUT + DIM_CHAIN): the forge sits in the
 // dimension BEFORE the one its armor protects, so you must forge each armor
@@ -11843,24 +11835,47 @@ function toggleArmorEquip(dim) {
 //   Lava forge  → Ocean armor (survive Ocean)
 //   Ocean forge → Void armor  (survive the Blither)
 //   Void forge  → Gold armor  (bonus/prestige — Gold has no hazard of its own)
+// Armor is never made from a menu — you BUILD it in the world. Place the two
+// materials in the fixed 9-block altar shape (see ARMOR_PATTERN) while standing
+// in the dimension named by `forge.dim`, and the blocks transform into the
+// armor on the spot. `base` fills the 8 outer blocks, `core` is the single
+// block in the middle row that the shape is anchored on. `mats` just mirrors
+// those counts so the Portal Book can still show "do you carry enough".
 const CRAFTING_RECIPES = [
   // ── Survival armor ──
   { id: 'armor_lava',  type: 'armor', dim: 'LAVA',  icon: '🔥',
-    name: 'Obsidian Heat Suit', effect: 'Forged in the Gold Dimension from Obsidian & Ember Ore. Negates Lava Core heat & lava-contact damage.',
-    mats: { [BLOCKS.OBSIDIAN]: 6, [BLOCKS.EMBER_ORE]: 5 },
+    name: 'Obsidian Heat Suit', effect: 'Built in the Gold Dimension from Obsidian with an Ember Ore core. Negates Lava Core heat & lava-contact damage.',
+    base: BLOCKS.OBSIDIAN, core: BLOCKS.EMBER_ORE,
+    mats: { [BLOCKS.OBSIDIAN]: 8, [BLOCKS.EMBER_ORE]: 1 },
     forge: { dim: 'GOLD', name: 'Vulcan-Schmiede' } },
   { id: 'armor_ocean', type: 'armor', dim: 'OCEAN', icon: '🌊',
-    name: 'Pressure Diving Suit', effect: 'Forged in the Lava Core from Ember Ore & Fire Crystal. Drastically slows Ocean Depth oxygen loss (not full immunity, you can still drown eventually).',
-    mats: { [BLOCKS.EMBER_ORE]: 6, [BLOCKS.FIRE_CRYSTAL]: 4 },
+    name: 'Pressure Diving Suit', effect: 'Built in the Lava Core from Ember Ore with a Fire Crystal core. Drastically slows Ocean Depth oxygen loss (not full immunity, you can still drown eventually).',
+    base: BLOCKS.EMBER_ORE, core: BLOCKS.FIRE_CRYSTAL,
+    mats: { [BLOCKS.EMBER_ORE]: 8, [BLOCKS.FIRE_CRYSTAL]: 1 },
     forge: { dim: 'LAVA', name: 'Flut-Altar' } },
   { id: 'armor_void',  type: 'armor', dim: 'VOID',  icon: '🌌',
-    name: 'Void Walker Boots', effect: 'Forged in Ocean Depth from Coral & Kelp. Saves you from the deadly fall in the Blither.',
-    mats: { [BLOCKS.CORAL]: 8, [BLOCKS.KELP]: 8 },
+    name: 'Void Walker Boots', effect: 'Built in Ocean Depth from Coral with a Kelp core. Saves you from the deadly fall in the Blither.',
+    base: BLOCKS.CORAL, core: BLOCKS.KELP,
+    mats: { [BLOCKS.CORAL]: 8, [BLOCKS.KELP]: 1 },
     forge: { dim: 'OCEAN', name: 'Abgrund-Altar' } },
   { id: 'armor_gold',  type: 'armor', dim: 'GOLD',  icon: '✨',
-    name: 'Golden Aegis', effect: 'Forged in the Blither from Void Ore & Star Dust. Pure damage resistance, the prestige capstone of the chain.',
-    mats: { [BLOCKS.VOID_ORE]: 6, [BLOCKS.STAR_DUST]: 4 },
+    name: 'Golden Aegis', effect: 'Built in the Blither from Void Ore with a Star Dust core. Pure damage resistance, the prestige capstone of the chain.',
+    base: BLOCKS.VOID_ORE, core: BLOCKS.STAR_DUST,
+    mats: { [BLOCKS.VOID_ORE]: 8, [BLOCKS.STAR_DUST]: 1 },
     forge: { dim: 'VOID', name: 'Ur-Altar' } },
+];
+
+// The armor altar. 9 blocks, two materials, offsets relative to the CORE block:
+//
+//     B B B B B
+//         C
+//       B B B
+//
+// Deliberately nothing like the portal recipe's 5-block plus, so an ordinary
+// wall — or a portal under construction — can never be mistaken for one.
+const ARMOR_PATTERN = [
+  [-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],   // top row, 5 wide
+  [-1, 1],[0, 1],[1, 1]                    // bottom row, 3 wide
 ];
 
 // ── Inventory helpers ──
@@ -11869,63 +11884,28 @@ function countInInventory(block) {
   for (const it of inventory) if (it && it.block === block) n += it.count;
   return n;
 }
-function removeFromInventory(block, amount) {
-  let left = amount;
-  for (let i = 0; i < inventory.length && left > 0; i++) {
-    const it = inventory[i];
-    if (!it || it.block !== block) continue;
-    const take = Math.min(it.count, left);
-    it.count -= take; left -= take;
-    if (it.count <= 0) inventory[i] = null;
-  }
-  return left === 0;
-}
-function recipeAffordable(r) {
-  for (const b in r.mats) if (countInInventory(parseInt(b, 10)) < r.mats[b]) return false;
-  return true;
-}
 function recipeOwned(r) {
   return r.type === 'armor' && craftedArmor.has(r.dim);
 }
 
-function craftItem(recipeId) {
-  const r = CRAFTING_RECIPES.find(x => x.id === recipeId);
-  if (!r) return;
-  if (recipeOwned(r)) { showNotification('✓ You already crafted the ' + r.name + '.'); return; }
-  if (!recipeAffordable(r)) { showNotification('🎒 Not enough materials for the ' + r.name + '.'); return; }
-  for (const b in r.mats) removeFromInventory(parseInt(b, 10), r.mats[b]);
-  craftedArmor.add(r.dim);
-  equippedArmor.add(r.dim); // auto-equip what you just made
-  showNotification('🛡️ Crafted ' + r.icon + ' ' + r.name + '! Equipped, you can survive there now.');
-  playSound('buy');
-  syncProgressToCloud();
-  drawHotbar();
-  updateDefenseBadge();
-  applyArmorStatBonuses();
-  if (document.getElementById('portal-book-modal').classList.contains('open') && pbCurrentTab === 'crafting') renderPortalBook();
-}
-
 // =========================================================
-// DIMENSION FORGES — every pocket dimension has ONE forge, built beside its
-// landmark (see _stampDimForge). It crafts the armor for the NEXT dimension in
-// the survival chain (FORGE_OUTPUT): the forge in dimension N makes the armor
-// you need to survive dimension N+1. Standing in range and holding E for
-// FORGE_HOLD_FRAMES forges it on the spot — the ONLY way any armor can be made
-// (see the `forge` field on every CRAFTING_RECIPES armor entry). Letting go or
-// stepping out of range resets progress; the collapse timer keeps ticking the
-// whole time, so holding still costs real risk.
+// DIMENSION FORGES — every pocket dimension has ONE forge monument, built
+// beside its landmark (see _stampDimForge). It is a LANDMARK, not a machine:
+// it has no interaction of its own. What it does is tell you, in-world, which
+// armor this realm makes — the hologram above it shows the piece, and the
+// hammer you hear approaching it is the cue that this realm forges something
+// at all. The armor itself is built by placing the altar pattern anywhere in
+// this dimension (see ARMOR_PATTERN / checkArmorAltar), which is what FORGE_OUTPUT
+// gates: the realm you're standing in decides which piece can be completed.
 // =========================================================
-const FORGE_HOLD_FRAMES = 600;      // 10s at ~60fps, dt-scaled like every other timer here
 const FORGE_RADIUS_PX = TILE * 2.2;
-// Which armor each dimension's forge produces. The forge sits one dimension
-// EARLIER than the armor protects, so the whole chain bootstraps: Gold (safe)
-// forges Lava armor → Lava forges Ocean armor → Ocean forges Void armor →
-// Void forges the prestige Gold armor.
+// Which armor each dimension produces. It sits one dimension EARLIER than the
+// armor protects, so the whole chain bootstraps: Gold (safe) makes Lava armor →
+// Lava makes Ocean armor → Ocean makes Void armor → Void makes the prestige
+// Gold armor.
 const FORGE_OUTPUT = { GOLD: 'armor_lava', LAVA: 'armor_ocean', OCEAN: 'armor_void', VOID: 'armor_gold' };
 // Hologram/ambient tint per forge dimension — blends with each realm's palette.
 const FORGE_TINT = { GOLD: '255,140,70', LAVA: '255,120,60', OCEAN: '90,200,255', VOID: '170,120,255' };
-let forgeHoldProgress = 0;
-let forgeHoldActiveId = null; // the dimension whose forge is mid-hold, or null
 let forgeSoundTimer = 0;      // rhythmic-hammer cadence counter (dt units)
 const FORGE_SOUND_RANGE = 10; // blocks — within this you hear the forge working
 
@@ -11947,31 +11927,6 @@ function nearestDimForge() {
   return null;
 }
 
-function showForgeHint(text) {
-  const el = document.getElementById('forge-hint');
-  if (!el) return;
-  el.textContent = text;
-  el.classList.add('show');
-}
-function hideForgeHint() {
-  const el = document.getElementById('forge-hint');
-  if (el) el.classList.remove('show');
-}
-function showForgeProgress(r, frac) {
-  hideForgeHint();
-  const box = document.getElementById('forge-progress');
-  const title = document.getElementById('fp-title');
-  const fill = document.getElementById('fp-fill');
-  if (!box) return;
-  box.classList.add('show');
-  if (title) title.textContent = 'Forging ' + r.name + '… ' + Math.min(100, Math.round(frac * 100)) + '%';
-  if (fill) fill.style.width = Math.min(100, frac * 100) + '%';
-}
-function hideForgeProgress() {
-  const box = document.getElementById('forge-progress');
-  if (box) box.classList.remove('show');
-}
-
 // Small fiery/golden particle burst on the character the instant armor gets
 // forged — the "feuriges Glühen" completion flourish.
 function spawnForgeGlowBurst(x, y, dim) {
@@ -11987,24 +11942,53 @@ function spawnForgeGlowBurst(x, y, dim) {
   }
 }
 
-function forgeCraftComplete(r) {
-  for (const b in r.mats) removeFromInventory(parseInt(b, 10), r.mats[b]);
+// Called from executePlace the moment a placed block completes an altar.
+// Scans every core position that could own the block just placed — the block
+// can be any of the 9 cells, so the owning core always lies within this window.
+function checkArmorAltar(wx, wy) {
+  const recipeId = FORGE_OUTPUT[currentDim];
+  // No entry means this dimension forges nothing — including the Overworld,
+  // which is what keeps an ordinary surface build from ever triggering armor.
+  if (!recipeId) return false;
+  const r = CRAFTING_RECIPES.find(x => x.id === recipeId);
+  if (!r || recipeOwned(r)) return false;
+  for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 1; dy++) {
+    const cx = wx + dx, cy = wy + dy;
+    if (getBlock(cx, cy) !== r.core) continue;
+    var complete = true;
+    for (const [ox, oy] of ARMOR_PATTERN) {
+      if (getBlock(cx + ox, cy + oy) !== r.base) { complete = false; break; }
+    }
+    if (complete) { completeArmorAltar(r, cx, cy); return true; }
+  }
+  return false;
+}
+
+function completeArmorAltar(r, cx, cy) {
+  // The altar IS the cost: its 9 blocks are consumed as they turn into the
+  // armor. Nothing is taken from the inventory here — placing them already did
+  // that, which is the whole point of building the recipe instead of buying it.
+  setBlockAndBroadcast(cx, cy, BLOCKS.AIR);
+  for (const [ox, oy] of ARMOR_PATTERN) setBlockAndBroadcast(cx + ox, cy + oy, BLOCKS.AIR);
+
   craftedArmor.add(r.dim);
-  equippedArmor.add(r.dim); // auto-equip what you just forged
+  equippedArmor.add(r.dim); // auto-equip what you just built
   syncProgressToCloud();
   drawHotbar();
   updateDefenseBadge();
   applyArmorStatBonuses();
-  hideForgeProgress();
-  hideForgeHint();
   playSound('buy');
   screenShake = Math.max(screenShake, 22);
-  spawnForgeGlowBurst(player.x + player.w / 2, player.y + player.h / 2, r.dim);
+  // Effects fire at the ALTAR, not the player — that's where the transformation
+  // visibly happens, and the player is usually standing off to one side after
+  // placing the last block.
+  const ax = (cx + 0.5) * TILE, ay = (cy + 0.5) * TILE;
+  spawnForgeGlowBurst(ax, ay, r.dim);
   // Expanding shockwave ring + a full-screen color-flash punch — reuses the
   // same 'ring' particle type and impactFlash mechanism as meteor/lightning
   // hits, so the completion moment reads with the same weight as the game's
   // other big impacts.
-  particles.push({ x: player.x + player.w / 2, y: player.y + player.h / 2, vx: 0, vy: 0, color: '', size: 0, life: 26, maxLife: 26, type: 'ring' });
+  particles.push({ x: ax, y: ay, vx: 0, vy: 0, color: '', size: 0, life: 26, maxLife: 26, type: 'ring' });
   impactFlash = Math.max(impactFlash, 0.7);
   const ARMOR_FLASH = { LAVA: '255,120,60', OCEAN: '90,200,255', VOID: '170,120,255', GOLD: '255,217,122' };
   const ARMOR_MSG = {
@@ -12033,17 +12017,6 @@ function spawnForgeAmbient(fx, fy, colorRgb) {
 // charging — visually ties the hologram/forge to the hold-progress bar and
 // gets denser as progress climbs, so the last couple seconds feel like the
 // forge is really pouring itself into the armor.
-function spawnForgeChargeMote(originX, originY, colorRgb) {
-  const dx = (player.x + player.w / 2) - originX, dy = (player.y + player.h / 2) - originY;
-  const dist = Math.hypot(dx, dy) || 1;
-  const spd = 3 + Math.random() * 2.5;
-  particles.push({
-    x: originX + (Math.random() - 0.5) * 12, y: originY + (Math.random() - 0.5) * 12,
-    vx: dx / dist * spd, vy: dy / dist * spd,
-    color: `rgba(${colorRgb},0.9)`, size: 2 + Math.random() * 2, life: 16, maxLife: 16, type: 'dust'
-  });
-}
-
 // Proximity forge ambience: a short metallic hammer clang, layered from two
 // detuned oscillators with a fast decay. Volume is passed in (scaled by how
 // close the player is) and routes through masterGain so the mute/volume slider
@@ -12256,20 +12229,15 @@ function drawDimForge() {
 }
 
 // Per-frame tick, called from the main loop right after updatePocketDimension.
+// The forge monument no longer has an interaction of its own — armor is built
+// by placing the altar pattern anywhere in this dimension (see checkArmorAltar).
+// What's left here is pure atmosphere: the rhythmic hammer you hear as you
+// approach, which is also the cue that tells you THIS is the realm that forges
+// something. It falls silent once the armor has been made.
 function updateDimForge(dt) {
   const r = (pocketActive && dimForgeX !== null) ? currentForgeRecipe() : null;
-  // No forge here, or already forged → nothing to interact with this frame.
-  if (!r || recipeOwned(r)) {
-    if (forgeHoldProgress > 0) { forgeHoldProgress = 0; forgeHoldActiveId = null; }
-    hideForgeHint(); hideForgeProgress();
-    const btn0 = document.getElementById('tc-interact');
-    if (btn0) btn0.classList.remove('visible');
-    return;
-  }
+  if (!r || recipeOwned(r)) { forgeSoundTimer = 0; return; }
 
-  // Proximity forge ambience — a rhythmic metallic hammer whose volume rises
-  // as you get closer (within FORGE_SOUND_RANGE blocks). Stops the moment the
-  // armor is forged (we've already returned above once recipeOwned).
   const fxp = (dimForgeX + 0.5) * TILE, fyp = (dimForgeY + 0.5) * TILE;
   const distTiles = Math.hypot(player.x + player.w / 2 - fxp, player.y + player.h / 2 - fyp) / TILE;
   if (distTiles < FORGE_SOUND_RANGE) {
@@ -12281,51 +12249,6 @@ function updateDimForge(dt) {
   } else {
     forgeSoundTimer = 0;
   }
-
-  const near = nearestDimForge();
-  // Touch devices have no E key — this mirrors the desktop hint by only
-  // surfacing the on-screen interact button once actually in range.
-  const interactBtn = document.getElementById('tc-interact');
-  if (interactBtn) interactBtn.classList.toggle('visible', !!near);
-  const holding = !!(near && keys['e']);
-
-  if (holding) {
-    if (!recipeAffordable(r)) {
-      forgeHoldProgress = 0; forgeHoldActiveId = null; hideForgeProgress();
-      showForgeHint('🎒 Missing materials for the ' + r.name + '.');
-      return;
-    }
-    if (forgeHoldActiveId !== currentDim) { forgeHoldProgress = 0; forgeHoldActiveId = currentDim; }
-    forgeHoldProgress += dt;
-    const frac = forgeHoldProgress / FORGE_HOLD_FRAMES;
-    showForgeProgress(r, frac);
-    // Motes flow from the forge into the character, and come faster the
-    // closer the hold gets to completion — the charge visibly building.
-    if (Math.random() < 0.25 + frac * 0.5) spawnForgeChargeMote(near.x, near.y, FORGE_TINT[currentDim] || '255,200,120');
-    screenShake = Math.max(screenShake, frac * 3);
-    if (forgeHoldProgress >= FORGE_HOLD_FRAMES) {
-      forgeCraftComplete(r);
-      forgeHoldProgress = 0; forgeHoldActiveId = null;
-    }
-    return;
-  }
-
-  // Not holding — any in-progress hold resets (moved away or let go).
-  if (forgeHoldProgress > 0) { forgeHoldProgress = 0; forgeHoldActiveId = null; }
-  hideForgeProgress();
-
-  const forgeName = (r.forge && r.forge.name) || 'forge';
-  if (near) {
-    showForgeHint(recipeAffordable(r)
-      ? '⚒️ Hold E to forge the ' + r.name + '!'
-      : '🎒 Missing materials for the ' + r.name + '.');
-    return;
-  }
-
-  // Not near the forge — a persistent nudge once materials are ready, so the
-  // player knows to go find it (Step B of the quest).
-  if (recipeAffordable(r)) showForgeHint('⚒️ Materials ready! Find the ' + forgeName + '.');
-  else hideForgeHint();
 }
 
 // Renders the Portal Book's Crafting tab: armor recipes, each with a live
@@ -12351,7 +12274,6 @@ function craftCard(r) {
   const card = document.createElement('div');
   card.className = 'craft-card';
   const owned = recipeOwned(r);
-  const affordable = recipeAffordable(r);
 
   // Icon — armor recipes get a real pixel-art preview of the piece (the exact
   // accent art worn in-game), everything else keeps the plain emoji.
@@ -12377,55 +12299,45 @@ function craftCard(r) {
   eff.className = 'craft-effect';
   eff.textContent = r.effect + (r.type === 'armor' ? ' (-' + Math.round(ARMOR_DEFENSE[r.dim] * 100) + '% DMG while equipped)' : '');
 
-  // Material checklist
-  const mats = document.createElement('div');
-  mats.className = 'craft-mats';
-  for (const b in r.mats) {
-    const bid = parseInt(b, 10);
-    const need = r.mats[b];
-    const have = countInInventory(bid);
-    const chip = document.createElement('div');
-    chip.className = 'craft-mat' + (have >= need ? ' ok' : ' short');
-    const mini = document.createElement('canvas');
-    mini.className = 'craft-mat-ico';
-    drawBlockMini(mini, bid);
-    const lbl = document.createElement('span');
-    lbl.innerHTML = escapeHtml(blockNames[bid] || 'Block') + ' <b>' + Math.min(have, need) + '/' + need + '</b>';
-    chip.appendChild(mini); chip.appendChild(lbl);
-    mats.appendChild(chip);
-  }
+  // The altar diagram IS the instruction — there is no craft button anywhere,
+  // because armor is only ever made by building this shape in the world. A live
+  // "do you carry enough" readout sits under it so the player can tell at a
+  // glance whether they can start building.
+  const build = document.createElement('div');
+  build.className = 'craft-build';
+  const shape = document.createElement('canvas');
+  shape.className = 'craft-shape';
+  drawAltarPreview(shape, r.base, r.core);
+  const where = document.createElement('div');
+  where.className = 'craft-where';
+  const haveBase = countInInventory(r.base), haveCore = countInInventory(r.core);
+  const needBase = r.mats[r.base], needCore = r.mats[r.core];
+  where.innerHTML =
+    'Build in the <b>' + escapeHtml(r.forge.dim) + '</b> Dimension<br>' +
+    '<span class="' + (haveBase >= needBase ? 'cm-ok' : 'cm-short') + '">' +
+      escapeHtml(blockNames[r.base] || 'Block') + ' ' + Math.min(haveBase, needBase) + '/' + needBase + '</span>' +
+    ' · ' +
+    '<span class="' + (haveCore >= needCore ? 'cm-ok' : 'cm-short') + '">' +
+      escapeHtml(blockNames[r.core] || 'Block') + ' ' + Math.min(haveCore, needCore) + '/' + needCore + ' (core)</span>';
+  build.appendChild(shape); build.appendChild(where);
 
-  info.appendChild(name); info.appendChild(eff); info.appendChild(mats);
+  info.appendChild(name); info.appendChild(eff); info.appendChild(build);
 
-  // Action button. Owned armor gets a real equip/unequip toggle instead of a
-  // dead "✓ Crafted" label — crafting it is permanent, but wearing it is a
-  // choice you can change any time (affects both the visual and whether that
-  // dimension's hazards can hurt you, see isHazardProtected()).
-  const btn = document.createElement('button');
-  btn.className = 'craft-btn';
+  card.appendChild(ico); card.appendChild(info);
+
+  // The ONLY button left: wearing what you already built. Crafting it is
+  // permanent, but wearing it is a choice you can change any time (affects both
+  // the visual and whether that dimension's hazards can hurt you, see
+  // isHazardProtected()).
   if (owned && r.type === 'armor') {
+    const btn = document.createElement('button');
+    btn.className = 'craft-btn';
     const equipped = equippedArmor.has(r.dim);
     btn.classList.add(equipped ? 'equipped' : 'stowed');
     btn.textContent = equipped ? '🛡️ Equipped (click to remove)' : '👕 Stowed (click to wear)';
     btn.onclick = () => toggleArmorEquip(r.dim);
-  } else if (owned) {
-    btn.classList.add('done');
-    btn.textContent = '✓ Crafted';
-    btn.disabled = true;
-  } else if (r.forge) {
-    btn.classList.add('locked');
-    btn.textContent = '🔒 Only at the ' + r.forge.name + ' (' + r.forge.dim + ' Dimension)';
-    btn.disabled = true;
-  } else if (affordable) {
-    btn.textContent = '🔨 Craft';
-    btn.onclick = () => craftItem(r.id);
-  } else {
-    btn.classList.add('locked');
-    btn.textContent = 'Need materials';
-    btn.disabled = true;
+    card.appendChild(btn);
   }
-
-  card.appendChild(ico); card.appendChild(info); card.appendChild(btn);
   return card;
 }
 
