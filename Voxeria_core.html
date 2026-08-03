@@ -622,6 +622,7 @@
     .mb-inv-row select { flex: 1; }
     .mb-inv-row input[type="number"] { width: 70px; flex: none; }
     .mb-btn-ghost {
+      display: inline-flex; align-items: center;
       background: rgba(232,84,220,0.12); color: #e78bf5; border: 1px solid rgba(232,84,220,0.4);
       padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12.5px; font-weight: 700; white-space: nowrap;
       transition: background 0.2s, border-color 0.2s;
@@ -638,6 +639,7 @@
     }
     .mb-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
     .mb-btn-primary {
+      display: inline-flex; align-items: center; justify-content: center;
       background: linear-gradient(135deg, #e854dc, #a855f7); color: #fff; border: none;
       padding: 10px 20px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 800;
       box-shadow: 0 4px 14px rgba(168,85,247,0.4); transition: transform 0.2s, box-shadow 0.2s;
@@ -648,7 +650,7 @@
       background: rgba(0,0,0,0.25); border: 1px solid rgba(232,84,220,0.2); border-radius: 12px;
       padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
     }
-    .mb-out-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.4px; }
+    .mb-out-label { display: flex; align-items: center; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.4px; }
     .mb-code-box {
       font-family: var(--font-mono); font-size: 11.5px; word-break: break-all; background: rgba(0,0,0,0.4);
       border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; color: #e0e0e0; max-height: 90px; overflow-y: auto;
@@ -656,6 +658,7 @@
     .mb-link-box { color: #7fc4ff; }
     .mb-tags { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
     .mb-tag {
+      display: inline-flex; align-items: center;
       border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.6);
       border-radius: 999px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer;
       transition: all 0.18s ease; font-family: inherit;
@@ -1533,7 +1536,7 @@
         <h2><canvas class="vx-icon vx-icon-settings" data-icon="puzzle"></canvas> Create &amp; Publish a Mod</h2>
         <div id="mod-builder-subtitle">Build a shareable mod code with a custom world, perks &amp; starting gear. Play it via the code or a direct-play link, right from the game, no website needed.</div>
 
-        <h2 class="mc-section-heading">📝 Basic Info</h2>
+        <h2 class="mc-section-heading"><canvas class="vx-icon vx-icon-sd" data-icon="note"></canvas>Basic Info</h2>
         <div class="mb-field">
           <label class="mb-label">Mod name</label>
           <input type="text" id="mb-name" class="mb-input" maxlength="30" placeholder="e.g. Desert Survivor">
@@ -1566,7 +1569,7 @@
           <input type="text" id="mb-seed" class="mb-input" maxlength="60" placeholder="e.g. 1234567">
         </div>
 
-        <h2 class="mc-section-heading">🌍 World Settings</h2>
+        <h2 class="mc-section-heading"><canvas class="vx-icon vx-icon-sd" data-icon="terrain"></canvas>World Settings</h2>
         <div class="mb-field">
           <label class="mb-label">Terrain height (hilliness)</label>
           <div class="mb-slider-row">
@@ -1579,38 +1582,38 @@
             <label class="mb-label">Forced biome</label>
             <select id="mb-biome" class="mb-input">
               <option value="">Mixed (normal)</option>
-              <option value="FOREST">🌳 Forest</option>
-              <option value="DESERT">🏜️ Desert</option>
-              <option value="JUNGLE">🌴 Jungle</option>
-              <option value="SNOW">❄️ Snow</option>
-              <option value="VOLCANO">🌋 Volcano</option>
-              <option value="MYSTIC">🔮 Mystic</option>
+              <option value="FOREST">Forest</option>
+              <option value="DESERT">Desert</option>
+              <option value="JUNGLE">Jungle</option>
+              <option value="SNOW">Snow</option>
+              <option value="VOLCANO">Volcano</option>
+              <option value="MYSTIC">Mystic</option>
             </select>
           </div>
           <div class="mb-field">
             <label class="mb-label">Weather</label>
             <select id="mb-weather" class="mb-input">
               <option value="">Normal (changes naturally)</option>
-              <option value="clear">☀️ Always clear</option>
-              <option value="rain">🌧️ Always rain</option>
-              <option value="storm">⛈️ Always storm</option>
-              <option value="snow">❄️ Always snow</option>
+              <option value="clear">Always clear</option>
+              <option value="rain">Always rain</option>
+              <option value="storm">Always storm</option>
+              <option value="snow">Always snow</option>
             </select>
           </div>
         </div>
 
-        <h2 class="mc-section-heading">⚡ Starting Perks</h2>
+        <h2 class="mc-section-heading"><canvas class="vx-icon vx-icon-sd" data-icon="bolt"></canvas>Starting Perks</h2>
         <div class="mb-checks">
-          <label class="mb-check"><input type="checkbox" id="mb-p-speed"> 🏃 Speed Boost (+30% speed)</label>
-          <label class="mb-check"><input type="checkbox" id="mb-p-reach"> 📏 Extra Reach (+2)</label>
-          <label class="mb-check"><input type="checkbox" id="mb-p-digspeed"> ⛏️ Double Mining Yield</label>
-          <label class="mb-check"><input type="checkbox" id="mb-p-doublejump"> 🚀 Double Jump</label>
-          <label class="mb-check"><input type="checkbox" id="mb-p-pickaxe"> 💎 Iron Pickaxe (3x3 mining)</label>
-          <label class="mb-check"><input type="checkbox" id="mb-p-megajump"> 🦘 Mega Jump (+50% jump height)</label>
-          <label class="mb-check"><input type="checkbox" id="mb-p-hazardimmune"> 🛡️ Hazard Immunity</label>
+          <label class="mb-check"><input type="checkbox" id="mb-p-speed"><canvas class="vx-icon vx-icon-sd" data-icon="speedlines"></canvas> Speed Boost (+30% speed)</label>
+          <label class="mb-check"><input type="checkbox" id="mb-p-reach"><canvas class="vx-icon vx-icon-sd" data-icon="ruler"></canvas> Extra Reach (+2)</label>
+          <label class="mb-check"><input type="checkbox" id="mb-p-digspeed"><canvas class="vx-icon vx-icon-sd" data-icon="pickaxe"></canvas> Double Mining Yield</label>
+          <label class="mb-check"><input type="checkbox" id="mb-p-doublejump"><canvas class="vx-icon vx-icon-sd" data-icon="rocket"></canvas> Double Jump</label>
+          <label class="mb-check"><input type="checkbox" id="mb-p-pickaxe"><canvas class="vx-icon vx-icon-sd" data-icon="diamond"></canvas> Iron Pickaxe (3x3 mining)</label>
+          <label class="mb-check"><input type="checkbox" id="mb-p-megajump"><canvas class="vx-icon vx-icon-sd" data-icon="jumpup"></canvas> Mega Jump (+50% jump height)</label>
+          <label class="mb-check"><input type="checkbox" id="mb-p-hazardimmune"><canvas class="vx-icon vx-icon-sd" data-icon="shield"></canvas> Hazard Immunity</label>
         </div>
 
-        <h2 class="mc-section-heading">🎒 Starting Inventory (max. 8)</h2>
+        <h2 class="mc-section-heading"><canvas class="vx-icon vx-icon-sd" data-icon="bag"></canvas>Starting Inventory (max. 8)</h2>
         <div class="mb-inv-row">
           <select id="mb-inv-block" class="mb-input"></select>
           <input type="number" id="mb-inv-count" class="mb-input" min="1" max="99" value="10">
@@ -1625,25 +1628,25 @@
         <div class="mb-result-card" id="mb-result-card" style="display:none;">
           <label class="mb-out-label">Your mod code</label>
           <div class="mb-code-box" id="mb-code-output">—</div>
-          <label class="mb-out-label">🔗 Direct-play link</label>
+          <label class="mb-out-label"><canvas class="vx-icon vx-icon-sd" data-icon="link"></canvas>Direct-play link</label>
           <div class="mb-code-box mb-link-box" id="mb-link-output">—</div>
           <div class="mb-actions">
-            <button type="button" class="mb-btn-ghost" id="mb-copy-code-btn">📋 Copy code</button>
-            <button type="button" class="mb-btn-primary" id="mb-copy-link-btn">🔗 Copy direct-play link</button>
+            <button type="button" class="mb-btn-ghost" id="mb-copy-code-btn"><canvas class="vx-icon vx-icon-sd" data-icon="copy"></canvas>Copy code</button>
+            <button type="button" class="mb-btn-primary" id="mb-copy-link-btn"><canvas class="vx-icon vx-icon-sd" data-icon="link"></canvas>Copy direct-play link</button>
           </div>
           <div class="shop-subtitle">Paste the code into the Seed field, or share the link. One click and it plays.</div>
         </div>
 
-        <h2 class="mc-section-heading">📤 Publish</h2>
+        <h2 class="mc-section-heading"><canvas class="vx-icon vx-icon-sd" data-icon="upload"></canvas>Publish</h2>
         <div class="shop-subtitle">Share it in the community gallery so other players can find &amp; play it. Pick at least one tag</div>
         <div class="mb-tags" id="mb-tags">
-          <button type="button" class="mb-tag" data-tag="hardcore">💀 Hardcore</button>
-          <button type="button" class="mb-tag" data-tag="speedrun">⏱️ Speedrun</button>
-          <button type="button" class="mb-tag" data-tag="fun">🎈 Fun / Sandbox</button>
-          <button type="button" class="mb-tag" data-tag="explore">🧭 Explore</button>
+          <button type="button" class="mb-tag" data-tag="hardcore"><canvas class="vx-icon vx-icon-sd" data-icon="skull"></canvas>Hardcore</button>
+          <button type="button" class="mb-tag" data-tag="speedrun"><canvas class="vx-icon vx-icon-sd" data-icon="stopwatch"></canvas>Speedrun</button>
+          <button type="button" class="mb-tag" data-tag="fun"><canvas class="vx-icon vx-icon-sd" data-icon="star"></canvas>Fun / Sandbox</button>
+          <button type="button" class="mb-tag" data-tag="explore"><canvas class="vx-icon vx-icon-sd" data-icon="compass"></canvas>Explore</button>
         </div>
         <div class="mb-actions">
-          <button type="button" class="mb-btn-primary" id="mb-publish-btn" disabled>📤 Publish mod</button>
+          <button type="button" class="mb-btn-primary" id="mb-publish-btn" disabled><canvas class="vx-icon vx-icon-sd" data-icon="upload"></canvas>Publish mod</button>
         </div>
 
         <button id="close-mod-builder" onclick="toggleModBuilder()">Close</button>
@@ -5721,8 +5724,15 @@ async function mbPublish() {
   }
   const btn = document.getElementById('mb-publish-btn');
   btn.disabled = true;
-  const oldText = btn.innerHTML;
-  btn.innerHTML = 'Publishing…';
+  // btn.innerHTML = '...' would rebuild the icon canvas from an HTML string,
+  // which draws nothing (the one-time _initVxIcons() pass that draws every
+  // icon already ran at load) — same class of bug as the chat-unlock button
+  // and the defense badge earlier. Detach the real icon node, swap only the
+  // text, then reattach it exactly as it was regardless of outcome.
+  const btnIcon = btn.querySelector('canvas.vx-icon');
+  btn.innerHTML = '';
+  if (btnIcon) btn.appendChild(btnIcon);
+  btn.appendChild(document.createTextNode('Publishing…'));
   try {
     const docId = (userId || 'anon') + '_' + Date.now();
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'voxeria_mods', docId), {
@@ -5744,7 +5754,9 @@ async function mbPublish() {
     showNotification('❌ Publishing failed.');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = oldText;
+    btn.innerHTML = '';
+    if (btnIcon) btn.appendChild(btnIcon);
+    btn.appendChild(document.createTextNode('Publish mod'));
   }
 }
 
@@ -11858,11 +11870,202 @@ function drawIconGamepad(cv) {
   c.beginPath(); c.arc(10, 9, 1, 0, Math.PI * 2); c.fill();
 }
 
+// ── Second batch: Mod Builder ("Create & Publish a Mod") section headers,
+// perk checkboxes, publish tags and copy/link buttons. Same restrained flat
+// style as the first batch above — this panel had the highest concentration
+// of leftover emoji in the game (five section headers, seven perks, four
+// tags, three action buttons), so it gets the same treatment as everywhere
+// else instead of being the one corner that still looks borrowed.
+function drawIconNote(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.fillRect(2, 1.5, 10, 13);
+  c.fillStyle = 'rgba(15,14,25,0.6)';
+  c.fillRect(4, 4.5, 6, 1.2); c.fillRect(4, 7, 6, 1.2); c.fillRect(4, 9.5, 4, 1.2);
+}
+function drawIconTerrain(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath(); c.moveTo(1, 13); c.lineTo(6, 4); c.lineTo(9, 8.5); c.lineTo(11, 6); c.lineTo(15, 13); c.closePath(); c.fill();
+  c.fillStyle = '#e8e8f0'; c.globalAlpha = 0.5;
+  c.beginPath(); c.moveTo(6, 4); c.lineTo(7.6, 6.4); c.lineTo(6.7, 6.7); c.lineTo(8.3, 8.7); c.lineTo(4.3, 8.7); c.closePath(); c.fill();
+  c.globalAlpha = 1;
+}
+function drawIconBolt(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#ffd166';
+  c.beginPath();
+  c.moveTo(9, 1); c.lineTo(3, 9.5); c.lineTo(7, 9.5); c.lineTo(6, 15); c.lineTo(13, 6); c.lineTo(9, 6);
+  c.closePath(); c.fill();
+}
+function drawIconBag(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.fillRect(2, 5.5, 12, 9);
+  c.strokeStyle = VX_ICON_LINE; c.lineWidth = 1.4;
+  c.beginPath(); c.arc(8, 5, 3, Math.PI, 0); c.stroke();
+  c.fillStyle = 'rgba(15,14,25,0.55)'; c.fillRect(7, 9, 2, 2);
+}
+function drawIconUpload(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath(); c.moveTo(8, 1.5); c.lineTo(12.5, 7); c.lineTo(9.5, 7); c.lineTo(9.5, 11); c.lineTo(6.5, 11); c.lineTo(6.5, 7); c.lineTo(3.5, 7); c.closePath(); c.fill();
+  c.fillRect(3, 13, 10, 1.8);
+}
+function drawIconSkull(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  // One silhouette (dome tapering into a narrower jaw) instead of a dome on
+  // top of a flat-bottomed rectangle — the flat bottom used to read as a
+  // rounded archway/ghost rather than a skull.
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath();
+  c.arc(8, 6, 5.3, Math.PI, 0);
+  c.lineTo(11, 10.5); c.quadraticCurveTo(11, 12.3, 8, 12.3); c.quadraticCurveTo(5, 12.3, 5, 10.5);
+  c.closePath(); c.fill();
+  c.fillStyle = 'rgba(15,14,25,0.85)';
+  c.beginPath(); c.arc(5.7, 6.6, 1.6, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.arc(10.3, 6.6, 1.6, 0, Math.PI * 2); c.fill();
+  // Teeth: a dark jaw band with three light notches cut into it reads much
+  // clearer at 16px than trying to draw individual teeth rectangles.
+  c.fillRect(5.6, 10, 4.8, 1.8);
+  c.fillStyle = VX_ICON_LINE;
+  c.fillRect(7, 10, 0.7, 1.8); c.fillRect(8.3, 10, 0.7, 1.8);
+}
+function drawIconStopwatch(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.fillRect(6, 0.5, 4, 1.6);
+  c.strokeStyle = VX_ICON_LINE; c.lineWidth = 1.5;
+  c.beginPath(); c.arc(8, 9, 5.5, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.moveTo(8, 9); c.lineTo(8, 5.2); c.stroke();
+  c.beginPath(); c.moveTo(8, 9); c.lineTo(10.6, 10.4); c.stroke();
+}
+function drawIconStar(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#ffd166';
+  c.save(); c.translate(8, 8);
+  c.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a1 = -Math.PI / 2 + i * (Math.PI * 2 / 5), a2 = a1 + Math.PI / 5;
+    c.lineTo(Math.cos(a1) * 6.5, Math.sin(a1) * 6.5);
+    c.lineTo(Math.cos(a2) * 2.8, Math.sin(a2) * 2.8);
+  }
+  c.closePath(); c.fill(); c.restore();
+}
+function drawIconCompass(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.strokeStyle = VX_ICON_LINE; c.lineWidth = 1.4;
+  c.beginPath(); c.arc(8, 8, 6, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = '#ff6b6b';
+  c.beginPath(); c.moveTo(8, 3.5); c.lineTo(9.6, 8); c.lineTo(8, 7); c.closePath(); c.fill();
+  c.fillStyle = VX_ICON_DIM;
+  c.beginPath(); c.moveTo(8, 12.5); c.lineTo(6.4, 8); c.lineTo(8, 9); c.closePath(); c.fill();
+}
+function drawIconLink(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  // Two diagonal capsules overlapping in the middle — the classic "chain
+  // link" glyph shape. An earlier version built from arcs+lines read as a
+  // resize/diagonal-arrow icon instead; explicit capsule outlines are
+  // unambiguous even at 16px.
+  const capsule = (cx, cy) => {
+    c.save(); c.translate(cx, cy); c.rotate(-Math.PI / 4);
+    c.beginPath();
+    if (c.roundRect) c.roundRect(-4.4, -2.1, 8.8, 4.2, 2.1); else c.rect(-4.4, -2.1, 8.8, 4.2);
+    c.stroke();
+    c.restore();
+  };
+  c.strokeStyle = VX_ICON_LINE; c.lineWidth = 1.8;
+  capsule(5.4, 10.6);
+  capsule(10.6, 5.4);
+}
+function drawIconCopy(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_DIM;
+  c.fillRect(2.5, 2.5, 8.5, 9.5);
+  c.fillStyle = VX_ICON_LINE;
+  c.fillRect(5, 4.5, 8.5, 9.5);
+  c.strokeStyle = 'rgba(15,14,25,0.5)'; c.lineWidth = 1;
+  c.strokeRect(5, 4.5, 8.5, 9.5);
+}
+function drawIconRuler(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.save(); c.translate(8, 8); c.rotate(-Math.PI / 4);
+  c.fillStyle = VX_ICON_LINE; c.fillRect(-7, -2.5, 14, 5);
+  c.fillStyle = 'rgba(15,14,25,0.6)';
+  for (let x = -5; x <= 5; x += 2.5) c.fillRect(x, -2.5, 1, 2.2);
+  c.restore();
+}
+function drawIconPickaxe(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.strokeStyle = '#c98a4b'; c.lineWidth = 2; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(6, 6); c.lineTo(12.5, 13.5); c.stroke();
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath(); c.moveTo(1.5, 6.5); c.quadraticCurveTo(6, 0.5, 12.5, 3); c.quadraticCurveTo(7, 5.5, 4, 9.5); c.closePath(); c.fill();
+}
+function drawIconRocket(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath(); c.moveTo(8, 0.5); c.quadraticCurveTo(12, 4, 10.5, 10); c.lineTo(5.5, 10); c.quadraticCurveTo(4, 4, 8, 0.5); c.closePath(); c.fill();
+  c.fillStyle = '#7fc9ff'; c.beginPath(); c.arc(8, 5.5, 1.6, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#ff6b6b';
+  c.beginPath(); c.moveTo(5.5, 8.5); c.lineTo(2.5, 12); c.lineTo(5.5, 11); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(10.5, 8.5); c.lineTo(13.5, 12); c.lineTo(10.5, 11); c.closePath(); c.fill();
+  c.fillStyle = '#ffa64b';
+  c.beginPath(); c.moveTo(6.3, 10); c.lineTo(8, 14.5); c.lineTo(9.7, 10); c.closePath(); c.fill();
+}
+function drawIconDiamond(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#7fe0ff';
+  c.beginPath(); c.moveTo(8, 1.5); c.lineTo(14, 6.5); c.lineTo(8, 14.5); c.lineTo(2, 6.5); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.55)';
+  c.beginPath(); c.moveTo(8, 1.5); c.lineTo(11, 6.5); c.lineTo(8, 6.5); c.closePath(); c.fill();
+}
+function drawIconJumpUp(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath(); c.moveTo(8, 1); c.lineTo(13, 7); c.lineTo(9.5, 7); c.lineTo(9.5, 10.5); c.lineTo(6.5, 10.5); c.lineTo(6.5, 7); c.lineTo(3, 7); c.closePath(); c.fill();
+  c.globalAlpha = 0.45;
+  c.beginPath(); c.moveTo(8, 9); c.lineTo(11.5, 13); c.lineTo(4.5, 13); c.closePath(); c.fill();
+  c.globalAlpha = 1;
+}
+function drawIconSpeedLines(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  // Diagonal, staggered, right-anchored — deliberately NOT horizontal bars,
+  // which would read as a second "menu" hamburger icon instead of motion.
+  c.strokeStyle = VX_ICON_LINE; c.lineWidth = 2; c.lineCap = 'round';
+  const starts = [[14, 3], [14.5, 8], [13, 13]];
+  const dx = [7, 10, 6];
+  for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(starts[i][0], starts[i][1]); c.lineTo(starts[i][0] - dx[i], starts[i][1] + dx[i] * 0.35); c.stroke(); }
+}
+
 const VX_ICONS = {
   menu: drawIconMenu, book: drawIconBook, shield: drawIconShield,
   puzzle: drawIconPuzzle, palette: drawIconPalette, globe: drawIconGlobe,
   chat: drawIconChat, gear: drawIconGear, clover: drawIconClover,
-  speaker: drawIconSpeaker, picture: drawIconPicture, gamepad: drawIconGamepad
+  speaker: drawIconSpeaker, picture: drawIconPicture, gamepad: drawIconGamepad,
+  note: drawIconNote, terrain: drawIconTerrain, bolt: drawIconBolt,
+  bag: drawIconBag, upload: drawIconUpload, skull: drawIconSkull,
+  stopwatch: drawIconStopwatch, star: drawIconStar, compass: drawIconCompass,
+  link: drawIconLink, copy: drawIconCopy, ruler: drawIconRuler,
+  pickaxe: drawIconPickaxe, rocket: drawIconRocket, diamond: drawIconDiamond,
+  jumpup: drawIconJumpUp, speedlines: drawIconSpeedLines
 };
 // Runs once at load — these are all static HTML buttons (unlike the Portal
 // Book's canvases, which redraw themselves every render), so a single pass
