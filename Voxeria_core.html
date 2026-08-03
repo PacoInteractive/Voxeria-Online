@@ -7454,11 +7454,19 @@ function drawSky() {
   }
   ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // Volcano: floating ash particles. (No sun disc here anymore — the real
-  // time-of-day sun/moon from drawDayNightOverlay() already renders on top
-  // of this since Volcano is a biome within OVERWORLD, not a separate
-  // dimension; this used to draw its own fixed orange sun as well, so two
-  // suns showed up simultaneously whenever standing in a Volcano biome.)
+  // The real time-of-day sun/moon, drawn once here — BEFORE drawWorld() runs
+  // and before the Volcano/Mystic branches below can early-return — so every
+  // Overworld biome gets it behind terrain and everything else, the same
+  // depth the clouds a bit further down already have. It used to be drawn
+  // by drawDayNightOverlay(), which ran dead last in the frame and painted
+  // over blocks/the player; moving it here is the actual fix for that,
+  // rather than just adding a second call some biomes could still skip.
+  drawCelestialBody();
+
+  // Volcano: floating ash particles. (Volcano used to draw its own separate
+  // fixed orange sun here too, on top of the real one above — two suns at
+  // once. That's gone; the real sun/moon from drawCelestialBody() above
+  // already covers every Overworld biome including this one.)
   if (biome==="VOLCANO") {
     for (let i = 0; i < 30; i++) {
       const ax = ((i * 131 + drawCamX * 0.04 + frameCount * (0.3 + i%3 * 0.1)) % 1400 + 1400) % 1400 - 100;
@@ -7513,9 +7521,6 @@ function drawSky() {
       if (st.life <= 0 || st.x < -40 || st.x > canvas.width + 40) shootingStar = null;
     }
   }
-  // The old static "sun" circle that lived here regardless of time of day
-  // (and even at night) is gone — the real, time-correct sun/moon with its
-  // own glow is drawn once, on top of everything, by drawDayNightOverlay().
   // Clouds tint with the sky: white by day, warm pink/orange in the golden
   // hour, and a dim blue-grey silhouette at night.
   let cloudTint = _lerp3([255,255,255], [95,100,130], nightIEased);
@@ -9414,6 +9419,77 @@ function getCelestialBodyScreenPos() {
   return { x: arcX, y: bodyY, isDayHalf };
 }
 
+// The sun/moon disc itself. Called from drawSky() — BEFORE drawWorld() runs —
+// so the body sits behind terrain, players and everything else, the same
+// depth relationship the clouds already have (drawn a few lines below this
+// in drawSky() too). It used to be drawn from drawDayNightOverlay(), which
+// runs dead last in the frame and painted the sun/moon on top of the whole
+// world, including blocks in front of it — backwards for something that's
+// supposed to be the single most distant object in the scene.
+//
+// Both bodies use the same technique the clouds use for their puffs: a
+// radial gradient ACROSS the disc itself (not a flat fill) so it reads as a
+// lit sphere with real shading, not a flat coloured circle.
+function drawCelestialBody() {
+  if (currentDim !== "OVERWORLD" || !isSkyVisible()) return;
+  const { x: arcX, y: bodyY, isDayHalf } = getCelestialBodyScreenPos();
+
+  ctx.save();
+  if (isDayHalf) {
+    // Wide, soft outer halo beneath the usual glow+disc for a real radiant look
+    const farGlow = ctx.createRadialGradient(arcX, bodyY, 8, arcX, bodyY, 95);
+    farGlow.addColorStop(0, 'rgba(255,235,170,0.22)'); farGlow.addColorStop(1, 'rgba(255,235,170,0)');
+    ctx.fillStyle = farGlow; ctx.beginPath(); ctx.arc(arcX, bodyY, 95, 0, Math.PI*2); ctx.fill();
+    const glow = ctx.createRadialGradient(arcX, bodyY, 2, arcX, bodyY, 44);
+    glow.addColorStop(0, 'rgba(255,240,180,0.9)'); glow.addColorStop(1, 'rgba(255,240,180,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(arcX, bodyY, 44, 0, Math.PI*2); ctx.fill();
+
+    // Off-centre hot spot fading to a warmer rim (limb darkening — real suns
+    // dim and redden slightly toward the edge) instead of one flat colour.
+    const disc = ctx.createRadialGradient(arcX-5, bodyY-6, 1, arcX, bodyY, 22);
+    disc.addColorStop(0, '#ffffff'); disc.addColorStop(0.45, '#fff7d6');
+    disc.addColorStop(0.8, '#ffe9a8'); disc.addColorStop(1, '#ffcf6b');
+    ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(arcX, bodyY, 22, 0, Math.PI*2); ctx.fill();
+
+    // Gently breathing hot core
+    const pulse = 0.5 + Math.sin(frameCount*0.03)*0.5;
+    ctx.fillStyle = `rgba(255,255,225,${0.3*pulse})`;
+    ctx.beginPath(); ctx.arc(arcX, bodyY, 13, 0, Math.PI*2); ctx.fill();
+  } else {
+    const moonLit  = bloodMoonActive ? '#ff8a6e' : '#f6f6fc';
+    const moonBase = bloodMoonActive ? '#c62828' : '#c7c7d6';
+    const moonDark = bloodMoonActive ? '#7a0f0f' : '#93939f';
+    const glowColor = bloodMoonActive ? 'rgba(255,40,40,0.55)' : 'rgba(220,220,255,0.35)';
+    const glowR = bloodMoonActive ? 54 : 36;
+    const glow = ctx.createRadialGradient(arcX, bodyY, 2, arcX, bodyY, glowR);
+    glow.addColorStop(0, glowColor); glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(arcX, bodyY, glowR, 0, Math.PI*2); ctx.fill();
+
+    // Lit sphere: bright toward the upper-left (matches the rim-light arc
+    // below), fading toward a darker limb on the far side — real roundness
+    // instead of one flat tint plus two flat "crater" dots.
+    const disc = ctx.createRadialGradient(arcX-6, bodyY-6, 1, arcX, bodyY, 20);
+    disc.addColorStop(0, moonLit); disc.addColorStop(0.55, moonBase); disc.addColorStop(1, moonDark);
+    ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(arcX, bodyY, 20, 0, Math.PI*2); ctx.fill();
+
+    // Soft-edged craters — a small radial gradient each, fading to nothing at
+    // the rim, so they read as shallow dips in the surface instead of three
+    // flat dots pasted on top.
+    const craterCol = bloodMoonActive ? '90,0,0' : '110,110,130';
+    for (const [ox, oy, r] of [[-5,-3,5], [7,5,3.5], [1,9,2.2]]) {
+      const cg = ctx.createRadialGradient(arcX+ox, bodyY+oy, 0, arcX+ox, bodyY+oy, r);
+      cg.addColorStop(0, `rgba(${craterCol},0.4)`); cg.addColorStop(1, `rgba(${craterCol},0)`);
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(arcX+ox, bodyY+oy, r, 0, Math.PI*2); ctx.fill();
+    }
+    // Thin crescent rim-light so the lit edge reads as crisp as a real
+    // sunlit limb, on top of the softer gradient shading underneath.
+    ctx.strokeStyle = bloodMoonActive ? 'rgba(255,150,150,0.55)' : 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(arcX, bodyY, 19, -Math.PI*0.7, -Math.PI*0.05); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // Scans straight up from the player's head to the top of the world — if
 // anything solid is in the way, there's a ceiling/rock between the player
 // and the open sky, so the sun/moon (and their sky-tinted overlays) have no
@@ -9426,42 +9502,17 @@ function isSkyVisible() {
   return true;
 }
 
+// The actual sun/moon disc — drawn from drawSky() now (see there for why),
+// so this only handles the two things that are legitimately meant to sit on
+// TOP of the whole scene, blocks included: the golden-hour colour wash (real
+// atmospheric haze tints the ground and player too, not just the sky) and
+// the Blood Moon's pulsing red wash.
 function drawDayNightOverlay() {
   if (currentDim !== "OVERWORLD" || !isSkyVisible()) return;
   const intensity = getNightIntensity();
-  const { x: arcX, y: bodyY, isDayHalf } = getCelestialBodyScreenPos();
+  const { x: arcX, y: bodyY } = getCelestialBodyScreenPos();
 
   ctx.save();
-  if (isDayHalf) {
-    // Wide, soft outer halo beneath the usual glow+disc for a real radiant look
-    const farGlow = ctx.createRadialGradient(arcX, bodyY, 8, arcX, bodyY, 95);
-    farGlow.addColorStop(0, 'rgba(255,235,170,0.22)'); farGlow.addColorStop(1, 'rgba(255,235,170,0)');
-    ctx.fillStyle = farGlow; ctx.beginPath(); ctx.arc(arcX, bodyY, 95, 0, Math.PI*2); ctx.fill();
-    const glow = ctx.createRadialGradient(arcX, bodyY, 2, arcX, bodyY, 44);
-    glow.addColorStop(0, 'rgba(255,240,180,0.9)'); glow.addColorStop(1, 'rgba(255,240,180,0)');
-    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(arcX, bodyY, 44, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#fff4c2'; ctx.beginPath(); ctx.arc(arcX, bodyY, 22, 0, Math.PI*2); ctx.fill();
-    // Gently breathing hot core
-    const pulse = 0.5 + Math.sin(frameCount*0.03)*0.5;
-    ctx.fillStyle = `rgba(255,255,225,${0.3*pulse})`;
-    ctx.beginPath(); ctx.arc(arcX, bodyY, 13, 0, Math.PI*2); ctx.fill();
-  } else {
-    const moonColor = bloodMoonActive ? '#ff4444' : '#e8e8f0';
-    const glowColor = bloodMoonActive ? 'rgba(255,40,40,0.55)' : 'rgba(220,220,255,0.35)';
-    const glowR = bloodMoonActive ? 54 : 36;
-    const glow = ctx.createRadialGradient(arcX, bodyY, 2, arcX, bodyY, glowR);
-    glow.addColorStop(0, glowColor); glow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(arcX, bodyY, glowR, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = moonColor; ctx.beginPath(); ctx.arc(arcX, bodyY, 20, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = bloodMoonActive ? 'rgba(120,0,0,0.35)' : 'rgba(160,160,180,0.35)';
-    ctx.beginPath(); ctx.arc(arcX-5, bodyY-3, 5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(arcX+7, bodyY+5, 3.5, 0, Math.PI*2); ctx.fill();
-    // Thin crescent rim-light so the disc reads as a lit sphere, not a flat dot
-    ctx.strokeStyle = bloodMoonActive ? 'rgba(255,150,150,0.55)' : 'rgba(255,255,255,0.45)';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath(); ctx.arc(arcX, bodyY, 19, -Math.PI*0.7, -Math.PI*0.05); ctx.stroke();
-  }
-  ctx.restore();
 
   // Golden-hour sky wash: a real two-tone sunset (violet fading into warm
   // orange/pink near the horizon) instead of a single flat orange band —
