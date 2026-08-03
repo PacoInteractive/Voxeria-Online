@@ -524,12 +524,17 @@
       box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(232,84,220,0.15), 0 0 45px rgba(168,60,160,0.22);
     }
     #mod-creator-modal.open { display: flex; flex-direction: column; gap: 14px; }
-    #mod-creator-modal h2 {
+    /* Was scoped to #mod-creator-modal only — #mod-builder-modal's own h2s
+       (title + all 5 section headings) fell through to the unstyled browser
+       default (~24-32px) instead, which is also why their icons looked so
+       much smaller than the text next to them: the icon was sized for a
+       16-20px heading, not an unstyled ~24px one. */
+    #mod-creator-modal h2, #mod-builder-modal h2 {
       text-align: center; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 0.5px;
       background: linear-gradient(135deg, #e854dc, #a855f7);
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    #mod-creator-modal h2.mc-section-heading { font-size: 16px; margin-top: 4px; }
+    #mod-creator-modal h2.mc-section-heading, #mod-builder-modal h2.mc-section-heading { font-size: 16px; margin-top: 4px; }
     #mod-creator-subtitle { text-align: center; color: rgba(255,255,255,0.55); font-size: 12.5px; line-height: 1.5; margin: -6px 0 2px; }
     #close-mod-creator-top {
       position: absolute; top: 16px; right: 16px;
@@ -759,11 +764,17 @@
        Canvas draws at a fixed internal resolution (see each drawIcon* below);
        these classes only set the DISPLAYED size, scaled crisply via
        image-rendering:pixelated same as every other in-game icon canvas. */
-    canvas.vx-icon { image-rendering: pixelated; vertical-align: -5px; flex-shrink: 0; }
-    .vx-icon-menu { width: 17px; height: 17px; margin-right: 7px; vertical-align: -4px; }
-    .vx-icon-settings { width: 19px; height: 19px; vertical-align: middle; }
-    .vx-icon-sd { width: 13px; height: 13px; margin-right: 5px; vertical-align: -2px; }
-    .vx-icon-luck { width: 14px; height: 14px; margin-right: 3px; vertical-align: -2px; }
+    /* Sized up from the first pass: each glyph is drawn with margin inside its
+       own canvas (so it never touches the edge), which makes it read as
+       noticeably smaller than a text character of the same box size — a
+       plain letter's ink runs much closer to its own bounding box. Boxes
+       below run roughly 20-25% larger than the box-for-box match that looked
+       "correct" on paper, to compensate for that. */
+    canvas.vx-icon { image-rendering: pixelated; vertical-align: -6px; flex-shrink: 0; }
+    .vx-icon-menu { width: 21px; height: 21px; margin-right: 7px; vertical-align: -5px; }
+    .vx-icon-settings { width: 24px; height: 24px; vertical-align: middle; }
+    .vx-icon-sd { width: 17px; height: 17px; margin-right: 6px; vertical-align: -3px; }
+    .vx-icon-luck { width: 17px; height: 17px; margin-right: 3px; vertical-align: -3px; }
     /* Privacy & Terms / FPS Test used to be a tiny fixed-position footer
        pinned to the top-left corner — harmless on the old padded layout,
        but once #game-wrapper went edge-to-edge for the fullscreen canvas
