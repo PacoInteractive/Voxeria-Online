@@ -1735,7 +1735,7 @@
       color: var(--text-3); padding: 0 6px 4px;
     }
     #portal-book-btn, #voxeriahub-btn, #mod-creator-btn, #my-mod-btn,
-    #discord-btn, #unlock-chat-btn, #menu-minimap-btn, #menu-block-inv-btn,
+    #discord-btn, #menu-minimap-btn, #menu-block-inv-btn,
     #menu-inventory-btn, #mod-editor-btn {
       background: transparent; border: var(--px) solid transparent;
       color: var(--text-2); cursor: pointer;
@@ -1745,12 +1745,12 @@
       transition: none;
     }
     #portal-book-btn:hover, #voxeriahub-btn:hover, #mod-creator-btn:hover, #my-mod-btn:hover,
-    #discord-btn:hover, #unlock-chat-btn:hover, #menu-minimap-btn:hover, #menu-block-inv-btn:hover,
+    #discord-btn:hover, #menu-minimap-btn:hover, #menu-block-inv-btn:hover,
     #menu-inventory-btn:hover, #mod-editor-btn:hover {
       background: var(--surface-3); border-color: var(--accent); color: var(--text-1);
     }
     #portal-book-btn:active, #voxeriahub-btn:active, #mod-creator-btn:active, #my-mod-btn:active,
-    #discord-btn:active, #unlock-chat-btn:active, #menu-minimap-btn:active, #menu-block-inv-btn:active,
+    #discord-btn:active, #menu-minimap-btn:active, #menu-block-inv-btn:active,
     #menu-inventory-btn:active, #mod-editor-btn:active {
       box-shadow: var(--bevel-in);
     }
@@ -2107,7 +2107,7 @@
      win the cascade and silently undo this sizing (that's why buttons never
      actually matched despite this rule existing before). */
   #info-bar #portal-book-btn, #info-bar #voxeriahub-btn,
-  #info-bar #mod-creator-btn, #info-bar #my-mod-btn, #info-bar #unlock-chat-btn,
+  #info-bar #mod-creator-btn, #info-bar #my-mod-btn,
   #info-bar #seed-btn, #info-bar #discord-btn {
     padding: 6px 4px; font-size: 9px; line-height: 1.2; box-shadow: none;
     width: 112px; box-sizing: border-box; text-align: center; white-space: nowrap;
@@ -2192,14 +2192,14 @@
      is what makes the row scrollable in the first place. */
   #info-bar > * { flex: 0 0 auto; }
   #info-bar #portal-book-btn, #info-bar #voxeriahub-btn,
-  #info-bar #mod-creator-btn, #info-bar #my-mod-btn, #info-bar #unlock-chat-btn,
+  #info-bar #mod-creator-btn, #info-bar #my-mod-btn,
   #info-bar #seed-btn, #info-bar #discord-btn { width: auto; padding: 7px 10px; }
 
   /* Touch targets: 44px is the smallest a finger reliably hits. The buttons
      get taller rather than wider, because width is what the scroll row has
      plenty of and height is what the canvas wants back. */
   #info-bar #portal-book-btn, #info-bar #voxeriahub-btn,
-  #info-bar #mod-creator-btn, #info-bar #my-mod-btn, #info-bar #unlock-chat-btn,
+  #info-bar #mod-creator-btn, #info-bar #my-mod-btn,
   #info-bar #seed-btn, #info-bar #discord-btn,
   #vx-menu-btn { min-height: 38px; }
 
@@ -2859,14 +2859,6 @@
     .craft-btn.equipped:hover { background: rgba(255,90,90,0.12); color: #ffb3b3; border-color: rgba(255,90,90,0.35); }
     .craft-btn.stowed { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6); box-shadow: none; border: 1px solid rgba(255,255,255,0.15); }
     .craft-btn.stowed:hover { background: rgba(74,222,128,0.12); color: #a3ffce; border-color: rgba(74,222,128,0.35); }
-    #chat-wrap{position:absolute;bottom:14px;left:14px;z-index:300;width:300px;max-width:calc(100vw - 28px);display:none;flex-direction:column;pointer-events:none;}
-    #chat-wrap.open{display:flex;pointer-events:auto;}
-    /* A neutral white pulse instead of blue — still says "look here, chat is
-       locked", just without spending colour on chrome. */
-    #unlock-chat-btn.chat-locked{animation:chatBtnGlow 1.6s ease-in-out infinite;}
-    @keyframes chatBtnGlow{0%,100%{box-shadow:0 0 8px rgba(255,255,255,.25);border-color:var(--line-2);}50%{box-shadow:0 0 18px rgba(255,255,255,.55);border-color:rgba(255,255,255,.7);}}
-    #age-gate-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:600;background:var(--surface-1);backdrop-filter:blur(var(--hud-blur));border:1px solid var(--line-1);border-radius:var(--radius-lg);padding:24px;width:320px;max-width:90vw;text-align:center;box-shadow:var(--shadow-panel);}
-    #age-gate-modal.open{display:block;}
     /* Admin modals used a red-tinted border/heading throughout as a permanent
        "restricted" signal. Neutralised to match every other panel — genuine
        errors and destructive actions (login failure, ban/kick, close) still
@@ -2884,7 +2876,6 @@
     .admin-section{background:var(--surface-2);border-radius:var(--radius-md);padding:10px;max-height:160px;overflow-y:auto;}
     .admin-row{display:flex;align-items:center;gap:6px;padding:5px 2px;font-size:12px;border-bottom:1px solid var(--line-1);}
     .admin-uid{flex:1;color:var(--text-2);word-break:break-all;}
-    .admin-msg{flex:1;color:var(--text-2);word-break:break-word;}
     .admin-row button{background:var(--surface-3);border:1px solid var(--line-1);color:var(--text-1);border-radius:0;padding:3px 8px;font-size:11px;cursor:pointer;}
     .admin-row button.danger{background:rgba(255,87,87,.18);border-color:rgba(255,87,87,.5);color:#ff8080;}
     .admin-empty{color:var(--text-3);font-size:12px;padding:6px 2px;}
@@ -2896,31 +2887,6 @@
     #admin-logout-btn:hover{background:var(--surface-3);}
     #admin-close-btn{background:var(--surface-2);color:var(--text-1);border:1px solid var(--line-1);}
     #admin-close-btn:hover{background:rgba(255,80,90,0.18);color:#ff8f96;}
-    #age-gate-modal h3{margin-bottom:10px;color:var(--text-1);font-size:17px;}
-    #age-gate-modal p{color:var(--text-2);font-size:13px;margin-bottom:14px;line-height:1.4;font-family:var(--font-ui);}
-    #age-gate-input{width:100%;background:var(--surface-2);border:1px solid var(--line-1);color:var(--text-1);padding:8px;border-radius:var(--radius-sm);font-size:14px;text-align:center;margin-bottom:14px;outline:none;}
-    #age-gate-input:focus{border-color:var(--accent);}
-    #age-gate-btns{display:flex;gap:10px;}
-    #age-gate-btns button{flex:1;border:none;padding:9px;border-radius:var(--radius-sm);cursor:pointer;font-weight:700;font-size:13px;}
-    #age-gate-confirm{background:var(--accent);color:#fff;}
-    #age-gate-confirm:hover{background:var(--accent-hover);}
-    #age-gate-cancel{background:var(--surface-2);color:var(--text-2);}
-    #age-gate-cancel:hover{background:var(--surface-3);}
-    /* Chat message colours by SPEAKER (you / others / system / admin / rank
-       announcement) are kept — that's the text carrying meaning, the same
-       exception health hearts and craft-btn states already get. Only the
-       surrounding chrome (panel backgrounds, input, send button) goes neutral. */
-    #chat-messages{pointer-events:auto;background:var(--surface-1);backdrop-filter:blur(0px);border:1px solid var(--line-1);border-bottom:none;border-radius:var(--radius-md) var(--radius-md) 0 0;padding:10px 10px 8px;display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto;scrollbar-width:thin;}
-    .chat-msg{font-size:12px;line-height:1.4;word-break:break-word;animation:chatIn .18s ease;font-family:var(--font-ui);}
-    .chat-msg .chat-who{font-weight:800;margin-right:4px;}.chat-msg .chat-txt{color:rgba(255,255,255,.82);}
-    .chat-msg.me .chat-who{color:#ffd200;}.chat-msg.other .chat-who{color:#4facfe;}.chat-msg.sys{color:rgba(255,255,255,.32);font-style:italic;font-size:11px;}
-    .chat-msg.admin{background:rgba(255,87,87,.12);border-radius:0;padding:3px 6px;}.chat-msg.admin .chat-who{color:#ff5757;}.chat-msg.admin .chat-txt{color:#ffd6d6;font-weight:600;}
-    .chat-msg.rank-announce{background:rgba(255,217,122,.14);border-radius:0;padding:3px 6px;}.chat-msg.rank-announce .chat-who{color:#ffd97a;}.chat-msg.rank-announce .chat-txt{color:#fff1d6;font-weight:600;}
-    @keyframes chatIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
-    #chat-input-row{pointer-events:auto;display:flex;background:var(--surface-1);backdrop-filter:blur(0px);border:1px solid var(--line-1);border-radius:0 0 var(--radius-md) var(--radius-md);overflow:hidden;}
-    #chat-input{flex:1;background:transparent;border:none;color:var(--text-1);font-size:13px;padding:8px 10px;outline:none;font-family:var(--font-ui);}#chat-input::placeholder{color:rgba(255,255,255,.28);}
-    #chat-send{background:var(--surface-2);border:none;border-left:1px solid var(--line-1);color:var(--text-1);padding:8px 13px;cursor:pointer;font-size:13px;font-weight:700;}
-    #chat-send:hover{background:var(--surface-3);}
 </style>
 
 <div id="bg-decor" aria-hidden="true"></div>
@@ -2999,7 +2965,6 @@
         <div id="menu-inventory-btn" onclick="toggleGameMenu(false); toggleInventory(true)"><canvas class="vx-icon vx-icon-menu" data-icon="bag"></canvas>Inventory<span class="gm-key">E</span></div>
         <div id="menu-block-inv-btn" onclick="toggleGameMenu(false); toggleBlockInventory()"><canvas class="vx-icon vx-icon-menu" data-icon="book"></canvas>Block Guide<span class="gm-key">I</span></div>
         <div id="menu-minimap-btn" onclick="toggleGameMenu(false); toggleMinimap()"><canvas class="vx-icon vx-icon-menu" data-icon="compass"></canvas>Minimap<span class="gm-key">M</span></div>
-        <div id="unlock-chat-btn" class="chat-locked" onclick="toggleGameMenu(false); onChatBtnClick()"><canvas class="vx-icon vx-icon-menu" data-icon="shield"></canvas>Unlock Chat (13+)</div>
       </div>
 
       <div class="gm-section">
@@ -3055,17 +3020,6 @@
       }
     </style>
     <!-- ===== END TEMPORARILY DISABLED ===== -->
-    <!-- ===== CHAT SYSTEM TEMPORARILY DISABLED until explicit re-enable — added by Claude =====
-         Hides the "Unlock Chat" button and the chat window itself so chat can't
-         be opened at all. To re-enable, remove this entire <style> block. -->
-    <style id="temp-disabled-chat">
-      #unlock-chat-btn,
-      #chat-wrap {
-        display: none !important;
-        pointer-events: none !important;
-      }
-    </style>
-    <!-- ===== END CHAT SYSTEM TEMPORARILY DISABLED ===== -->
     <div id="mod-banner">🧩 Mod active</div>
 
     
@@ -3981,8 +3935,6 @@
     <div id="fps-counter">-- FPS</div>
   </div>
 </div>
-  <div id="chat-wrap"><div id="chat-messages"><div class="chat-msg sys"><span class="chat-txt">World Chat loading...</span></div></div><div id="chat-input-row"><input id="chat-input" maxlength="80" placeholder="Chat with all players..." autocomplete="off" /><button id="chat-send">&gt;</button></div></div>
-  <div id="age-gate-modal"><h3><canvas class="vx-icon vx-icon-settings" data-icon="shield"></canvas> Unlock World Chat</h3><p>Chatting with other players is only available for ages 13 and up. Please enter your age:</p><input type="number" id="age-gate-input" placeholder="Your age" min="0" max="120"><div id="age-gate-btns"><button id="age-gate-cancel" onclick="closeAgeGate()">Cancel</button><button id="age-gate-confirm" onclick="confirmAgeGate()">Confirm</button></div></div>
   <div id="admin-login-modal">
     <h3>🔒 Owner Access</h3>
     <p style="font-size:12px;color:rgba(255,255,255,.6);">Enter the admin serial number or load your key file.</p>
@@ -3997,19 +3949,9 @@
   </div>
   <div id="admin-panel-modal">
     <h3>🛠️ Admin Panel</h3>
-    <p style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;">Owner tools - moderate players and chat. Keep your key confidential.</p>
-    <div style="display:flex;gap:8px;margin-bottom:10px;">
-      <button id="admin-lock-chat-btn" onclick="adminToggleChatLock()" style="flex:1;background:rgba(79,172,254,.18);border:1px solid rgba(79,172,254,.4);color:#4facfe;border-radius:0;padding:7px;cursor:pointer;font-weight:700;font-size:12px;">🔒 Lock Chat</button>
-      <button onclick="adminClearChat()" style="flex:1;background:rgba(255,87,87,.18);border:1px solid rgba(255,87,87,.5);color:#ff8080;border-radius:0;padding:7px;cursor:pointer;font-weight:700;font-size:12px;">🧹 Clear Chat</button>
-    </div>
-    <div class="admin-manual-row" style="margin-bottom:6px;">
-      <input type="text" id="admin-broadcast-input" placeholder="Announcement to all players...">
-      <button onclick="adminSendBroadcast()" style="background:rgba(79,172,254,.18);border:1px solid rgba(79,172,254,.4);color:#4facfe;border-radius:0;padding:6px 10px;cursor:pointer;">📢 Send</button>
-    </div>
+    <p style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;">Owner tools - moderate players. Keep your key confidential.</p>
     <h4>Online Players <span id="admin-online-count" style="color:rgba(255,255,255,.4);"></span></h4>
     <div class="admin-section" id="admin-online-list"><div class="admin-empty">Loading...</div></div>
-    <h4>Recent Chat</h4>
-    <div class="admin-section" id="admin-chat-log"><div class="admin-empty">Loading...</div></div>
     <h4>Restricted Players <span id="admin-ban-count" style="color:rgba(255,255,255,.4);"></span></h4>
     <div class="admin-section" id="admin-ban-list"><div class="admin-empty">Loading...</div></div>
     <div class="admin-manual-row">
@@ -4318,11 +4260,11 @@
     background-image: var(--tex-surface3);
   }
   #seed-btn, #policy-close, .mb-btn-primary, #sell-all-btn, #voxeriahub-confirm, #new-world-confirm,
-  #age-gate-confirm, .vx-btn.primary, .craft-btn {
+  .vx-btn.primary, .craft-btn {
     background-image: var(--tex-accent); background-repeat: repeat; background-size: 64px 64px; image-rendering: pixelated;
   }
   #seed-btn:hover, #policy-close:hover, .mb-btn-primary:hover, #sell-all-btn:hover, #voxeriahub-confirm:hover, #new-world-confirm:hover,
-  #age-gate-confirm:hover, .vx-btn.primary:hover, .craft-btn:hover {
+  .vx-btn.primary:hover, .craft-btn:hover {
     background-image: var(--tex-accent-hover);
   }
 </style>

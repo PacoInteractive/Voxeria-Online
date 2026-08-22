@@ -38,5 +38,5 @@ window.toggleBlockInventory = toggleBlockInventory;
 window.applySeedFromUI=applySeedFromUI;
 
 // -- Start the game ---------------------------------------------------------
-initFirebase(); drawHealth(); drawHotbar(); checkChatUnlockStatus(); updateDefenseBadge(); VibrantVox.syncSelect(); requestAnimationFrame(gameLoop);
+initFirebase(); drawHealth(); drawHotbar(); updateDefenseBadge(); VibrantVox.syncSelect(); requestAnimationFrame(gameLoop);
 

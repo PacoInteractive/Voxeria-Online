@@ -11975,99 +11975,8 @@ function _drainHintQueue() {
   introHintTimer = setTimeout(dismissIntroHint, 10000);
 }
 
-function _escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-// =========================================================
-// CHAT AGE GATE (COPPA / Kinderschutz)
-// =========================================================
-// Keeps the button's own icon canvas (textContent='...' would silently wipe
-// it, since the canvas is a child node, not text) and only swaps the label.
-function _setChatBtnUnlocked(){var btn=document.getElementById('unlock-chat-btn');if(!btn)return;btn.classList.remove('chat-locked');var ic=btn.querySelector('canvas.vx-icon');btn.innerHTML='';if(ic)btn.appendChild(ic);btn.appendChild(document.createTextNode('Open Chat'));btn.onclick=toggleChatWrap;}
-function toggleChatWrap(){var wrap=document.getElementById('chat-wrap');if(wrap)wrap.classList.toggle('open');}
-function onChatBtnClick(){if(localStorage.getItem('voxeria_chat_unlocked')==='true'){toggleChatWrap();}else{openAgeGate();}}
-function checkChatUnlockStatus(){if(localStorage.getItem('voxeria_chat_unlocked')==='true')_setChatBtnUnlocked();}
-function openAgeGate(){var m=document.getElementById('age-gate-modal'),input=document.getElementById('age-gate-input');if(input)input.value='';if(m)m.classList.add('open');}
-function closeAgeGate(){var m=document.getElementById('age-gate-modal');if(m)m.classList.remove('open');}
-function confirmAgeGate(){var input=document.getElementById('age-gate-input'),age=input?parseInt(input.value,10):NaN;closeAgeGate();if(!isNaN(age)&&age>=13){localStorage.setItem('voxeria_chat_unlocked','true');_setChatBtnUnlocked();var wrap=document.getElementById('chat-wrap');if(wrap)wrap.classList.add('open');}else{showNotification('Sorry, chat is only available for ages 13 and up.');}}
 function openPolicyModal(){var m=document.getElementById('policy-modal');if(m)m.classList.add('open');}
 function closePolicyModal(){var m=document.getElementById('policy-modal');if(m)m.classList.remove('open');}
-
-// =========================================================
-// CHAT CONTENT FILTER (Jugendschutz / Kid-Safe Moderation)
-// =========================================================
-var _badWords = [
-  'fuck','fucking','fucker','motherfucker','shit','bullshit','bitch','asshole','ahole','bastard','cunt',
-  'dick','dickhead','pussy','whore','slut','fag','faggot','nigger','nigga','retard','retarded',
-  'rape','rapist','nazi','hitler','kys','pedo','pedophile','molest',
-  'arschloch','hurensohn','hure','fotze','wichser','wixer','schlampe','scheisse','scheiße','missgeburt',
-  'spast','spasti','behindert','volltrottel','vollidiot','penner','schwuchtel','bringdichum','umbringen'
-];
-var _contactPatterns = [
-  /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i,                       // E-Mail-Adressen
-  /\b(https?:\/\/|www\.)\S+/i,                                    // Links
-  /(\+?\d[\d\s\-().]{6,}\d)/,                                      // Telefonnummern
-  /\b(insta(gram)?|snap(chat)?|discord|whats?app|telegram|tiktok|skype|kik|signal)\b[\s:@.]*[\w._-]{2,}/i // Social-Media-Handles
-];
-var _leetMap = {'4':'a','@':'a','3':'e','1':'i','!':'i','0':'o','$':'s','5':'s','7':'t'};
-function _isWordChar(c){ return /[a-z0-9äöüß]/.test(c || ''); }
-function _normalizeChat(s){ return String(s).toLowerCase().split('').map(function(c){ return _leetMap[c] || c; }).join(''); }
-// Per-word regex instead of plain indexOf: each letter may repeat ("fuuuck")
-// and up to 2 separator chars (spaces, punctuation, zero-width unicode) may
-// sit between letters ("f u c k", "f.u.c.k"), which is how kids typically try
-// to sneak profanity past a naive substring filter. Built once at load time.
-function _buildBadWordRegex(word){
-  return new RegExp(word.toLowerCase().split('').map(function(ch, i, arr){
-    var part = ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '+';
-    return i < arr.length - 1 ? part + '[^a-z0-9äöüß]{0,2}' : part;
-  }).join(''), 'g');
-}
-var _badWordRegexes = _badWords.map(function(w){ return { word: w, re: _buildBadWordRegex(w) }; });
-function _maskProfanity(text){
-  var norm = _normalizeChat(text), out = text.split(''), flagged = false;
-  _badWordRegexes.forEach(function(entry){
-    var re = entry.re; re.lastIndex = 0;
-    var m;
-    while ((m = re.exec(norm))) {
-      var start = m.index, end = start + m[0].length;
-      var before = start > 0 ? norm[start - 1] : '';
-      var after = end < norm.length ? norm[end] : '';
-      if (!_isWordChar(before) && !_isWordChar(after)) {
-        for (var i = start; i < end; i++) out[i] = '*';
-        flagged = true;
-      }
-      re.lastIndex = end;
-    }
-  });
-  return { text: out.join(''), flagged: flagged };
-}
-function _containsContactInfo(text){ return _contactPatterns.some(function(re){ return re.test(text); }); }
-var _lastChatSendAt = 0;
-// Own-message flood guard: blocks repeating the same line and caps bursts
-// tighter than the base 1.2s-per-message cooldown alone would.
-var _ownMsgHistory = []; // {text, ts}
-function _checkOwnFlood(text){
-  var now = Date.now();
-  while (_ownMsgHistory.length && now - _ownMsgHistory[0].ts > 20000) _ownMsgHistory.shift();
-  var normText = text.trim().toLowerCase();
-  if (_ownMsgHistory.some(function(m){ return m.text === normText; })) {
-    return { ok: false, reason: "Please don't repeat the same message." };
-  }
-  var recentCount = _ownMsgHistory.filter(function(m){ return now - m.ts <= 15000; }).length;
-  if (recentCount >= 6) {
-    return { ok: false, reason: "You're sending messages too fast. Please slow down." };
-  }
-  _ownMsgHistory.push({ text: normText, ts: now });
-  return { ok: true };
-}
-function _filterOutgoingChat(text){
-  if (_containsContactInfo(text)) return { ok: false, reason: 'contact' };
-  var masked = _maskProfanity(text);
-  return { ok: true, text: masked.text, flagged: masked.flagged };
-}
-function _filterIncomingChat(text){
-  if (_containsContactInfo(text)) return '[message removed - contact info detected]';
-  return _maskProfanity(text).text;
-}
 
 // =========================================================
 // ADMIN PANEL (Besitzer-Werkzeuge: Bannen, Kicken, Chat moderieren)
@@ -12096,7 +12005,6 @@ function _startBanSync(){
 }
 
 var _clientBootTs = Date.now();
-var _chatLocked = false;
 var _controlSyncTimer = null;
 function _startControlSync(){
   if (_controlSyncTimer === 'done') return;
@@ -12106,9 +12014,7 @@ function _startControlSync(){
   onSnapshot(doc(db,'artifacts',appId,'public','data','voxeria_admin_control','state'), function(snap){
     var data = snap && snap.exists && snap.exists() ? snap.data() : (snap && snap.data ? snap.data() : null);
     if (!data) return;
-    _chatLocked = !!data.chatLocked;
     if (data.reloadAt && data.reloadAt > _clientBootTs) { location.reload(); return; }
-    if (_isAdmin) _updateAdminLockBtn();
   }, function(e){ console.warn('Control sync error:', e); });
 }
 
@@ -12141,42 +12047,16 @@ function openAdminPanel(){
   _startControlSync();
   _renderAdminOnlineList();
   _renderAdminBanList();
-  _renderAdminChatLog();
-  _updateAdminLockBtn();
 }
 function closeAdminPanel(){ var m = document.getElementById('admin-panel-modal'); if (m) m.classList.remove('open'); }
 function adminLogout(){ _isAdmin = false; sessionStorage.removeItem('voxeria_admin'); closeAdminPanel(); }
 function adminCloseAndReloadAll(){
   if (!confirm('This will reload the game for every connected player right now. Continue?')){ closeAdminPanel(); return; }
   if (typeof db !== 'undefined' && db){
-    setDoc(doc(db,'artifacts',appId,'public','data','voxeria_admin_control','state'), { reloadAt: Date.now(), chatLocked: _chatLocked }, { merge: true }).catch(function(e){ console.warn(e); });
+    setDoc(doc(db,'artifacts',appId,'public','data','voxeria_admin_control','state'), { reloadAt: Date.now() }, { merge: true }).catch(function(e){ console.warn(e); });
   }
   showNotification('Reloading the game for all players...');
   closeAdminPanel();
-}
-function _updateAdminLockBtn(){
-  var btn = document.getElementById('admin-lock-chat-btn');
-  if (!btn) return;
-  btn.textContent = _chatLocked ? '🔓 Unlock Chat' : '🔒 Lock Chat';
-}
-function adminToggleChatLock(){
-  if (!_isAdmin || typeof db === 'undefined' || !db) return;
-  var next = !_chatLocked;
-  setDoc(doc(db,'artifacts',appId,'public','data','voxeria_admin_control','state'), { chatLocked: next }, { merge: true }).then(function(){
-    _chatLocked = next;
-    _updateAdminLockBtn();
-    showNotification(next ? 'Chat locked for everyone.' : 'Chat unlocked.');
-  }).catch(function(e){ console.warn(e); });
-}
-function adminSendBroadcast(){
-  var input = document.getElementById('admin-broadcast-input');
-  if (!input) return;
-  var text = input.value.trim();
-  if (!text || typeof db === 'undefined' || !db) return;
-  input.value = '';
-  setDoc(doc(db,'artifacts',appId,'public','data','voxeria_chat',Date.now()+'_admin'), {
-    text: text, name: '📢 Admin', userId: 'admin-broadcast', ts: Date.now(), isAdmin: true
-  }).catch(function(e){ console.warn(e); });
 }
 
 function _adminRow(labelText, buttons){
@@ -12201,12 +12081,10 @@ function _renderAdminOnlineList(){
   if (header) header.textContent = '(' + uids.length + ')';
   if (!uids.length){ el.innerHTML = '<div class="admin-empty">No other players online.</div>'; return; }
   uids.forEach(function(uid){
-    var restriction = _bannedUids[uid];
+    var banned = !!_bannedUids[uid];
     var buttons = [{ text: 'Kick', onClick: function(){ adminKick(uid); } }];
-    if (restriction && restriction.type === 'ban') buttons.push({ text: 'Unban', onClick: function(){ adminUnban(uid); } });
+    if (banned) buttons.push({ text: 'Unban', onClick: function(){ adminUnban(uid); } });
     else buttons.push({ text: 'Ban', danger: true, onClick: function(){ adminBan(uid, uid); } });
-    if (restriction && restriction.type === 'mute') buttons.push({ text: 'Unmute', onClick: function(){ adminUnban(uid); } });
-    else buttons.push({ text: 'Mute', onClick: function(){ adminMute(uid, uid); } });
     el.appendChild(_adminRow(uid, buttons));
   });
 }
@@ -12221,33 +12099,8 @@ function _renderAdminBanList(){
   if (!uids.length){ el.innerHTML = '<div class="admin-empty">No restricted players.</div>'; return; }
   uids.forEach(function(uid){
     var b = _bannedUids[uid] || {};
-    var label = (b.name || uid) + (b.type === 'mute' ? ' (muted)' : ' (banned)');
-    el.appendChild(_adminRow(label, [{ text: 'Remove', onClick: function(){ adminUnban(uid); } }]));
+    el.appendChild(_adminRow((b.name || uid) + ' (banned)', [{ text: 'Remove', onClick: function(){ adminUnban(uid); } }]));
   });
-}
-
-function _renderAdminChatLog(){
-  var el = document.getElementById('admin-chat-log');
-  if (!el || typeof db === 'undefined' || !db) return;
-  el.innerHTML = '<div class="admin-empty">Loading...</div>';
-  getDocs(query(collection(db,'artifacts',appId,'public','data','voxeria_chat'), orderBy('ts','desc'), limitQuery(30))).then(function(snap){
-    el.innerHTML = '';
-    if (snap.empty){ el.innerHTML = '<div class="admin-empty">No messages yet.</div>'; return; }
-    snap.forEach(function(d){
-      var data = d.data(), uid = data.userId || '', name = data.name || '?';
-      var row = document.createElement('div'); row.className = 'admin-row';
-      var msg = document.createElement('span'); msg.className = 'admin-msg';
-      msg.textContent = name + ': ' + (data.text || '');
-      row.appendChild(msg);
-      var banBtn = document.createElement('button'); banBtn.className = 'danger'; banBtn.textContent = 'Ban';
-      banBtn.onclick = function(){ adminBan(uid, name); };
-      row.appendChild(banBtn);
-      var muteBtn = document.createElement('button'); muteBtn.textContent = 'Mute';
-      muteBtn.onclick = function(){ adminMute(uid, name); };
-      row.appendChild(muteBtn);
-      el.appendChild(row);
-    });
-  }).catch(function(e){ console.warn(e); el.innerHTML = '<div class="admin-empty">Could not load chat.</div>'; });
 }
 
 function adminBan(uid, name){
@@ -12259,15 +12112,6 @@ function adminBan(uid, name){
     showNotification('Player banned.');
     _renderAdminOnlineList(); _renderAdminBanList();
   }).catch(function(e){ console.warn(e); showNotification('Ban failed.'); });
-}
-function adminMute(uid, name){
-  if (!_isAdmin || !uid || typeof db === 'undefined' || !db) return;
-  setDoc(doc(db,'artifacts',appId,'public','data','voxeria_bans', uid), {
-    uid: uid, name: name || uid, type: 'mute', reason: 'muted by admin', bannedAt: Date.now()
-  }).then(function(){
-    showNotification('Player muted.');
-    _renderAdminOnlineList(); _renderAdminBanList();
-  }).catch(function(e){ console.warn(e); showNotification('Mute failed.'); });
 }
 function adminUnban(uid){
   if (!_isAdmin || !uid || typeof db === 'undefined' || !db) return;
@@ -12289,15 +12133,6 @@ function adminBanManual(){
   if (!uid) return;
   adminBan(uid, uid);
   input.value = '';
-}
-function adminClearChat(){
-  if (!_isAdmin || typeof db === 'undefined' || !db) return;
-  if (!confirm('Delete the last 100 chat messages for everyone?')) return;
-  getDocs(query(collection(db,'artifacts',appId,'public','data','voxeria_chat'), orderBy('ts','desc'), limitQuery(100))).then(function(snap){
-    var jobs = [];
-    snap.forEach(function(d){ jobs.push(deleteDoc(doc(db,'artifacts',appId,'public','data','voxeria_chat', d.id))); });
-    Promise.all(jobs).then(function(){ showNotification('Chat cleared.'); _renderAdminChatLog(); });
-  }).catch(function(e){ console.warn(e); });
 }
 
 window.addEventListener('DOMContentLoaded', function(){
@@ -12326,27 +12161,18 @@ window.addEventListener('DOMContentLoaded', function(){
 });
 
 (function(){
-  var CHAT_MAX=40,_chatName=null,_chatReady=false;
-  function _getChatName(){if(_chatName)return _chatName;var s=localStorage.getItem('voxeria_chat_name');if(s){_chatName=s;return s;}_chatName=(typeof userId!=='undefined'&&userId)?'Player'+userId.slice(-4).toUpperCase():'Guest'+Math.floor(Math.random()*9000+1000);localStorage.setItem('voxeria_chat_name',_chatName);return _chatName;}
-  function _addMsg(name,text,isMe,isSys,isAdminMsg,isRankMsg){var box=document.getElementById('chat-messages');if(!box)return;var div=document.createElement('div');div.className='chat-msg '+(isSys?'sys':isAdminMsg?'admin':isRankMsg?'rank-announce':isMe?'me':'other');div.innerHTML=isSys?'<span class="chat-txt">'+_escH(text)+'</span>':'<span class="chat-who">'+_escH(name)+':</span><span class="chat-txt">'+_escH(text)+'</span>';while(box.children.length>=CHAT_MAX)box.removeChild(box.firstChild);box.appendChild(div);box.scrollTop=box.scrollHeight;}
-  // Per-sender burst tracking for INCOMING messages: even if a tampered client
-  // bypasses its own send cooldown, every other player's client independently
-  // hides that uid's messages once it floods, so nobody's chat view gets spammed.
-  var _incomingBurst={},_burstWarned={};
-  function _initChat(){if(_chatReady)return;if(typeof db==='undefined'||!db){setTimeout(_initChat,2000);return;}_chatReady=true;var box=document.getElementById('chat-messages');if(box)box.innerHTML='';onSnapshot(query(collection(db,'artifacts',appId,'public','data','voxeria_chat'),orderBy('ts','asc'),limitQuery(40)),function(snap){if(!snap||snap.empty)return;snap.docChanges().forEach(function(change){if(change.type!=='added')return;var d=change.doc.data();if(_bannedUids[d.userId])return;var uid=d.userId||'?';if(!d.isAdmin&&!d.isRankAnnounce){var now=Date.now();var hist=_incomingBurst[uid]||(_incomingBurst[uid]=[]);while(hist.length&&now-hist[0]>8000)hist.shift();hist.push(now);if(hist.length>5){if(!_burstWarned[uid]){_burstWarned[uid]=true;_addMsg('',(d.name||'A player')+' is sending messages too fast. Further messages are hidden briefly.',false,true);}return;}_burstWarned[uid]=false;}var isMe=(typeof userId!=='undefined'&&d.userId===userId);_addMsg(d.name||'Player',d.isAdmin?d.text:_filterIncomingChat(d.text||''),isMe,false,!!d.isAdmin,!!d.isRankAnnounce);});},function(err){console.warn('Chat:',err);});}
-  // Feedback goes through showNotification (the always-visible toast), not
-  // _addMsg — the chat log it writes to is hidden while World Chat is
-  // disabled, so that would be silent. Backs the "/"-prefixed chat input
-  // (for whenever chat ships), exposed on window.
+  // Dev/QA console command, kept even with chat removed: type
+  // _runRankCommand('/testarmor all') in DevTools to preview crafted-armor
+  // visuals instantly without grinding materials. Used to be reachable by
+  // typing "/testarmor ..." into the chat input; that input is gone, so this
+  // is now the only way in, which is fine since it was never meant for
+  // players — admin-gated the same way the rest of the admin panel is, so it
+  // can't become a free hazard-immunity exploit (armor grants real
+  // isHazardProtected() protection, not just a look).
   function _runRankCommand(raw,uid){
     var parts=raw.slice(1).trim().split(/\s+/);
     var cmd=(parts.shift()||'').toLowerCase();
     var arg=parts.join(' ');
-    // Dev/test-only command to preview crafted-armor visuals instantly without
-    // grinding materials. Admin-gated (same _isAdmin check used elsewhere in
-    // the admin panel) so it can't be used by regular players as a free
-    // hazard-immunity exploit
-    // — armor grants real isHazardProtected() protection, not just a look.
     if(cmd==='testarmor'){
       if(!_isAdmin){openAdminLogin();return;}
       var dimArg=(arg||'').trim().toUpperCase();
@@ -12367,30 +12193,6 @@ window.addEventListener('DOMContentLoaded', function(){
     showNotification('❓ Unknown command: /'+cmd);
   }
   window._runRankCommand=_runRankCommand;
-  function _sendChat(){
-    var input=document.getElementById('chat-input');if(!input)return;
-    var text=input.value.trim();if(!text)return;
-    var uid=(typeof userId!=='undefined'&&userId)?userId:'anon';
-    if(_bannedUids[uid]){input.value='';_addMsg('','You have been banned from chat.',false,true);return;}
-    if(text.charAt(0)==='/'){input.value='';_runRankCommand(text,uid);return;}
-    if(_chatLocked && !_isAdmin){input.value='';_addMsg('','Chat is currently locked by an admin.',false,true);return;}
-    var now=Date.now();
-    if(now-_lastChatSendAt<1200){_addMsg('','Please slow down a little before sending another message.',false,true);return;}
-    var floodCheck=_checkOwnFlood(text);
-    if(!floodCheck.ok){_addMsg('',floodCheck.reason,false,true);return;}
-    var result=_filterOutgoingChat(text);
-    if(!result.ok){
-      input.value='';
-      _addMsg('','For your safety, links, phone numbers and contact details are not allowed in chat.',false,true);
-      return;
-    }
-    input.value='';
-    if(!_chatReady||typeof db==='undefined'||!db){_addMsg('','Not connected',false,true);return;}
-    _lastChatSendAt=now;
-    var name=_getChatName();
-    setDoc(doc(db,'artifacts',appId,'public','data','voxeria_chat',Date.now()+'_'+uid.slice(-6)),{text:result.text,name:name,userId:uid,ts:Date.now()}).catch(function(e){console.warn(e);});
-  }
-  window.addEventListener('DOMContentLoaded',function(){var inp=document.getElementById('chat-input'),btn=document.getElementById('chat-send');if(inp){inp.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter'){e.preventDefault();_sendChat();}if(e.key==='Escape')inp.blur();});inp.addEventListener('keyup',function(e){e.stopPropagation();});inp.addEventListener('keypress',function(e){e.stopPropagation();});}if(btn)btn.addEventListener('click',function(){_sendChat();inp&&inp.focus();});setTimeout(_initChat,1500);});
 })();
 
 (function(){
