@@ -705,12 +705,25 @@
       60% { transform: translateX(-3px); } 80% { transform: translateX(3px); }
     }
     .fx-deny { animation: fxDeny 0.32s ease; }
-    #policy-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:600;background:var(--surface-1);backdrop-filter:blur(var(--hud-blur));border:1px solid var(--line-2);border-radius:var(--radius-lg);padding:26px;width:520px;max-width:92vw;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-panel);}
+    #policy-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:600;background:var(--surface-1);backdrop-filter:blur(var(--hud-blur));border:1px solid var(--line-2);border-radius:var(--radius-lg);padding:26px;width:600px;max-width:92vw;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-panel);}
     #policy-modal.open{display:block;}
-    #policy-modal h3{color:var(--text-1);font-size:18px;margin-bottom:14px;}
-    #policy-modal h4{color:var(--text-1);font-size:14px;margin:16px 0 6px;}
+    #policy-modal .pm-head{margin-bottom:14px;}
+    #policy-modal .pm-eyebrow{color:var(--accent);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 4px;font-family:var(--font-ui);}
+    #policy-modal h3{color:var(--text-1);font-size:19px;margin:0 0 4px;}
+    #policy-modal .pm-updated{color:var(--text-3);font-size:11px;font-family:var(--font-mono);margin:0;}
+    /* Same recipe as #settings-popover .settings-divider, reused here so the
+       two legal-adjacent panels in the game read as one design language
+       instead of each inventing their own section-heading style. */
+    #policy-modal .pm-section-divider{
+      display:flex;align-items:center;gap:6px;color:var(--text-3);font-size:10.5px;font-weight:800;
+      text-transform:uppercase;letter-spacing:0.09em;margin:20px 0 6px;
+    }
+    #policy-modal .pm-section-divider::after{content:'';flex:1;height:1px;margin-left:2px;background:var(--line-1);}
+    #policy-modal h4{color:var(--text-1);font-size:13.5px;margin:14px 0 5px;}
     #policy-modal p{color:var(--text-2);font-size:13px;line-height:1.55;margin-bottom:8px;font-family:var(--font-ui);}
     #policy-modal strong{color:var(--text-1);}
+    #policy-modal a{color:var(--accent);}
+    #policy-modal a:hover{color:var(--accent-hover);}
     #policy-modal .pm-foot{color:var(--text-3);font-size:11px;margin-top:14px;letter-spacing:1px;text-align:right;}
     #policy-close{margin-top:16px;width:100%;border:none;background:var(--accent);color:#fff;padding:10px;border-radius:var(--radius-sm);cursor:pointer;font-weight:700;font-size:13px;}
     #policy-close:hover{background:var(--accent-hover);}
@@ -3964,14 +3977,53 @@
     </div>
   </div>
   <div id="policy-modal">
-    <h3>Privacy Policy and Terms of Use</h3>
-    <p>Welcome to Voxeria. The protection of your data and providing a safe gaming experience are our top priorities. Below you will find our guidelines regarding data processing.</p>
-    <h4>1. Data Privacy and Storage</h4>
-    <p>We respect your privacy and have designed the game to require as little data as possible:</p>
-    <p><strong>No Account Required:</strong> You do not need a user account to play Voxeria. In particular, no Google account or any other login is required.</p>
-    <p><strong>No Personal Data:</strong> We do not collect, store, or process any of your personal data (such as your real name, address, email, or phone number). We do not require any sensitive information.</p>
-    <p><strong>Temporary Data &amp; Local Storage:</strong> Certain game states or settings are stored strictly locally on your device.</p>
-    <p>These guidelines are in place to keep Voxeria safe, fair, and fun for all players. Enjoy the game!</p>
+    <div class="pm-head">
+      <p class="pm-eyebrow">Legal</p>
+      <h3>Privacy Policy &amp; Terms of Use</h3>
+      <p class="pm-updated">Effective 22 August 2026</p>
+    </div>
+    <p>Voxeria is built to need as little of your data as possible: there is no account, no login, and no real name, email address, or phone number anywhere in the game. This page explains exactly what that means in practice, and what you agree to by playing.</p>
+
+    <div class="pm-section-divider">Privacy Policy</div>
+
+    <h4>1. No Account, No Personal Details</h4>
+    <p>You never create an account or log in to play Voxeria. We never ask for your name, email address, phone number, or any other personal detail, and nothing you enter in-game (like a world name or seed) is checked against your real identity.</p>
+
+    <h4>2. Anonymous Play Identifier</h4>
+    <p>The first time you play, Firebase (operated by Google, the service we use for multiplayer and cloud saves) assigns your browser a random anonymous ID. It is not linked to your name or any personal information — we simply never collect any to link it to.</p>
+
+    <h4>3. Multiplayer &amp; Shared-World Data</h4>
+    <p>When you play in a shared or multiplayer world, your in-game position, the blocks you place or mine, your equipped armor, and any custom blocks, creatures, or rules you've chosen to share through the Creator Studio are synced so other players in that same world can see them. This is what makes multiplayer and mod-sharing work, and it is visible to other players currently in that world.</p>
+
+    <h4>4. Stored Only On Your Device</h4>
+    <p>Your keybinds, volume settings, single-player world saves, and UI preferences are stored in your browser's local storage. None of this is ever sent to us.</p>
+
+    <h4>5. Retention &amp; Deletion</h4>
+    <p>Your saved inventory and world data stay tied to your anonymous ID so your progress is there next time you play from the same browser. Clearing your browser's site data for Voxeria removes this immediately and resets your anonymous ID. If you'd like data tied to a specific anonymous ID deleted on our end, contact us below with that ID and we'll remove it.</p>
+
+    <h4>6. Third-Party Processing</h4>
+    <p>We use Firebase (Google) to host multiplayer and save data. As with any connection to any server, Google's infrastructure necessarily processes your IP address while you're connected, and data may be processed outside your country, including in the United States. We do not use any advertising network, tracker, or analytics service — Voxeria has none installed.</p>
+
+    <h4>7. Children's Privacy</h4>
+    <p>Voxeria does not include chat, messaging, or any other way to type text to other players, and does not knowingly collect information that could identify a specific child.</p>
+
+    <div class="pm-section-divider">Terms of Use</div>
+
+    <h4>8. Acceptable Use</h4>
+    <p>Play fair: don't exploit bugs to disrupt other players' games, don't attempt to access or alter another player's saved data, and don't use custom mod codes to distribute unlawful content.</p>
+
+    <h4>9. Content You Create</h4>
+    <p>The Creator Studio lets you design and share custom blocks, creatures, and rule sets ("Player Content"). Player Content stays yours. By sharing it with other players or publishing a mod code, you grant us a non-exclusive, worldwide, royalty-free license to display, store, and reproduce that Player Content within Voxeria and in promotional material for Voxeria, such as trailers, screenshots, or store listings. We may remove Player Content we believe infringes someone else's rights or violates these Terms, at any time.</p>
+
+    <h4>10. Availability &amp; Changes</h4>
+    <p>Voxeria is provided as-is. We may update the game, these Terms, or any online feature at any time; the date above reflects the last update.</p>
+
+    <h4>11. Governing Law</h4>
+    <p>These Terms are governed by the laws of Switzerland, without regard to its conflict-of-law principles.</p>
+
+    <h4>12. Contact</h4>
+    <p>For privacy requests or questions about these Terms, reach us at <a href="mailto:winklerjaylen@gmail.com">winklerjaylen@gmail.com</a>.</p>
+
     <div class="pm-foot">VOXERIA™</div>
     <button id="policy-close" onclick="closePolicyModal()">Close</button>
   </div>
