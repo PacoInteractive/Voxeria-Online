@@ -1,8 +1,9 @@
 {
     "name": "voxeria",
     "version": "1.1.0",
-    "author": "",
-    "license": "ISC",
+    "private": true,
+    "author": "Jaylen Winkler",
+    "license": "UNLICENSED",
     "main": "main.js",
     "type": "commonjs",
     "scripts": {
