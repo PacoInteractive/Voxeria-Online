@@ -100,19 +100,86 @@
   </script>
 
   <script>
-  // === DOMAIN-HINWEIS: reiner Konsolen-Hinweis, blockiert das Spiel nicht ===
-  // Standalone-Build (itch.io/Newgrounds) — keine Plattform-SDK-Kopplung mehr.
-  // Die Erkennung dient nur als dokumentierender Hinweis in der Konsole.
+  // === HERKUNFTS-HINWEIS ====================================================
+  // Voxeria is a single .html + a handful of .js files, so anyone can save the
+  // page and re-host it. That is not preventable in a browser game -- the
+  // source has to reach the client to run at all, and any "protection" that
+  // blocks execution just as reliably locks out real players whenever a
+  // legitimate new host appears (a publisher's test environment, a mirror, a
+  // renamed domain). So this deliberately BLOCKS NOTHING.
+  //
+  // What it does instead: on a host that isn't ours, it shows a small,
+  // dismissible badge pointing at the official build. That makes a stolen
+  // copy visibly a stolen copy to the people playing it, which is the part
+  // that actually costs a re-hoster something -- their traffic advertises the
+  // original. It is also the only approach that cannot produce a false
+  // positive bad enough to break the game.
+  //
+  // Adding a host: put it in ALLOWED_HOSTS below. Note that Electron loads
+  // via file://, where hostname is '' -- that's covered by isLocalOrPackaged,
+  // so the desktop build never shows the badge.
   (function () {
     var host = (window.location.hostname || '').toLowerCase();
-    var isLocalDev = (host === '' || host === 'localhost' || host === '127.0.0.1' || host === '::1');
-    var isItch = /(^|\.)itch\.io$/.test(host);
-    var isItchZone = /(^|\.)itch\.zone$/.test(host);
-    var isNewgrounds = /(^|\.)newgrounds\.com$/.test(host);
-    var isNgfiles = /(^|\.)ngfiles\.com$/.test(host);
-    if (!(isLocalDev || isItch || isItchZone || isNewgrounds || isNgfiles)) {
-      console.warn('Voxeria: running on an unrecognized host (' + host + ').');
+    var isLocalOrPackaged = (host === '' || host === 'localhost' || host === '127.0.0.1' || host === '::1');
+    // Matches the host itself or any subdomain of it, never a lookalike:
+    // "voxeriahub.com.evil.example" must NOT pass, hence the anchored suffix.
+    var ALLOWED_HOSTS = ['voxeriahub.com', 'itch.io', 'itch.zone', 'newgrounds.com', 'ngfiles.com'];
+    function hostMatches(h, allowed) { return h === allowed || h.endsWith('.' + allowed); }
+    var isOfficial = isLocalOrPackaged || ALLOWED_HOSTS.some(function (a) { return hostMatches(host, a); });
+    if (isOfficial) return;
+
+    console.warn('Voxeria: running on an unrecognized host (' + host + '). The official version is at voxeriahub.com');
+
+    function showBadge() {
+      if (document.getElementById('vx-origin-badge')) return;
+      var bar = document.createElement('div');
+      bar.id = 'vx-origin-badge';
+      bar.setAttribute('style', [
+        'position:fixed', 'left:12px', 'bottom:12px', 'z-index:2147483646',
+        'max-width:min(320px,calc(100vw - 24px))', 'box-sizing:border-box',
+        'background:rgba(14,17,22,0.92)', 'color:#e8ecef',
+        'border:1px solid #39414d', 'border-radius:8px',
+        'padding:10px 12px', 'font:12px/1.45 system-ui,-apple-system,Segoe UI,sans-serif',
+        'box-shadow:0 8px 28px rgba(0,0,0,0.45)',
+        'display:flex', 'gap:10px', 'align-items:flex-start'
+      ].join(';'));
+
+      var text = document.createElement('div');
+      text.style.flex = '1';
+      // textContent (not innerHTML) for the host string -- it comes from the
+      // URL, so treating it as markup would be an injection vector on exactly
+      // the kind of host this badge exists to call out.
+      var line1 = document.createElement('div');
+      line1.style.cssText = 'font-weight:600;margin-bottom:2px';
+      line1.textContent = 'Unofficial copy';
+      var line2 = document.createElement('div');
+      line2.style.cssText = 'color:#a9b2bc';
+      line2.appendChild(document.createTextNode('This build is hosted on ' + host + '. The official Voxeria is at '));
+      var link = document.createElement('a');
+      link.href = 'https://voxeriahub.com';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'voxeriahub.com';
+      link.style.cssText = 'color:#6ea8fe;font-weight:600';
+      line2.appendChild(link);
+      text.appendChild(line1);
+      text.appendChild(line2);
+
+      var close = document.createElement('button');
+      close.textContent = '✕';
+      close.setAttribute('aria-label', 'Dismiss');
+      close.style.cssText = 'flex:0 0 auto;background:transparent;border:0;color:#8a939e;font:inherit;font-size:14px;line-height:1;cursor:pointer;padding:2px 4px';
+      close.addEventListener('click', function () { bar.remove(); });
+
+      bar.appendChild(text);
+      bar.appendChild(close);
+      (document.body || document.documentElement).appendChild(bar);
     }
+
+    // <body> may not exist yet -- this script runs from <head> on purpose so
+    // a re-host can't strip it by trimming the end of the file.
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showBadge);
+    else showBadge();
   })();
   </script>
 
