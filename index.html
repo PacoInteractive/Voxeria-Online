@@ -6,6 +6,100 @@
   <title>Voxeria v1.1</title>
 
   <script>
+  // === GLOBAL ERROR OVERLAY ================================================
+  // The one place in the whole game with no fallback for an uncaught error
+  // was everywhere OUTSIDE the game loop (which already recovers on its own,
+  // see gameLoop's own try/catch in voxeria-engine.js): the main menu, a mod
+  // code parse, a Firebase callback, or the ~12MB engine file's own top-level
+  // evaluation. Any of those throwing used to leave a silent white/frozen
+  // screen with nothing but a console line no player will ever see. This is
+  // deliberately the very FIRST script in <head>, before anything else, so
+  // it is armed even for an error while voxeria-engine.js is still parsing.
+  //
+  // Shows once and stays reused for anything after it (a second error is
+  // appended to the same panel, not stacked as a second overlay). Reload and
+  // Copy details never depend on the rest of the page still working.
+  (function () {
+    var errors = [];
+    var MAX_LOGGED = 20;
+
+    function ensureOverlay() {
+      var existing = document.getElementById('vx-fatal-overlay');
+      if (existing) return existing;
+      var el = document.createElement('div');
+      el.id = 'vx-fatal-overlay';
+      el.setAttribute('style', [
+        'position:fixed', 'inset:0', 'z-index:2147483647',
+        'background:rgba(10,12,16,0.92)', 'color:#e8ecef',
+        'font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'padding:24px', 'box-sizing:border-box'
+      ].join(';'));
+      el.innerHTML =
+        '<div style="max-width:520px;width:100%;background:#181c22;border:1px solid #333a44;border-radius:10px;padding:24px 28px;box-shadow:0 20px 60px rgba(0,0,0,0.5);box-sizing:border-box">' +
+          '<div style="font-size:18px;font-weight:600;margin-bottom:8px">Something went wrong</div>' +
+          '<div style="color:#a9b2bc;margin-bottom:16px">Voxeria hit an unexpected error. Reloading usually fixes it. If it keeps happening, copy the details below and report it.</div>' +
+          '<pre id="vx-fatal-details" style="max-height:180px;overflow:auto;background:#0d0f13;border:1px solid #2a2f37;border-radius:6px;padding:10px 12px;font:12px/1.4 ui-monospace,Consolas,monospace;color:#c7cdd4;white-space:pre-wrap;word-break:break-word;margin:0 0 16px"></pre>' +
+          '<div style="display:flex;gap:10px">' +
+            '<button id="vx-fatal-reload" style="flex:1;padding:10px 14px;border:0;border-radius:6px;background:#3d7bfd;color:#fff;font:inherit;font-weight:600;cursor:pointer">Reload</button>' +
+            '<button id="vx-fatal-copy" style="padding:10px 14px;border:1px solid #3a414c;border-radius:6px;background:transparent;color:#e8ecef;font:inherit;cursor:pointer">Copy details</button>' +
+          '</div>' +
+        '</div>';
+      document.documentElement.appendChild(el);
+      el.querySelector('#vx-fatal-reload').addEventListener('click', function () { location.reload(); });
+      el.querySelector('#vx-fatal-copy').addEventListener('click', function () {
+        var btn = el.querySelector('#vx-fatal-copy');
+        var reset = function (label) { btn.textContent = label; setTimeout(function () { btn.textContent = 'Copy details'; }, 1500); };
+        // Clipboard writes can fail for reasons that have nothing to do with
+        // whether this is a real bug report (no permission, insecure origin,
+        // an unfocused document) -- claiming "Copied" when nothing was
+        // actually copied would send a player off to paste an empty report.
+        // On failure, fall back to selecting the (always-visible) details
+        // text so a manual Ctrl+C still works.
+        var fallbackSelect = function () {
+          var pre = el.querySelector('#vx-fatal-details');
+          var range = document.createRange();
+          range.selectNodeContents(pre);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          reset('Selected — press Ctrl+C');
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(errors.join('\n\n')).then(function () { reset('Copied'); }, fallbackSelect);
+        } else {
+          fallbackSelect();
+        }
+      });
+      return el;
+    }
+
+    function report(label, detail) {
+      if (errors.length < MAX_LOGGED) errors.push('[' + new Date().toISOString() + '] ' + label + ': ' + detail);
+      var overlay = ensureOverlay();
+      var pre = overlay.querySelector('#vx-fatal-details');
+      if (pre) pre.textContent = errors.join('\n\n');
+    }
+
+    window.addEventListener('error', function (e) {
+      // A failed <script>/<img>/<link> load fires a bare 'error' event on the
+      // element, not a real script error -- e.message is empty there and
+      // there's nothing actionable to show, so only real thrown errors reach
+      // here. "Script error." with no filename is the browser hiding details
+      // for cross-origin script failures -- also not actionable for a
+      // same-origin build like this one.
+      if (!e || !e.message || (e.message === 'Script error.' && !e.filename)) return;
+      report('Error', e.message + (e.filename ? ' (' + e.filename + ':' + e.lineno + ')' : ''));
+    });
+
+    window.addEventListener('unhandledrejection', function (e) {
+      var reason = e && e.reason;
+      report('Unhandled promise rejection', (reason && (reason.stack || reason.message)) || String(reason));
+    });
+  })();
+  </script>
+
+  <script>
   // === DOMAIN-HINWEIS: reiner Konsolen-Hinweis, blockiert das Spiel nicht ===
   // Standalone-Build (itch.io/Newgrounds) — keine Plattform-SDK-Kopplung mehr.
   // Die Erkennung dient nur als dokumentierender Hinweis in der Konsole.

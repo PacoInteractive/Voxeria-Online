@@ -42,6 +42,22 @@ nutzte aus demselben Grund schon immer MP3.
 **Wichtig:** `Music/` muss deshalb mit in den Build. Fehlt der Ordner, spielt
 nur das eingebettete Stück — ohne Fehlermeldung, nur eine Warnung in der Konsole.
 
+## Globaler Fehler-Überlag
+
+Das allererste `<script>` in `index.html`, noch vor allem anderen, fängt jeden
+nicht abgefangenen Fehler und jede nicht abgefangene Promise-Rejection ab
+und zeigt einen ruhigen Hinweis mit Reload-Knopf statt einer stummen weißen
+Fläche. Betrifft alles **außerhalb** der Spielschleife (die schon ihren
+eigenen `try`/`catch` hat und einen Frame-Fehler übersteht, siehe `gameLoop`
+in `voxeria-engine.js`) — Hauptmenü, Mod-Code-Parsing, Firebase-Callbacks,
+oder ein Fehler beim Parsen der ~10 MB großen `voxeria-engine.js` selbst.
+
+Steht bewusst ganz am Anfang von `<head>`, damit er schon während des Ladens
+der übrigen Skripte scharf ist. Der "Copy details"-Knopf kopiert die
+gesammelten Fehler in die Zwischenablage — bei fehlender Berechtigung markiert
+er den Text stattdessen zum manuellen Kopieren, statt fälschlich "Copied" zu
+zeigen. Praktisch als Fehlerberichts-Kanal für den Playtest.
+
 ## Wie die Dateien zusammenhängen
 
 Alle `.js`-Dateien sind **klassische Scripts**, keine ES-Module. Sie teilen sich
