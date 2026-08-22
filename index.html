@@ -1963,10 +1963,12 @@
 }
 #settings-popover input[type="range"]::-moz-range-track { height: 4px; border-radius: 0; background: var(--surface-3); }
 #settings-popover input[type="range"]::-moz-range-progress { height: 4px; border-radius: 0; background: var(--accent); }
-#volume-readout {
+#music-volume-readout, #sfx-volume-readout {
   min-width: 34px; text-align: right; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
   color: var(--text-2);
 }
+/* Same house style as #rp-toggle-row's checkbox (multiplayer panel). */
+#settings-popover input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 /* ── Selects: the OS chevron replaced with a hand-drawn one so the control
    doesn't look like an unstyled form leftover. ── */
 #settings-popover select {
@@ -3106,10 +3108,17 @@
         <div class="settings-section">
           <div class="settings-row settings-divider"><span class="sd-icon"><canvas class="vx-icon vx-icon-sd" data-icon="speaker"></canvas></span>Audio</div>
           <div class="settings-row">
-            <label for="volume-slider">Volume</label>
+            <label for="music-volume-slider">Music</label>
             <div class="settings-slider-wrap">
-              <input type="range" id="volume-slider" min="0" max="100" value="100" oninput="setMasterVolume(this.value/100); _updateVolumeReadout(this.value)">
-              <span id="volume-readout">100%</span>
+              <input type="range" id="music-volume-slider" min="0" max="100" value="100" oninput="setMusicVolume(this.value/100); _updateVolumeReadout(this, 'music-volume-readout', this.value)">
+              <span id="music-volume-readout">100%</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <label for="sfx-volume-slider">Sound Effects</label>
+            <div class="settings-slider-wrap">
+              <input type="range" id="sfx-volume-slider" min="0" max="100" value="100" oninput="setSfxVolume(this.value/100); _updateVolumeReadout(this, 'sfx-volume-readout', this.value)">
+              <span id="sfx-volume-readout">100%</span>
             </div>
           </div>
         </div>
@@ -3124,6 +3133,13 @@
             </select>
           </div>
           <div class="settings-row" id="vibrantvox-readout-row"><span id="vibrantvox-readout">—</span></div>
+          <div class="settings-row">
+            <label for="screenshake-toggle">Screen shake</label>
+            <input type="checkbox" id="screenshake-toggle" checked onchange="setScreenShakeEnabled(this.checked)">
+          </div>
+          <div class="settings-row">
+            <button class="rebind-btn" id="fullscreen-btn" onclick="toggleFullscreen()" style="width:100%">Enter fullscreen</button>
+          </div>
         </div>
         <div class="settings-section">
           <div class="settings-row settings-divider"><span class="sd-icon"><canvas class="vx-icon vx-icon-sd" data-icon="gamepad"></canvas></span>Controls</div>
@@ -3138,6 +3154,22 @@
           <div class="settings-row">
             <label>Jump</label>
             <button class="rebind-btn" id="rebind-jump" onclick="startRebind('jump')"></button>
+          </div>
+          <div class="settings-row">
+            <label>Inventory</label>
+            <button class="rebind-btn" id="rebind-inventory" onclick="startRebind('inventory')"></button>
+          </div>
+          <div class="settings-row">
+            <label>Block Guide</label>
+            <button class="rebind-btn" id="rebind-blockGuide" onclick="startRebind('blockGuide')"></button>
+          </div>
+          <div class="settings-row">
+            <label>Minimap</label>
+            <button class="rebind-btn" id="rebind-minimap" onclick="startRebind('minimap')"></button>
+          </div>
+          <div class="settings-row">
+            <label>Ping</label>
+            <button class="rebind-btn" id="rebind-ping" onclick="startRebind('ping')"></button>
           </div>
           <div class="settings-row">
             <button class="settings-reset-btn" onclick="resetKeyBinds()">Reset controls to default</button>
