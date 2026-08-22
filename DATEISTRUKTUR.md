@@ -17,7 +17,8 @@ Es ist jetzt aufgeteilt — inhaltlich identisch, nur auf mehrere Dateien vertei
 | `voxeria-devtools.js` | Verstecktes Entwickler-Werkzeug (Strg+Shift+E, UI-Layout-Editor) | nur intern |
 | `voxeria-boot.js` | Spawnpunkt, `player`-Objekt, Kamera, und die Zeile, die das Spiel startet | **muss zuletzt geladen werden** |
 
-`Assets/` enthält die Block-Texturen (PNG).
+`Assets/` enthält die Block-Texturen (PNG) und, in `Assets/sfx/`, die
+nachgeladenen Soundeffekte (MP3).
 
 Die Musik ist eine Playlist aus drei Stücken (`MUSIC_TRACKS` in
 `voxeria-engine.js`). Das erste steckt als Base64 direkt in der Datei und ist
@@ -25,6 +26,18 @@ damit immer da; die beiden anderen liegen als MP3 in `Music/` und werden zur
 Laufzeit nachgeladen (zusammen ~9 MB — als Base64 wären das ~12 MB, die jeder
 Spieler vor dem Start herunterladen müsste). Ein Stück, das sich nicht laden
 lässt, fällt still aus der Rotation.
+
+Die Soundeffekte folgen demselben Prinzip, konsequent zu Ende gedacht: sechs
+kurze UI-/Mod-Editor-Sounds (Klick, Hover, Tippen, drei Knoten-Sounds) müssen
+schon beim allerersten Klick da sein, noch bevor irgendein Asset geladen
+werden konnte — die bleiben als Base64-MP3 eingebettet. Alle anderen 24
+(Grasgeräusche, Abbau-/Platzier-Samples für Erde/Holz/Stein/Laub) passieren
+erst mitten im laufenden Spiel und liegen deshalb als MP3-Dateien in
+`Assets/sfx/`, die bei Bedarf nachgeladen werden. Alle 30 waren ursprünglich
+rohes, unkomprimiertes WAV als Base64 (~2,2 MB) — jetzt komprimiertes MP3
+(~174 KB gesamt für die 24 Dateien). Format ist bewusst MP3, nicht Ogg: Safari
+unterstützt Ogg Vorbis in `decodeAudioData` nicht zuverlässig, und die Musik
+nutzte aus demselben Grund schon immer MP3.
 
 **Wichtig:** `Music/` muss deshalb mit in den Build. Fehlt der Ordner, spielt
 nur das eingebettete Stück — ohne Fehlermeldung, nur eine Warnung in der Konsole.
