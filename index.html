@@ -765,23 +765,23 @@
     #policy-modal.open{display:block;}
     #policy-modal .pm-head{margin-bottom:14px;}
     #policy-modal .pm-eyebrow{color:var(--accent);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 4px;font-family:var(--font-ui);}
-    #policy-modal h3{color:var(--text-1);font-size:19px;margin:0 0 4px;}
+    #policy-modal h3{color:var(--text-1);font-size:19px;margin:0 0 4px;font-family:var(--font-ui);}
     #policy-modal .pm-updated{color:var(--text-3);font-size:11px;font-family:var(--font-mono);margin:0;}
     /* Same recipe as #settings-popover .settings-divider, reused here so the
        two legal-adjacent panels in the game read as one design language
        instead of each inventing their own section-heading style. */
     #policy-modal .pm-section-divider{
       display:flex;align-items:center;gap:6px;color:var(--text-3);font-size:10.5px;font-weight:800;
-      text-transform:uppercase;letter-spacing:0.09em;margin:20px 0 6px;
+      text-transform:uppercase;letter-spacing:0.09em;margin:20px 0 6px;font-family:var(--font-ui);
     }
     #policy-modal .pm-section-divider::after{content:'';flex:1;height:1px;margin-left:2px;background:var(--line-1);}
-    #policy-modal h4{color:var(--text-1);font-size:13.5px;margin:14px 0 5px;}
+    #policy-modal h4{color:var(--text-1);font-size:13.5px;margin:14px 0 5px;font-family:var(--font-ui);}
     #policy-modal p{color:var(--text-2);font-size:13px;line-height:1.55;margin-bottom:8px;font-family:var(--font-ui);}
     #policy-modal strong{color:var(--text-1);}
     #policy-modal a{color:var(--accent);}
     #policy-modal a:hover{color:var(--accent-hover);}
-    #policy-modal .pm-foot{color:var(--text-3);font-size:11px;margin-top:14px;letter-spacing:1px;text-align:right;}
-    #policy-close{margin-top:16px;width:100%;border:none;background:var(--accent);color:#fff;padding:10px;border-radius:var(--radius-sm);cursor:pointer;font-weight:700;font-size:13px;}
+    #policy-modal .pm-foot{color:var(--text-3);font-size:11px;margin-top:14px;letter-spacing:1px;text-align:right;font-family:var(--font-ui);}
+    #policy-close{margin-top:16px;width:100%;border:none;background:var(--accent);color:#fff;padding:10px;border-radius:var(--radius-sm);cursor:pointer;font-weight:700;font-size:13px;font-family:var(--font-ui);}
     #policy-close:hover{background:var(--accent-hover);}
     /* fixed, and above #vx-menu (z-index 100050): toasts used to sit under the
        main menu and were simply invisible there. That affected everything
