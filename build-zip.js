@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver'); // npm install archiver --save-dev
 
-const OUTPUT_ZIP = 'Voxeria_pitch_build.zip';
+// Optional target lets us create a test build without overwriting the last
+// known-good pitch archive. `npm run build` keeps the original default.
+const OUTPUT_ZIP = process.env.VOXERIA_BUILD_OUTPUT || 'Voxeria_pitch_build.zip';
 
 // 1. Temp index.html ohne voxeria-director.js erstellen
 let htmlContent = fs.readFileSync('index.html', 'utf8');

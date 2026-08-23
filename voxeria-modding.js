@@ -3006,6 +3006,292 @@ function vxCreatorBlocks(modalId) {
   return false;
 }
 
+// =========================================================
+// F10 -- random mod code. Every MOD_FIELDS entry gets a random raw value
+// inside its own bit width and is decoded straight back through
+// modRawToField(), the exact same clamp a hand-typed or corrupt code goes
+// through — so unlike guessing a code string, this can never land on
+// something the game would have to reject or clamp later.
+//
+// Actually LOADS, not just generates: dropping the code into #seed-input
+// and calling applySeedFromUI() is exactly what happens when a player
+// pastes a mod code there by hand (see applySeedFromUI's isModCode branch)
+// -- reusing that path is what makes this a mod that really runs (creatures
+// spawn, gravity/terrain/weather change, the reskin applies) instead of just
+// a string that happens to decode cleanly.
+// =========================================================
+function generateRandomModCode() {
+  if (!vxCreatorAllowed()) { vxCreatorDenied(); return; }
+  const mod = { name: 'Random Mod', visual: {}, behavior: {}, dim: {}, world: {}, perks: {} };
+  for (const f of MOD_FIELDS) {
+    const raw = Math.floor(Math.random() * (1 << f.bits));
+    const v = modRawToField(f, raw);
+    if (f.k === '__flags') mod[f.g] = v; else mod[f.g][f.k] = v;
+  }
+  const code = encodeModCode2(mod);
+  const seedInput = document.getElementById('seed-input');
+  if (seedInput) seedInput.value = code;
+  applySeedFromUI();
+  copyTextWithFallback(code, '🎲 Random mod loaded — code copied: ' + code);
+}
+window.generateRandomModCode = generateRandomModCode;
+
+// =========================================================
+// F8 -- COMMAND CONSOLE (Exploration mode only)
+// A handful of debug commands, not a devtools replacement: every one of them
+// just calls something the game already exposes (inventory, player state,
+// the day/night clock) instead of reaching into anything new. Typed with a
+// leading '*' so a command can never be confused with, say, a seed field.
+// =========================================================
+let vxConsoleOpen = false;
+function toggleCommandConsole() {
+  if (!vxConsoleOpen && !vxCreatorAllowed()) { vxCreatorDenied(); return; }
+  vxConsoleOpen = !vxConsoleOpen;
+  const el = document.getElementById('vx-console');
+  const input = document.getElementById('vx-console-input');
+  if (el) el.classList.toggle('open', vxConsoleOpen);
+  if (vxConsoleOpen) {
+    if (input) {
+      input.value = '*';
+      // Focusing synchronously, the same frame the 'open' class is applied,
+      // can lose the click/keydown that triggered this on some browsers —
+      // the modal-open dance elsewhere in this file doesn't hit that because
+      // it doesn't focus anything. One rAF is enough to dodge it.
+      requestAnimationFrame(() => { input.focus(); input.setSelectionRange(1, 1); });
+    }
+  } else if (input) {
+    input.blur();
+  }
+}
+// Always safe to call regardless of mode or gating — a console left open
+// must always be closeable, same reasoning as vxCreatorBlocks() above for
+// the creator modals.
+function closeCommandConsole() {
+  vxConsoleOpen = false;
+  const el = document.getElementById('vx-console');
+  const input = document.getElementById('vx-console-input');
+  if (el) el.classList.remove('open');
+  if (input) input.blur();
+}
+
+// Every entry's `run` only ever touches state the game already exposes and
+// re-derives from (inventory, player, the day/night clock, the graph-mod
+// multipliers applyActiveRules() reapplies from scratch every time it's
+// called — see that function's own "safe to call again" comment). Nothing
+// here is a new mechanic, just a shortcut to ones that already exist.
+// F12's help panel (renderCommandHelp) reads `usage`/`desc` straight off
+// this object, so it can never drift out of sync with what actually runs.
+const VX_COMMANDS = {
+  help: {
+    usage: '*help', desc: 'List every command',
+    run: () => showNotification('⌨️ ' + Object.keys(VX_COMMANDS).sort().map(c => '*' + c).join('  ') + '  — full list: F12'),
+  },
+  heal: {
+    usage: '*heal', desc: 'Restore full health',
+    run: () => {
+      player.health = maxHealth;
+      if (typeof drawHealth === 'function') drawHealth();
+      showNotification('❤️ Healed to full');
+    },
+  },
+  tp: {
+    usage: '*tp <x> <y>', desc: 'Teleport to block coordinates',
+    run: (args) => {
+      const x = parseFloat(args[0]), y = parseFloat(args[1]);
+      if (!isFinite(x) || !isFinite(y)) { showNotification('⌨️ Usage: *tp <x> <y>  (block coordinates)'); return; }
+      player.x = x * TILE; player.y = y * TILE; player.vx = 0; player.vy = 0;
+      // Snapped instead of left to the camera's own smoothing (see camX's
+      // per-frame lerp in the game loop) — a debug teleport should cut, not pan.
+      camX = player.x - (COLS >> 1) * TILE;
+      camY = player.y - (ROWS >> 1) * TILE;
+      showNotification('🧭 Teleported to ' + x + ', ' + y);
+    },
+  },
+  give: {
+    usage: '*give <block> [count]', desc: 'Add a block/item to your inventory',
+    run: (args) => {
+      const name = (args[0] || '').toUpperCase();
+      const id = BLOCKS[name];
+      if (id === undefined || NON_ITEM_BLOCK_IDS.has(id)) {
+        showNotification('⌨️ Unknown block: ' + (args[0] || '?') + ' — try its name, e.g. *give wood 10');
+        return;
+      }
+      const count = Math.max(1, Math.min(99, parseInt(args[1], 10) || 1));
+      if (addToInventory(id, count)) {
+        drawHotbar();
+        showNotification('🎒 +' + count + ' ' + (blockNames[id] || name));
+      }
+    },
+  },
+  time: {
+    usage: '*time day|night', desc: 'Force the day/night clock',
+    run: (args) => {
+      const phase = (args[0] || '').toLowerCase();
+      // Midpoints of updateDayNightCycle()'s own day/night bands (t<0.5 day,
+      // 0.56..0.94 night) rather than the boundary values, so this doesn't
+      // land exactly on a dusk/dawn transition tick.
+      if (phase === 'day') dayTime = DAY_LENGTH * 0.25;
+      else if (phase === 'night') dayTime = DAY_LENGTH * 0.75;
+      else { showNotification('⌨️ Usage: *time day|night'); return; }
+      showNotification('🕐 Time set to ' + phase);
+    },
+  },
+  weather: {
+    usage: '*weather clear|storm', desc: 'Force the weather (overworld only)',
+    run: (args) => {
+      const type = (args[0] || '').toLowerCase();
+      if (type !== 'clear' && type !== 'storm') { showNotification('⌨️ Usage: *weather clear|storm'); return; }
+      // rain/snow are folded into 'clear' now (see updateWeather) — clear and
+      // storm are the only two states that still do anything.
+      weather.type = type;
+      weather.targetIntensity = type === 'storm' ? 1.0 : 0;
+      weather.timer = 0;
+      showNotification('🌦️ Weather set to ' + type);
+    },
+  },
+  despawn: {
+    usage: '*despawn', desc: 'Clear every animal/creature on screen',
+    run: () => {
+      const n = animals.length;
+      animals.length = 0;
+      showNotification('🧹 Despawned ' + n + ' creature(s)');
+    },
+  },
+  speed: {
+    usage: '*speed <mult>', desc: 'Move-speed multiplier, e.g. *speed 2',
+    run: (args) => {
+      const v = parseFloat(args[0]);
+      if (!isFinite(v) || v <= 0) { showNotification('⌨️ Usage: *speed <mult>  e.g. *speed 2'); return; }
+      graphSpeedMult = v;
+      applyActiveRules();
+      showNotification('🏃 Speed ×' + v);
+    },
+  },
+  gravity: {
+    usage: '*gravity <mult>', desc: 'Gravity multiplier, e.g. *gravity 0.4 for low-g',
+    run: (args) => {
+      const v = parseFloat(args[0]);
+      if (!isFinite(v) || v <= 0) { showNotification('⌨️ Usage: *gravity <mult>  e.g. *gravity 0.4'); return; }
+      graphGravityMult = v;
+      applyActiveRules();
+      showNotification('🌗 Gravity ×' + v);
+    },
+  },
+  jump: {
+    usage: '*jump <n>', desc: 'Air jumps allowed, e.g. *jump 2 for a double jump',
+    run: (args) => {
+      const n = Math.max(1, Math.min(9, parseInt(args[0], 10) || 0));
+      if (!n) { showNotification('⌨️ Usage: *jump <n>  e.g. *jump 2'); return; }
+      graphMaxJumps = n;
+      applyActiveRules();
+      showNotification('🦘 ' + n + ' jump(s) allowed');
+    },
+  },
+  reach: {
+    usage: '*reach <blocks>', desc: 'Extra mining/placing reach',
+    run: (args) => {
+      const n = parseFloat(args[0]);
+      if (!isFinite(n) || n < 0) { showNotification('⌨️ Usage: *reach <blocks>  e.g. *reach 3'); return; }
+      graphReachBonus = n;
+      applyActiveRules();
+      showNotification('📏 Reach +' + n);
+    },
+  },
+  pickaxe: {
+    usage: '*pickaxe', desc: 'Toggle the instant-mine super pickaxe',
+    run: () => {
+      graphBigPickaxe = !graphBigPickaxe;
+      applyActiveRules();
+      showNotification(graphBigPickaxe ? '⛏️ Super pickaxe on' : '⛏️ Super pickaxe off');
+    },
+  },
+  immune: {
+    usage: '*immune', desc: 'Toggle hazard immunity (lava, fall damage, etc.)',
+    run: () => {
+      graphHazardImmune = !graphHazardImmune;
+      applyActiveRules();
+      showNotification(graphHazardImmune ? '🛡️ Hazard immunity on' : '🛡️ Hazard immunity off');
+    },
+  },
+  reset: {
+    usage: '*reset', desc: 'Undo every *speed/*gravity/*jump/*reach/*pickaxe/*immune buff',
+    run: () => {
+      graphSpeedMult = 1; graphGravityMult = 1; graphReachBonus = 0; graphMaxJumps = 1;
+      graphJumpMult = 1; graphBigPickaxe = false; graphHazardImmune = false;
+      applyActiveRules();
+      showNotification('🔄 Console buffs reset');
+    },
+  },
+  randommod: {
+    usage: '*randommod', desc: 'Same as F10 — load a freshly rolled random mod',
+    run: () => generateRandomModCode(),
+  },
+};
+
+function runConsoleCommand() {
+  const input = document.getElementById('vx-console-input');
+  if (!input) return;
+  const raw = input.value.trim();
+  closeCommandConsole();
+  if (!raw.startsWith('*')) { showNotification('⌨️ Commands start with * — try *help'); return; }
+  const parts = raw.slice(1).trim().split(/\s+/).filter(Boolean);
+  const name = (parts.shift() || '').toLowerCase();
+  const cmd = VX_COMMANDS[name];
+  if (!cmd) { showNotification('⌨️ Unknown command: *' + name + ' — try *help'); return; }
+  try { cmd.run(parts); }
+  catch (e) { console.error('Voxeria console command error:', e); showNotification('⚠️ *' + name + ' failed'); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('vx-console-input');
+  if (!input) return;
+  input.addEventListener('keydown', (e) => {
+    // Stops this from ever reaching the document-level keydown handler too —
+    // that handler already bails out on an INPUT-focused activeElement (see
+    // its `tag === 'INPUT'` guard), so this is defence in depth, not the
+    // only thing standing between a command and the WASD movement handler.
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); runConsoleCommand(); }
+    else if (e.key === 'Escape' || e.key === 'F8') { e.preventDefault(); closeCommandConsole(); }
+  });
+});
+window.toggleCommandConsole = toggleCommandConsole;
+
+// =========================================================
+// F12 -- command reference panel. Pure readout, built from VX_COMMANDS
+// itself (see its own comment above) so this can never list a command that
+// doesn't exist or describe one wrong.
+// =========================================================
+let vxHelpOpen = false;
+function toggleCommandHelp() {
+  if (!vxHelpOpen && !vxCreatorAllowed()) { vxCreatorDenied(); return; }
+  vxHelpOpen = !vxHelpOpen;
+  const modal = document.getElementById('vx-help-modal');
+  if (!modal) return;
+  modal.classList.toggle('open', vxHelpOpen);
+  if (vxHelpOpen) renderCommandHelp();
+}
+function renderCommandHelp() {
+  const body = document.getElementById('vxh-body');
+  if (!body) return;
+  body.innerHTML = '';
+  Object.keys(VX_COMMANDS).sort().forEach(name => {
+    const cmd = VX_COMMANDS[name];
+    const row = document.createElement('div');
+    row.className = 'vxh-row';
+    const usage = document.createElement('div');
+    usage.className = 'vxh-usage';
+    usage.textContent = cmd.usage;
+    const desc = document.createElement('div');
+    desc.className = 'vxh-desc';
+    desc.textContent = cmd.desc;
+    row.appendChild(usage);
+    row.appendChild(desc);
+    body.appendChild(row);
+  });
+}
+window.toggleCommandHelp = toggleCommandHelp;
+
 // Shuts any creator modal that is currently open. Guarding the doors is not
 // enough on its own: a designer opened in an Exploration world stayed open
 // straight through loading a Normal one, sitting fully usable on top of a mode

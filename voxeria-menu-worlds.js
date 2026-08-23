@@ -140,11 +140,20 @@ window.VxWorlds = (function () {
       // every run regardless, see exploredCells above). Packed as "cx,cy"
       // strings same as the runtime Set, one entry per MINIMAP_CELL cell
       // explored rather than per tile.
-      exploredOverworld: [...exploredCells.OVERWORLD]
+      exploredOverworld: [...exploredCells.OVERWORLD],
+      minimapCell: MINIMAP_CELL
     };
   }
 
-  function save() {
+  // `thumb` defaults to true for every explicit/manual save. The periodic
+  // autosave below passes false: canvas.toDataURL('image/png') is a genuine
+  // synchronous PNG-encode, not just pixel pushing, and paying that cost
+  // every 20s regardless of whether anything on-screen changed was landing
+  // as a real, repeatable hitch during play. The thumbnail still gets
+  // refreshed whenever it actually matters — tab-hidden, beforeunload, and
+  // leaving the world — just not on every routine tick.
+  function save(thumb) {
+    if (thumb === undefined) thumb = true;
     // currentWorldId is the only gate. Checking gameState === 'PLAYING' here
     // looked safer but silently broke world creation: resetGameAndWorld() puts
     // the game back into 'INTRO', so the save() right after createWorld() did
@@ -174,8 +183,10 @@ window.VxWorlds = (function () {
     // Only overwrite a stored thumb on success — a transient capture failure
     // (e.g. autosave firing a frame before spawn finished) should never wipe
     // out a perfectly good thumbnail from a previous save.
-    const thumb = captureWorldThumb();
-    if (thumb) meta.thumb = thumb;
+    if (thumb) {
+      const capturedThumb = captureWorldThumb();
+      if (capturedThumb) meta.thumb = capturedThumb;
+    }
     if (row) Object.assign(row, meta); else list.push(meta);
     writeIndex(list);
     return true;
@@ -251,7 +262,13 @@ window.VxWorlds = (function () {
     }
     // resetGameAndWorld() above already cleared every exploredCells set for
     // the fresh world being switched to; repopulate OVERWORLD's from the save.
-    exploredCells.OVERWORLD = new Set(Array.isArray(data.exploredOverworld) ? data.exploredOverworld : []);
+    // Older saves used a coarser 8×8 fog grid. Those keys cannot be safely
+    // interpreted as 4×4 coordinates, so they begin with fresh fog instead
+    // of revealing the wrong places on the detailed map.
+    exploredCells.OVERWORLD = new Set(
+      data.minimapCell === MINIMAP_CELL && Array.isArray(data.exploredOverworld)
+        ? data.exploredOverworld : []
+    );
     _minimapLastCell = null; // force a redraw against the newly-loaded fog
     // The pre-existing sessionStorage resume would otherwise fire a moment
     // later and stomp the position we just restored.
@@ -798,9 +815,12 @@ window.VxWorlds = (function () {
 
   // Autosave. 20s is a compromise: frequent enough that a crash costs little,
   // rare enough that stringifying the edit map never lands in a frame budget
-  // often. Also saved when the tab is hidden, which is when a phone browser is
-  // most likely to kill the page outright.
-  setInterval(() => { save(); }, 20000);
+  // often. Skips the thumbnail (see save()'s `thumb` param) — that part is a
+  // real PNG encode, not cheap enough to repeat every 20s of live play. Also
+  // saved (with a thumb this time) when the tab is hidden, which is when a
+  // phone browser is most likely to kill the page outright, and when leaving
+  // is a natural moment to pay a one-off cost rather than a recurring one.
+  setInterval(() => { save(false); }, 20000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
   window.addEventListener('beforeunload', () => { save(); });
 

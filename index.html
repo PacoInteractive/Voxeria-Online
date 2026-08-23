@@ -685,6 +685,53 @@
       background: var(--surface-1); padding: 4px 8px; border-radius: var(--radius-sm);
       letter-spacing: 0.3px;
     }
+    /* F2 debug menu -- Minecraft-F3-style readout. pointer-events:none so it
+       never steals a click meant for the game underneath it, same reasoning
+       as #controls-hint. white-space:pre because updateDebugMenu() below
+       builds the whole block as one newline-joined string rather than one
+       element per line. */
+    #debug-menu {
+      display: none; position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left));
+      z-index: 250; color: #e8f0e8; font-size: 12px; font-weight: 600; font-family: var(--font-mono);
+      background: rgba(10, 14, 10, 0.72); padding: 8px 10px; border-radius: var(--radius-sm);
+      line-height: 1.5; letter-spacing: 0.2px; pointer-events: none; white-space: pre;
+      text-shadow: 1px 1px 0 rgba(0,0,0,0.6); max-width: min(320px, 60vw);
+    }
+    /* F4 -- hide all UI (Minecraft-F1-style). #canvas is explicitly excluded
+       so the world itself always stays visible, and anything currently
+       `.open` (an active modal) is excluded too, so F4 during, say, the mod
+       editor doesn't rip an in-use panel off the screen. Everything else
+       under #canvas-wrapper (HUD, hotbar, touch controls, closed modals) is
+       one rule instead of a maintained id list, so a newly added HUD piece
+       is covered automatically without editing this rule again. */
+    body.vx-hide-ui #info-bar,
+    body.vx-hide-ui #controls-hint,
+    body.vx-hide-ui #fps-counter,
+    body.vx-hide-ui #debug-menu,
+    body.vx-hide-ui #canvas-wrapper > *:not(#canvas):not(.open) {
+      display: none !important;
+    }
+    /* F8 -- tiny command console, Exploration mode only (see vxCreatorAllowed()
+       in voxeria-modding.js). Real <input>, not a custom div: the main
+       keydown handler already bails out whenever document.activeElement is
+       an INPUT/TEXTAREA, so focusing this one for free stops WASD, hotbar
+       numbers and every other game hotkey from firing while typing a
+       command -- no extra guard needed here. */
+    #vx-console {
+      position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom));
+      width: min(480px, 86vw); z-index: 400;
+      opacity: 0; pointer-events: none; transform: translate(-50%, 8px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    #vx-console.open { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+    #vx-console-input {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      font-family: var(--font-mono); font-size: 14px; color: var(--text-1);
+      background: var(--hud-bg); backdrop-filter: blur(var(--hud-blur));
+      border: 1px solid var(--hud-border); border-radius: var(--hud-radius);
+      box-shadow: var(--hud-shadow); outline: none;
+    }
+    #vx-console-input::placeholder { color: var(--text-3); }
     /* ===== Button Juice (click feedback for all menu buttons) ===== */
     .fx-ripple {
       position: fixed; border-radius: 0; pointer-events: none; z-index: 9998;
@@ -1858,7 +1905,7 @@
        Same visual family as #pocket-timer (see below): HUD glass panel,
        hidden via opacity/pointer-events until .show is toggled. ── */
     #minimap-panel {
-      position: absolute; top: 16px; right: 16px;
+      position: absolute; top: 16px; right: 16px; transform-origin: top right;
       padding: 6px; border-radius: var(--hud-radius);
       background: var(--hud-bg); backdrop-filter: blur(var(--hud-blur));
       border: 1px solid var(--hud-border); box-shadow: var(--hud-shadow);
@@ -1866,7 +1913,16 @@
       transition: opacity 0.35s, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       z-index: 90;
     }
-    #minimap-panel.show { opacity: 1; transform: scale(1); }
+    #minimap-panel.show { opacity: 1; transform: scale(1); pointer-events: auto; }
+    /* Click-to-zoom: scaled up in place via CSS transform rather than a
+       bigger backing canvas, so the same pixel-art raster drawMinimap()
+       already produced just gets blown up — image-rendering:pixelated below
+       keeps it crisp instead of blurry at the larger size. Higher z-index
+       while zoomed so the enlarged panel draws over the rest of the HUD
+       instead of getting clipped under it. */
+    #minimap-panel.show.zoomed { transform: scale(2.6); z-index: 260; }
+    #minimap-canvas { cursor: zoom-in; }
+    #minimap-panel.zoomed #minimap-canvas { cursor: zoom-out; }
     #minimap-canvas { display: block; image-rendering: pixelated; border-radius: calc(var(--hud-radius) - 4px); }
     /* position:fixed + a very high z-index, same recipe as #settings-popover:
        this is NOT nested under #info-bar (see HTML comment there for why). */
@@ -1941,7 +1997,7 @@
        further down: #pb-header/#pb-close/#pb-body etc. all carry a matching
        #bi-* selector) so the new Block Inventory reads as the same kind of
        window as the Portal Book, not a bolted-on second UI language. */
-    #portal-book-modal, #block-inv-modal, #inventory-modal {
+    #portal-book-modal, #block-inv-modal, #inventory-modal, #vx-help-modal {
       display: flex; position: absolute; top: 50%; left: 50%;
       background: var(--surface-1); backdrop-filter: blur(var(--hud-blur));
       border: 1px solid var(--line-2); padding: 0; border-radius: var(--radius-lg);
@@ -2683,7 +2739,7 @@
 .asr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asr-pts { font-variant-numeric: tabular-nums; }
 
-    #portal-book-modal.open, #block-inv-modal.open, #inventory-modal.open {
+    #portal-book-modal.open, #block-inv-modal.open, #inventory-modal.open, #vx-help-modal.open {
       opacity: 1; visibility: visible; pointer-events: auto;
       transform: translate(-50%,-50%) scale(1);
       transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.16,1,0.3,1);
@@ -2721,25 +2777,33 @@
     }
     #inv-cursor.show { display: flex; }
     #inv-cursor canvas { width: 36px; height: 36px; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.55)); }
-    #pb-header, #bi-header {
+    #pb-header, #bi-header, #vxh-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 18px 24px; border-bottom: 1px solid var(--line-1);
       background: var(--surface-2);
       flex-shrink: 0;
     }
-    #pb-header h2, #bi-header h2 { font-size: 20px; color: var(--text-1); letter-spacing: 1px; }
-    #pb-header .pb-subtitle, #bi-header .pb-subtitle { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-    #pb-close, #bi-close {
+    #pb-header h2, #bi-header h2, #vxh-header h2 { font-size: 20px; color: var(--text-1); letter-spacing: 1px; }
+    #pb-header .pb-subtitle, #bi-header .pb-subtitle, #vxh-header .pb-subtitle { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    #pb-close, #bi-close, #vxh-close {
       background: var(--surface-2); color: var(--text-2); border: 1px solid var(--line-1);
       width: 32px; height: 32px; border-radius: 0; cursor: pointer; font-size: 16px;
       display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;
     }
-    #pb-close:hover, #bi-close:hover { background: rgba(255,80,90,0.18); border-color: rgba(255,80,90,0.4); color: #ff8f96; }
-    #pb-body, #bi-body { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    #pb-body::-webkit-scrollbar, #bi-body::-webkit-scrollbar { width: 8px; }
-    #pb-body::-webkit-scrollbar-track, #bi-body::-webkit-scrollbar-track { background: transparent; }
-    #pb-body::-webkit-scrollbar-thumb, #bi-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 0; }
-    #pb-body::-webkit-scrollbar-thumb:hover, #bi-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.26); }
+    #pb-close:hover, #bi-close:hover, #vxh-close:hover { background: rgba(255,80,90,0.18); border-color: rgba(255,80,90,0.4); color: #ff8f96; }
+    #pb-body, #bi-body, #vxh-body { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    #pb-body::-webkit-scrollbar, #bi-body::-webkit-scrollbar, #vxh-body::-webkit-scrollbar { width: 8px; }
+    #pb-body::-webkit-scrollbar-track, #bi-body::-webkit-scrollbar-track, #vxh-body::-webkit-scrollbar-track { background: transparent; }
+    #pb-body::-webkit-scrollbar-thumb, #bi-body::-webkit-scrollbar-thumb, #vxh-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 0; }
+    #pb-body::-webkit-scrollbar-thumb:hover, #bi-body::-webkit-scrollbar-thumb:hover, #vxh-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.26); }
+    /* ── F12 command reference rows ── */
+    .vxh-row {
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 10px 14px; background: var(--surface-2);
+      border: 1px solid var(--line-1); border-radius: var(--radius-sm);
+    }
+    .vxh-usage { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--accent); }
+    .vxh-desc { font-size: 12px; color: var(--text-3); }
     /* ── Block Inventory grid ── */
     .inv-section-label {
       font-size: 10px; color: var(--text-3); text-transform: uppercase;
@@ -3224,7 +3288,7 @@
         </div>
         <div id="arena-scores"></div>
       </div>
-      <div id="minimap-panel"><canvas id="minimap-canvas" width="160" height="120"></canvas></div>
+      <div id="minimap-panel"><canvas id="minimap-canvas" width="208" height="144" onclick="toggleMinimapZoom()"></canvas></div>
       <div id="ocean-oxygen-bar"><div id="ocean-oxygen-label"><span>💧 Oxygen</span><span id="ocean-oxygen-pct">100%</span></div><div id="ocean-oxygen-track"><div id="ocean-oxygen-fill"></div></div></div>
       <div id="intro-hint-banner">
         <div id="ih-close" onclick="dismissIntroHint()">✕</div>
@@ -3931,6 +3995,19 @@
       <!-- The stack currently "in hand" while rearranging. Outside the modal
            so it is never clipped by the panel's overflow. -->
       <div id="inv-cursor"></div>
+      <!-- F12 command reference. Shares the Portal Book's exact modal chrome
+           (see #pb-header/#pb-close/#pb-body's shared selectors) — rows are
+           built at open time by renderCommandHelp() from VX_COMMANDS. -->
+      <div id="vx-help-modal">
+        <div id="vxh-header">
+          <div>
+            <h2>⌨️ Commands</h2>
+            <div class="pb-subtitle">F8 opens the console — every command starts with *</div>
+          </div>
+          <div id="vxh-close" onclick="toggleCommandHelp()">✕</div>
+        </div>
+        <div id="vxh-body"></div>
+      </div>
       <div id="touch-controls">
         <div class="tc-group">
             <button id="tc-left" class="tc-btn">◀</button>
@@ -3946,6 +4023,8 @@
     </div>
     <div id="controls-hint">Voxeria v.1.2</div>
     <div id="fps-counter">-- FPS</div>
+    <div id="debug-menu"></div>
+    <div id="vx-console"><input type="text" id="vx-console-input" autocomplete="off" spellcheck="false" placeholder="*command"></div>
   </div>
 </div>
   <div id="admin-login-modal">
@@ -4482,11 +4561,7 @@
 <script src="voxeria-coop-mods.js"></script>
 <script src="voxeria-devtools.js"></script>
 <script src="voxeria-juice.js"></script>
+<script src="voxeria-desert-prototype.js"></script>
 <script src="voxeria-boot.js"></script>
-<!-- RECORDING RIG -- remove this one line before shipping a build.
-     Adds F7-F10 capture hotkeys and nothing else; it patches no engine
-     function and writes no storage, so deleting the tag removes it whole.
-     Loads after boot so `player` and `camX` are already initialised. -->
-<script src="voxeria-director.js"></script>
 </body>
 </html>

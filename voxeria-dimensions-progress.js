@@ -17,19 +17,21 @@
 // =========================================================
 // POCKET DIMENSIONS — bounded, timed, single-landmark instances
 // ---------------------------------------------------------
-// The four portal dimensions used to be infinite chunk worlds sharing the
+// The original portal dimensions used to be infinite chunk worlds sharing the
 // overworld's terrain engine. They are now bounded "pocket runs": each entry
 // clears and re-generates the dimension fresh (per-visit nonce), the playable
 // area is walled off to ~POCKET_INTERIOR_W blocks, exactly ONE guaranteed
 // landmark structure spawns, and a collapse timer counts down. When it hits
-// zero a dimension-specific catastrophe (Gold meteor / Tsunami / Lava flood /
-// Black hole) "kills" the player: only the loot gathered THIS run is lost,
+// zero a sandstorm "kills" the player: only the loot gathered THIS run is lost,
 // the Portal Book's unlock progress is untouched, and the entry portal is
 // consumed. Dying by any other hazard inside a pocket does the same thing.
 // =========================================================
-const POCKET_DIMS = new Set(["GOLD", "OCEAN", "LAVA", "VOID", "ERG"]);
+// Prototype: The Erg is intentionally the only reachable extraction dimension.
+// The legacy branches below remain in source for now, but no portal, book entry
+// or teleport can reach them. This keeps the prototype reversible.
+const POCKET_DIMS = new Set(["ERG"]);
 const POCKET_LEFT = 4;                                    // first playable column (bedrock/void wall to its left)
-const POCKET_INTERIOR_W = 360;                            // playable span in blocks (300-400 range)
+const POCKET_INTERIOR_W = 320;                            // ten whole 32-block chunks; reads as the requested ~300-block run
 const POCKET_RIGHT = POCKET_LEFT + POCKET_INTERIOR_W - 1; // last playable column
 const POCKET_MAX_CX = Math.floor(POCKET_RIGHT / CHUNK_W); // last chunk index that still contains playable ground
 const POCKET_ENTRY_X = Math.floor((POCKET_LEFT + POCKET_RIGHT) / 2); // player lands here (dead center)
@@ -1203,51 +1205,19 @@ function checkPortal(wx, wy) {
     let cx2 = wx+dx, cy2 = wy+dy;
     const center = getBlock(cx2, cy2);
 
-    // ── Gold Dimension: Rainbow center, Gold cross ──
-    if (center === BLOCKS.RAINBOW_ORE) {
-      if (getBlock(cx2-1,cy2) === BLOCKS.GOLD_ORE && getBlock(cx2+1,cy2) === BLOCKS.GOLD_ORE &&
-          getBlock(cx2,cy2-1) === BLOCKS.GOLD_ORE && getBlock(cx2,cy2+1) === BLOCKS.GOLD_ORE) {
-        activatePortal(cx2, cy2, 'GOLD', '🌟 Gold Dimension Portal opened!');
-        return;
-      }
-    }
-    // ── Ocean Depth: Ice center, Diamond cross ──
-    if (center === BLOCKS.ICE) {
-      if (getBlock(cx2-1,cy2) === BLOCKS.DIAMOND_ORE && getBlock(cx2+1,cy2) === BLOCKS.DIAMOND_ORE &&
-          getBlock(cx2,cy2-1) === BLOCKS.DIAMOND_ORE && getBlock(cx2,cy2+1) === BLOCKS.DIAMOND_ORE) {
-        activatePortal(cx2, cy2, 'OCEAN', '🌊 Ocean Depth Portal opened!');
-        return;
-      }
-    }
-    // ── Lava Core: Coal center, Gold Brick cross ──
-    if (center === BLOCKS.COAL_ORE) {
-      if (getBlock(cx2-1,cy2) === BLOCKS.GOLD_BRICK && getBlock(cx2+1,cy2) === BLOCKS.GOLD_BRICK &&
-          getBlock(cx2,cy2-1) === BLOCKS.GOLD_BRICK && getBlock(cx2,cy2+1) === BLOCKS.GOLD_BRICK) {
-        activatePortal(cx2, cy2, 'LAVA', '🔥 Lava Core Portal opened!');
-        return;
-      }
-    }
-    // ── Blither: Diamond center, Rainbow cross ──
-    if (center === BLOCKS.DIAMOND_ORE) {
-      if (getBlock(cx2-1,cy2) === BLOCKS.RAINBOW_ORE && getBlock(cx2+1,cy2) === BLOCKS.RAINBOW_ORE &&
-          getBlock(cx2,cy2-1) === BLOCKS.RAINBOW_ORE && getBlock(cx2,cy2+1) === BLOCKS.RAINBOW_ORE) {
-        activatePortal(cx2, cy2, 'VOID', '🌌 Blither Portal opened!');
-        return;
-      }
-    }
-    // ── The Erg: Cactus center, Sand cross — both Overworld-obtainable, so
-    // this dimension doesn't need to be gated behind any other ──
-    if (center === BLOCKS.CACTUS) {
-      if (getBlock(cx2-1,cy2) === BLOCKS.SAND && getBlock(cx2+1,cy2) === BLOCKS.SAND &&
-          getBlock(cx2,cy2-1) === BLOCKS.SAND && getBlock(cx2,cy2+1) === BLOCKS.SAND) {
-        activatePortal(cx2, cy2, 'ERG', '🏜️ The Erg Portal opened!');
+    // ── The Erg: Grass centre, four Dirt blocks. Deliberately cheap so the
+    // prototype can be exercised immediately in a fresh world. ──
+    if (center === BLOCKS.GRASS) {
+      if (getBlock(cx2-1,cy2) === BLOCKS.DIRT && getBlock(cx2+1,cy2) === BLOCKS.DIRT &&
+          getBlock(cx2,cy2-1) === BLOCKS.DIRT && getBlock(cx2,cy2+1) === BLOCKS.DIRT) {
+        activatePortal(cx2, cy2, 'ERG', '🏜️ Sandportal geöffnet — der Sturm wartet nicht!');
         return;
       }
     }
   }
 }
 
-const PORTAL_BURST_COLORS = { GOLD:'#ffd76a', OCEAN:'#5fd0ff', LAVA:'#ff6a3d', VOID:'#c99bff', ERG:'#e8c468', OVERWORLD:'#8fe08f' };
+const PORTAL_BURST_COLORS = { ERG:'#e8c468', OVERWORLD:'#8fe08f' };
 function activatePortal(cx2, cy2, targetDim, msg) {
   // targetDim rides along with each block broadcast, so portalDestinations
   // ends up populated for every player, not just the one who built it.
@@ -1457,7 +1427,7 @@ function removePortalCluster(tx, ty) {
 function showPocketTimer() {
   const b = document.getElementById('pocket-timer');
   if (!b) return;
-  const lbl = document.getElementById('pt-label'); if (lbl) lbl.textContent = 'Collapse in';
+  const lbl = document.getElementById('pt-label'); if (lbl) lbl.textContent = 'Sandsturm in';
   b.classList.add('show'); b.classList.remove('danger');
 }
 function hidePocketTimer() {
@@ -1472,6 +1442,26 @@ function updatePocketTimerHud() {
   el.textContent = m + ':' + String(s).padStart(2, '0');
   const box = document.getElementById('pocket-timer');
   if (box) box.classList.toggle('danger', pocketTimer <= POCKET_WARN_AT);
+}
+
+// The last 40 seconds are not a second damage system. They are a readable
+// approach phase for the same hard run deadline: dust increases, but the
+// player still has a fair chance to navigate back to the portal.
+function drawErgStormWarning() {
+  if (!pocketActive || pocketCollapsing || currentDim !== 'ERG' || pocketTimer > 2400) return;
+  const t = 1 - Math.max(0, pocketTimer) / 2400;
+  const W = canvas.width, H = canvas.height;
+  ctx.save();
+  ctx.fillStyle = `rgba(151,91,30,${0.05 + t * 0.18})`;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 0.12 + t * 0.2;
+  const drift = (frameCount * (1.5 + t * 2.5)) % 26;
+  for (let y = 12; y < H; y += 26) {
+    ctx.fillStyle = (Math.floor(y / 26) % 2) ? '#dca954' : '#8e5525';
+    ctx.fillRect(Math.floor(-drift), y, 18 + t * 22, 2);
+    ctx.fillRect(Math.floor(W * 0.48 - drift), y + 9, 24 + t * 26, 2);
+  }
+  ctx.restore();
 }
 
 // Ocean's oxygen meter — same top-center HUD slot as the collapse timer
@@ -1570,7 +1560,11 @@ function startPocketCollapse(fromRemote) {
   if (box) { const lbl = document.getElementById('pt-label'); if (lbl) lbl.textContent = 'Collapsing!'; const t = document.getElementById('pt-time'); if (t) t.textContent = '0:00'; box.classList.add('danger'); }
   screenShake = Math.max(screenShake, 22);
   const cx0 = player.x + player.w / 2, cy0 = player.y + player.h / 2;
-  if (currentDim === 'GOLD') {
+  if (currentDim === 'ERG') {
+    playSound('hiss');
+    impactFlash = Math.max(impactFlash, 0.35); impactFlashColor = '235,190,105';
+    addJuiceText(cx0, player.y - 20, '🌪️ SANDSTURM!', '#f3cf76');
+  } else if (currentDim === 'GOLD') {
     playSound('meteor');
     impactFlash = Math.max(impactFlash, 0.5); impactFlashColor = '255,200,90';
     pocketMeteor = null; pocketShowerMeteors = [];
@@ -1617,7 +1611,20 @@ function runPocketCollapse(dt) {
     }
   }
 
-  if (currentDim === 'GOLD') {
+  if (currentDim === 'ERG') {
+    // A bounded, visual-only wall of sand. The run itself is still resolved by
+    // the shared timer, so this never has to simulate an expensive sand fill.
+    const n = 4 + Math.floor(progress * 15);
+    for (let k = 0; k < n; k++) {
+      particles.push({
+        x: camX + Math.random() * COLS * TILE,
+        y: camY + Math.random() * ROWS * TILE,
+        vx: -5 - progress * 8, vy: (Math.random() - 0.5) * 1.6,
+        color: Math.random() < 0.55 ? '#e5bd65' : '#a96728',
+        size: 2 + Math.random() * 4, life: 12 + Math.random() * 14, maxLife: 26, type: 'dust'
+      });
+    }
+  } else if (currentDim === 'GOLD') {
     if (progress < 0.55) {
       // Buildup — a meteor shower streaks across the sky (cosmetic only; the
       // crumble effect above already handles terrain destruction).
@@ -1680,7 +1687,23 @@ function drawPocketCollapseOverlay() {
   const progress = 1 - pocketCollapseTimer / POCKET_COLLAPSE_LEN;
   const W = canvas.width, H = canvas.height;
 
-  if (currentDim === 'GOLD') {
+  if (currentDim === 'ERG') {
+    // Pixel-dust veil with diagonal streaks; no blur so it remains legible at
+    // the game's low-resolution look even on a large display.
+    ctx.save();
+    ctx.fillStyle = `rgba(133,76,25,${0.14 + progress * 0.42})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 0.24 + progress * 0.42;
+    const step = 20;
+    const drift = (frameCount * (2 + progress * 3)) % step;
+    for (let y = -step; y < H + step; y += step) {
+      for (let x = -step; x < W + step; x += step * 2) {
+        ctx.fillStyle = ((x + y) / step) % 2 ? '#f4d581' : '#b87931';
+        ctx.fillRect(Math.floor(x - drift), Math.floor(y + (x % 13)), 12, 2);
+      }
+    }
+    ctx.restore();
+  } else if (currentDim === 'GOLD') {
     ctx.save();
     ctx.fillStyle = `rgba(255,190,60,${Math.min(0.35, progress * 0.4)})`;
     ctx.fillRect(0, 0, W, H);
@@ -1748,7 +1771,7 @@ function doTeleport() {
       targetDim = portalDestinations[`${pTileX+dx},${pTileY+dy}`];
     }
   }
-  if (!targetDim) targetDim = currentDim === "OVERWORLD" ? "GOLD" : "OVERWORLD";
+  if (!targetDim) targetDim = currentDim === "OVERWORLD" ? "ERG" : "OVERWORLD";
 
   const prevDim = currentDim;
 
@@ -1772,7 +1795,7 @@ function doTeleport() {
     showNotification("🌀 Just a practice portal. It doesn't lead anywhere.");
   } else {
     currentDim = targetDim;
-    const dimNames = { GOLD: "🌟 Gold Dimension!", OCEAN: "🌊 Ocean Depth!", LAVA: "🔥 Lava Core!", VOID: "🌌 Blither!", ERG: "🏜️ The Erg!" };
+    const dimNames = { ERG: "🏜️ The Erg — Wüstendimension!" };
     showNotification("✨ Welcome to the " + (dimNames[targetDim] || targetDim));
   }
 
@@ -1859,43 +1882,11 @@ function doTeleport() {
 // =========================================================
 const PORTAL_DEFS = [
   {
-    id: 'GOLD', name: 'Gold Dimension', unlocked: true,
-    color: '#f1c40f', glow: 'rgba(255,215,0,0.3)',
-    desc: 'The safe starting dimension, with no hazard of its own. This is where the Obsidian Heat Suit you need to survive the Lava Core is built. Mine its Obsidian & Ember Ore veins, then build the altar shape shown on its armor page.',
-    recipe: { center: BLOCKS.RAINBOW_ORE, cross: BLOCKS.GOLD_ORE },
-    centerLabel: 'Bixbit', crossLabel: 'Gold Ore',
-    rewards: 'Obsidian, Ember Ore, Bixbit, Gold Bricks'
-  },
-  {
-    id: 'LAVA', name: 'Lava Core', unlocked: true,
-    color: '#ff4400', glow: 'rgba(255,80,0,0.3)',
-    desc: 'The molten heart of the world. Obsidian pillars rise from rivers of lava, and Fire Crystals pulse with dangerous energy. Heat damages you over time, so bring the Obsidian Heat Suit forged back in the Gold Dimension.',
-    recipe: { center: BLOCKS.COAL_ORE, cross: BLOCKS.GOLD_BRICK },
-    centerLabel: 'Coal Ore', crossLabel: 'Gold Brick',
-    rewards: 'Obsidian, Ember Ore, Fire Crystal, Magma Rock'
-  },
-  {
-    id: 'OCEAN', name: 'Ocean Depth', unlocked: true,
-    color: '#4fc3f7', glow: 'rgba(80,180,255,0.3)',
-    desc: 'An endless underwater world of coral reefs, kelp forests, and crushing deep-water pressure. Sea Lanterns light the murky depths. Bring the Pressure Diving Suit forged back in the Lava Core.',
-    recipe: { center: BLOCKS.ICE, cross: BLOCKS.DIAMOND_ORE },
-    centerLabel: 'Ice Block', crossLabel: 'Aquamarine',
-    rewards: 'Coral, Kelp, Sea Lantern, Ember Ore'
-  },
-  {
-    id: 'VOID', name: 'Blither', unlocked: true,
-    color: '#9966ff', glow: 'rgba(120,60,255,0.3)',
-    desc: 'Blither, a realm of floating islands drifting through infinite space. The deadly fall is survived only with the Void Walker Boots forged back in Ocean Depth. Its Ur-Altar forges the prestige Golden Aegis from Void Ore & Star Dust.',
-    recipe: { center: BLOCKS.DIAMOND_ORE, cross: BLOCKS.RAINBOW_ORE },
-    centerLabel: 'Aquamarine', crossLabel: 'Bixbit',
-    rewards: 'Void Stone, Void Ore, Star Dust, Ether Crystal, Void Glass'
-  },
-  {
     id: 'ERG', name: 'The Erg', unlocked: true,
     color: '#e8c468', glow: 'rgba(232,196,104,0.3)',
-    desc: 'A boundless sea of dunes under a haze-white sun. Wind-packed sandstone hides pale cactus-wood ruins half-swallowed by the sand.',
-    recipe: { center: BLOCKS.CACTUS, cross: BLOCKS.SAND },
-    centerLabel: 'Cactus', crossLabel: 'Sand',
+    desc: 'Eine begrenzte Wüstendimension mit wandernden Dünen, versunkenen Ruinen und einem tödlichen Sandsturm. Baue wertvolle Materialien ab und kehre vor der Sturmwand zum Portal zurück.',
+    recipe: { center: BLOCKS.GRASS, cross: BLOCKS.DIRT },
+    centerLabel: 'Grass Block', crossLabel: 'Dirt Block',
     rewards: 'Dune Sand, Erg Sandstone, Cactus Wood'
   }
 ];
@@ -1905,7 +1896,7 @@ const PORTAL_DEFS = [
 // before it in the chain. `visitedDims` is intentionally a fresh per-session Set
 // (not persisted) — portals aren't saved either (see setBlockAndBroadcast), so
 // each session is its own discovery run.
-const DIM_CHAIN = ['GOLD', 'LAVA', 'OCEAN', 'VOID'];
+const DIM_CHAIN = ['ERG'];
 let visitedDims = new Set();
 function isDimRevealed(id) {
   const idx = DIM_CHAIN.indexOf(id);
@@ -1962,7 +1953,7 @@ const FORGE_RADIUS_PX = TILE * 2.2;
 // armor protects, so the whole chain bootstraps: Gold (safe) makes Lava armor →
 // Lava makes Ocean armor → Ocean makes Void armor → Void makes the prestige
 // Gold armor.
-const FORGE_OUTPUT = { GOLD: 'armor_lava', LAVA: 'armor_ocean', OCEAN: 'armor_void', VOID: 'armor_gold' };
+const FORGE_OUTPUT = {};
 // Hologram/ambient tint per forge dimension — blends with each realm's palette.
 const FORGE_TINT = { GOLD: '255,140,70', LAVA: '255,120,60', OCEAN: '90,200,255', VOID: '170,120,255' };
 let forgeSoundTimer = 0;      // rhythmic-hammer cadence counter (dt units)
@@ -2436,5 +2427,3 @@ updateAndDrawIntro = function(ctx, dt) {
     tryResumeSession();
   }
 };
-
-

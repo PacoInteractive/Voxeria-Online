@@ -1075,6 +1075,13 @@ const VibrantVox = (function () {
     windowStart = now; frames = 0; accum = 0;
     if (!starved) refreshReadout();
 
+    // The grade budget adapts even when the resolution ladder is locked. Those
+    // are separate decisions: the buffer size is a fixed policy choice, while
+    // the colour passes are pure garnish and are the first thing that should go
+    // when a machine can't hold the frame. Deliberately ABOVE the adaptive gate
+    // below, which the locked 'performance' mode returns at.
+    gradeBudget(now, starved);
+
     if (!MODES[mode].adaptive) return;
     const age = now - startedAt;
     if (age < WARMUP_MS) return;
@@ -1255,21 +1262,56 @@ const VibrantVox = (function () {
     ctx.drawImage(bloomWide, 0, 0, w, h);
   }
 
+  // ── Grade budget ────────────────────────────────────────────────────────
+  // Every pass in grade() is a full-screen blend, and the non-separable modes
+  // it needs are the expensive kind: measured on the 1168x604 buffer, the
+  // 'overlay' self-composite costs 1.10ms, 'saturation' 1.08ms and 'soft-light'
+  // 0.95ms, against 0.115ms for an ordinary full-screen fillRect. Together
+  // that's about a third of the whole frame spent on colour.
+  //
+  // So the tier sheds them one at a time, cheapest loss of identity first:
+  //   3 = everything (and bloom, where the rung allows it)
+  //   2 = no vibrance. The overlay pass draws the canvas onto ITSELF, which
+  //       forces a full copy of the backing surface on top of the blend, so
+  //       it's both the priciest and the subtlest. First to go.
+  //   1 = tint only. Losing the desaturation costs rain and deep caves some
+  //       of their mood, but every dimension keeps its own colour.
+  //   0 = nothing. The raw palette, for a machine that needs the millisecond.
+  const GRADE_FULL = 3;
+  let gradeTier = GRADE_FULL;
+  let lastGradeChangeAt = 0;
+
+  function gradeBudget(now, starved) {
+    if (now - lastGradeChangeAt < COOLDOWN_MS) return;
+    if (now - startedAt < WARMUP_MS) return;
+    if (typeof gameState !== 'undefined' && gameState !== 'PLAYING') return;
+
+    // Too few frames to average means the frame rate collapsed rather than that
+    // the data is missing, the same reading frame() takes of a starved window.
+    const down = starved || lastFps < FPS_LOW;
+    if (down && gradeTier > 0) { gradeTier--; lastGradeChangeAt = now; refreshReadout(); return; }
+    // Only climb back on real headroom, so a machine sitting near the target
+    // doesn't flip a full-screen pass on and off every couple of seconds.
+    if (!starved && lastFps > FPS_HIGH && gradeTier < GRADE_FULL) {
+      gradeTier++; lastGradeChangeAt = now; refreshReadout();
+    }
+  }
+
   // Runs once per frame, over the finished world image.
   function grade() {
     const strength = ATMO_STRENGTH[atmosphere] || 0;
-    if (strength <= 0) return;
+    if (strength <= 0 || gradeTier <= 0) return;
     const m = currentMood();
     if (!m) return;
 
-    const vib = m.vib * strength;
+    const vib = gradeTier >= 3 ? m.vib * strength : 0;
     const amt = m.amt * strength;
     // Bloom is the only genuinely costly pass, so it's also the first thing
     // given up: not at 'subtle', and never while the scaler has already had to
     // drop the buffer to keep up. The two halves share one budget.
-    const bloom = (atmosphere === 'rich' && rung >= BLOOM_MIN_RUNG) ? m.bloom * strength : 0;
+    const bloom = (atmosphere === 'rich' && rung >= BLOOM_MIN_RUNG && gradeTier >= GRADE_FULL) ? m.bloom * strength : 0;
 
-    const desat = (m.desat || 0) * strength;
+    const desat = gradeTier >= 2 ? (m.desat || 0) * strength : 0;
 
     try {
       if (vib > 0.005) {
@@ -1323,7 +1365,8 @@ const VibrantVox = (function () {
       fps: lastFps,
       native: scale >= 0.999,
       atmosphere: atmosphere,
-      bloomActive: atmosphere === 'rich' && rung >= BLOOM_MIN_RUNG,
+      gradeTier: gradeTier,
+      bloomActive: atmosphere === 'rich' && rung >= BLOOM_MIN_RUNG && gradeTier >= GRADE_FULL,
     };
   }
 
@@ -1334,8 +1377,8 @@ const VibrantVox = (function () {
     if (!el) return;
     const pct = Math.round(scale * 100);
     const resText = scale >= 0.999 ? 'Full resolution' : pct + '% resolution';
-    const lightText = atmosphere === 'off' ? '' :
-      (atmosphere === 'rich' && rung >= BLOOM_MIN_RUNG) ? ' · Enhanced lighting' : ' · Basic lighting';
+    const lightText = (atmosphere === 'off' || gradeTier <= 0) ? '' :
+      (atmosphere === 'rich' && rung >= BLOOM_MIN_RUNG && gradeTier >= GRADE_FULL) ? ' · Enhanced lighting' : ' · Basic lighting';
     el.textContent = resText + lightText;
   }
 
@@ -2300,24 +2343,71 @@ let dayPhase = 'day'; // 'day' | 'dusk' | 'night' | 'dawn'
 
 
 
-// Each cloud is a small cluster of irregular, independently-drifting puffs
-// (instead of the same 4 fixed circles every time) with a depth value that
-// drives parallax — farther clouds are smaller, slower, hazier; near ones
-// are bigger, faster, bolder — so the sky reads as layered instead of flat.
+// Each cloud is a genuine 32x32 pixel-art sprite, hard-edged like every other
+// texture in the game (see DUST_PUFF_W/BUTTERFLY_FRAME_W, 32x32 is the
+// game's native pixel-art unit), not the soft per-frame gradient blobs this
+// used to be. The irregular multi-lobe silhouette (still a different random
+// cluster every time, not 4 fixed circles) is rasterised to a hard mask ONCE
+// per cloud at startup; drawSky() below just blits the cached result, which
+// is also a lot cheaper than rebuilding gradients 20 times a frame.
+const CLOUD_PX = 32;
+// mask values: 0 = empty, 1 = sunlit top, 2 = body, 3 = shaded belly. Bands are
+// cut by the pixel's vertical position in the WHOLE cluster's bounding box
+// (not per-lobe), so the shading reads as one coherent cloud lit from above
+// instead of each lobe looking separately top-lit.
+function _buildCloudMask() {
+  const mask = new Uint8Array(CLOUD_PX * CLOUD_PX);
+  const puffCount = 4 + Math.floor(Math.random()*3);
+  const cx = CLOUD_PX/2, cy = CLOUD_PX/2;
+  const lobes = [];
+  let topMost = Infinity, botMost = -Infinity;
+  for (let p = 0; p < puffCount; p++) {
+    const ang = (p/puffCount)*Math.PI*2 + Math.random()*0.6;
+    const dist = 0.3 + Math.random()*0.9;
+    const lx = cx + Math.cos(ang)*8*dist, ly = cy + Math.sin(ang)*3.2*dist - 1, r = 4.5+Math.random()*3.5;
+    lobes.push({ x: lx, y: ly, r });
+    if (ly-r < topMost) topMost = ly-r;
+    if (ly+r > botMost) botMost = ly+r;
+  }
+  const span = Math.max(1, botMost - topMost);
+  for (let py = 0; py < CLOUD_PX; py++) {
+    const rel = (py - topMost) / span;
+    const band = rel < 0.32 ? 1 : rel > 0.68 ? 3 : 2;
+    for (let px = 0; px < CLOUD_PX; px++) {
+      for (const l of lobes) {
+        const dx = px+0.5-l.x, dy = py+0.5-l.y;
+        if (dx*dx+dy*dy <= l.r*l.r) { mask[py*CLOUD_PX+px] = band; break; }
+      }
+    }
+  }
+  return mask;
+}
+// Bakes one cloud's mask into an actual 32x32 canvas for the current sky
+// tint. Cheap (one putImageData), but still only called when that cloud's
+// tint bucket changes, see the tintKey check in drawSky().
+function _renderCloudSprite(mask, hi, base, sh) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = CLOUD_PX;
+  const cctx = cv.getContext('2d');
+  const img = cctx.createImageData(CLOUD_PX, CLOUD_PX);
+  for (let i = 0; i < mask.length; i++) {
+    const band = mask[i];
+    if (!band) continue;
+    const col = band === 1 ? hi : band === 3 ? sh : base;
+    const o = i * 4;
+    img.data[o] = col[0]|0; img.data[o+1] = col[1]|0; img.data[o+2] = col[2]|0; img.data[o+3] = 255;
+  }
+  cctx.putImageData(img, 0, 0);
+  return cv;
+}
 let clouds = [];
 for (let i = 0; i < 20; i++) {
   const depth = Math.random();
-  const puffCount = 4 + Math.floor(Math.random()*3);
-  const puffs = [];
-  for (let p = 0; p < puffCount; p++) {
-    const ang = (p/puffCount)*Math.PI*2 + Math.random()*0.6;
-    const dist = 0.35 + Math.random()*0.95;
-    puffs.push({ ox: Math.cos(ang)*32*dist, oy: Math.sin(ang)*12*dist - 5, r: 13+Math.random()*17, phase: Math.random()*Math.PI*2 });
-  }
   clouds.push({
     x: Math.random() * 2500, y: Math.random() * 120 + 10,
     speed: 0.06 + depth*0.32, scale: 0.5 + depth*1.3, depth,
-    seed: Math.random() * 100, puffs
+    seed: Math.random() * 100, mask: _buildCloudMask(),
+    _spriteKey: '', _sprite: null
   });
 }
 
@@ -2795,19 +2885,16 @@ let blockHitFlashes = [];
 const dimensions = { "OVERWORLD": new Map(), "GOLD": new Map(), "OCEAN": new Map(), "LAVA": new Map(), "VOID": new Map(), "ERG": new Map() };
 
 // =========================================================
-// MINIMAP — Terraria-style fog-of-war: revealed patches of the map stay
-// revealed permanently, the rest renders solid black. Tracked in coarse
-// MINIMAP_CELL-sized cells rather than per-tile deliberately — the save
-// system (see VxWorlds further down) is built so a save "grows with what you
-// build, not how far you walk"; per-tile reveal tracking would break that for
-// exactly the OVERWORLD data it applies to. Coarse cells keep growth bounded
-// to roughly one entry per 8 blocks walked instead of one per block.
+// MINIMAP — detailed pixel map with fog-of-war. Fog is tracked per 4×4 cell,
+// while the rendered map shows every individual world block as one pixel. This
+// gives terrain, caves and player buildings real shape without storing one
+// permanent exploration entry for every single tile.
 // Only OVERWORLD's cells are persisted (see VxWorlds.serialize/applySave) —
 // pocket dimensions are already thrown away every run (see POCKET_DIMS
 // comments), so their fog resets right along with everything else.
 // =========================================================
-const MINIMAP_CELL = 8;      // reveal granularity, in world blocks
-const MINIMAP_REVEAL_R = 2;  // reveal radius, in cells, around the player
+const MINIMAP_CELL = 4;      // fog granularity, in world blocks
+const MINIMAP_REVEAL_R = 3;  // 28-block circular reveal around the player
 const exploredCells = { OVERWORLD: new Set(), GOLD: new Set(), OCEAN: new Set(), LAVA: new Set(), VOID: new Set(), ERG: new Set() };
 let minimapVisible = localStorage.getItem('voxeria_minimap_visible') !== '0';
 function _mmCellKey(cx, cy) { return cx + ',' + cy; }
@@ -2836,26 +2923,39 @@ function toggleMinimap(force) {
   if (btn) btn.classList.toggle('open', minimapVisible);
   try { localStorage.setItem('voxeria_minimap_visible', minimapVisible ? '1' : '0'); } catch (e) {}
   _minimapLastCell = null; // force a redraw even if the player hasn't moved since hiding it
+  // Hiding the map while it's zoomed in should not leave it stuck zoomed for
+  // the next time it's shown.
+  if (!minimapVisible && minimapZoomed) toggleMinimapZoom();
 }
 
-// Downsampled render: each on-screen block is one sampled MINIMAP_CELL,
-// colored off the real block at that cell's center (same palette the rest of
-// the game uses — see blockColors). Fogged cells stay solid black. The
-// player sits fixed at the panel's center; the sampled window scrolls under
-// them exactly like the main camera does for the real view.
-// Redraws only when the player crosses into a new reveal cell (i.e. roughly
-// every MINIMAP_CELL blocks moved) rather than every frame — the picture
-// literally cannot change any faster than that, since reveal itself is
-// keyed to the same cell grid.
-// 8px per cell (not the 4px this started at) specifically so each sampled
-// cell is big enough to actually show the block's real 32x32 pixel-art
-// texture (see BLOCK_TEXTURE_SOURCES) rather than reading as an abstract
-// color-mosaic — the same raster art the main view uses, just downscaled
-// with the same crisp/no-smoothing rule (drawn via _hasBlockTexture below,
-// falling back to a flat blockColors swatch only for the many blocks that
-// are procedural-only and have no PNG at all).
-const MINIMAP_PX = 8; // on-screen pixels per sampled cell
+// Click-to-zoom: a pure CSS scale-up of the existing panel (see #minimap-
+// panel.zoomed), so this just flips the class — drawMinimap() itself needs
+// no changes at all.
+let minimapZoomed = false;
+function toggleMinimapZoom() {
+  if (!minimapVisible) return;
+  minimapZoomed = !minimapZoomed;
+  const panel = document.getElementById('minimap-panel');
+  if (panel) panel.classList.toggle('zoomed', minimapZoomed);
+}
+
+// A fog cell is rendered as a 4×4 block-pixel patch. The panel therefore
+// shows 208×144 actual world blocks, not a blurry centre sample of each area.
+const MINIMAP_PX = MINIMAP_CELL;
 let _minimapLastCell = null;
+
+function _minimapBlockColor(b, wx, wy) {
+  if (b === BLOCKS.PORTAL) return (Math.floor(frameCount / 10) % 2) ? '#fff0ad' : '#e0a13f';
+  if (b === BLOCKS.AIR) return currentDim === 'ERG' ? '#6e4522' : '#0d1420';
+  if (b === BLOCKS.WATER || b === BLOCKS.DEEP_WATER) return '#2379a7';
+  const palette = blockColors[b];
+  if (!palette) return '#18212b';
+  // A brighter top edge makes slopes, tunnels and built roofs readable at a
+  // glance, rather than reducing the whole map to flat material colours.
+  if (isSolid(b) && !isSolid(getBlock(wx, wy - 1))) return palette[2] || palette[0];
+  return palette[0];
+}
+
 function drawMinimap() {
   if (!minimapVisible) return;
   const canvas = document.getElementById('minimap-canvas');
@@ -2867,7 +2967,7 @@ function drawMinimap() {
   _minimapLastCell = cellKey;
 
   const mctx = canvas.getContext('2d');
-  mctx.imageSmoothingEnabled = false; // nearest-neighbor downscale, same crispness as the main renderer
+  mctx.imageSmoothingEnabled = false;
   const cols = Math.floor(canvas.width / MINIMAP_PX), rows = Math.floor(canvas.height / MINIMAP_PX);
   const set = exploredCells[currentDim];
   mctx.fillStyle = '#050505';
@@ -2877,23 +2977,24 @@ function drawMinimap() {
     for (let sy = 0; sy < rows; sy++) {
       const wcx = pcx + (sx - halfC), wcy = pcy + (sy - halfR);
       if (!set || !set.has(_mmCellKey(wcx, wcy))) continue; // stays fogged
-      const wx = wcx * MINIMAP_CELL + (MINIMAP_CELL >> 1);
-      const wy = wcy * MINIMAP_CELL + (MINIMAP_CELL >> 1);
-      const b = getBlock(wx, wy);
       const px = sx * MINIMAP_PX, py = sy * MINIMAP_PX;
-      if (_hasBlockTexture(b)) {
-        mctx.drawImage(_blockTextures[b], px, py, MINIMAP_PX, MINIMAP_PX);
-      } else {
-        const bc = blockColors[b];
-        mctx.fillStyle = bc ? bc[0] : '#0d1420'; // AIR (and anything uncoloured) reads as open sky/cave
-        mctx.fillRect(px, py, MINIMAP_PX, MINIMAP_PX);
+      const baseX = wcx * MINIMAP_CELL, baseY = wcy * MINIMAP_CELL;
+      for (let dx = 0; dx < MINIMAP_CELL; dx++) {
+        for (let dy = 0; dy < MINIMAP_CELL; dy++) {
+          const wx = baseX + dx, wy = baseY + dy;
+          mctx.fillStyle = _minimapBlockColor(getBlock(wx, wy), wx, wy);
+          mctx.fillRect(px + dx, py + dy, 1, 1);
+        }
       }
     }
   }
-  mctx.fillStyle = '#ffffff';
-  mctx.beginPath();
-  mctx.arc(halfC * MINIMAP_PX + MINIMAP_PX / 2, halfR * MINIMAP_PX + MINIMAP_PX / 2, 3, 0, Math.PI * 2);
-  mctx.fill();
+  // Pixel compass marker: outline + bright core + one-pixel facing tip.
+  const mx = halfC * MINIMAP_PX + Math.floor(MINIMAP_PX / 2);
+  const my = halfR * MINIMAP_PX + Math.floor(MINIMAP_PX / 2);
+  mctx.fillStyle = '#10151c'; mctx.fillRect(mx - 3, my - 3, 7, 7);
+  mctx.fillStyle = '#ffffff'; mctx.fillRect(mx - 1, my - 1, 3, 3);
+  mctx.fillStyle = '#ffcf5a';
+  mctx.fillRect((player.facing || 1) >= 0 ? mx + 2 : mx - 3, my, 2, 1);
 }
 
 // ── Named world saves (the VxWorlds block near </body> owns the rest) ──────
@@ -4277,6 +4378,47 @@ function toggleFPS() {
   fpsLastUpdate = performance.now();
 }
 
+// F2 debug menu -- Minecraft-F3-style overlay. Deliberately reads only global
+// state that already exists elsewhere (VibrantVox.status(), worldEdits, the
+// entity arrays) rather than tracking anything new, so it can't itself become
+// a source of the kind of per-frame cost it exists to help diagnose.
+let debugMenuEnabled = false;
+let debugMenuLastUpdate = 0;
+function toggleDebugMenu() {
+  debugMenuEnabled = !debugMenuEnabled;
+  const el = document.getElementById('debug-menu');
+  if (el) el.style.display = debugMenuEnabled ? 'block' : 'none';
+  debugMenuLastUpdate = 0; // force an immediate refresh instead of waiting out the throttle
+}
+function updateDebugMenu() {
+  const el = document.getElementById('debug-menu');
+  if (!el) return;
+  const vv = VibrantVox.status();
+  const tx = Math.floor(player.x / TILE), ty = Math.floor(player.y / TILE);
+  const cx = Math.floor(tx / CHUNK_W);
+  const biome = currentDim === 'OVERWORLD' ? getBiome(Math.floor(player.x / (CHUNK_W * TILE))) : '-';
+  const online = 1 + Object.keys(otherPlayers).length;
+  el.textContent =
+    'Voxeria Debug (F2)\n' +
+    `${Math.round(vv.fps)} FPS · ${vv.w}×${vv.h}${vv.native ? '' : ' ↓'} · grade ${vv.gradeTier}/3\n` +
+    `XY: ${player.x.toFixed(1)} / ${player.y.toFixed(1)}\n` +
+    `Block: ${tx} / ${ty} · Chunk: ${cx}\n` +
+    `Dim: ${currentDim} · Biome: ${biome} · ${dayPhase}\n` +
+    `World: ${currentWorldName || '-'} (${gameMode}) · seed ${rawSeedString}\n` +
+    `Edits: ${worldEdits.size} · Players online: ${online}\n` +
+    `Entities: ${animals.length} animals · ${particles.length} particles · ${itemDrops.length} drops\n` +
+    `State: ${gameState}${isGamePaused() ? ' (paused)' : ''}`;
+}
+
+// F4 -- hide every HUD element (Minecraft-F1-style), leaving only the
+// rendered world on screen. All the actual hiding lives in the CSS rule for
+// body.vx-hide-ui (see index.html); this just flips the class.
+let uiHidden = false;
+function toggleUIVisibility() {
+  uiHidden = !uiHidden;
+  document.body.classList.toggle('vx-hide-ui', uiHidden);
+}
+
 function _todayDateStr() { return new Date().toISOString().slice(0, 10); }
 
 let damageFlashTimer = 0;      // white/red flash on hit
@@ -4380,20 +4522,22 @@ function showNotification(text) {
   notifTimeout = setTimeout(() => notif.classList.remove('show'), 2500);
 }
 
-function copyTextWithFallback(text) {
+function copyTextWithFallback(text, successMessage) {
+  const msg = successMessage || "🔗 Invite link copied to clipboard!";
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
-      showNotification("🔗 Invite link copied to clipboard!");
+      showNotification(msg);
     }).catch((e) => {
       console.error("Clipboard write error:", e);
-      legacyCopyFallback(text);
+      legacyCopyFallback(text, msg);
     });
   } else {
-    legacyCopyFallback(text);
+    legacyCopyFallback(text, msg);
   }
 }
 
-function legacyCopyFallback(text) {
+function legacyCopyFallback(text, successMessage) {
+  const msg = successMessage || "🔗 Invite link copied to clipboard!";
   try {
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -4405,7 +4549,7 @@ function legacyCopyFallback(text) {
     const ok = document.execCommand('copy');
     document.body.removeChild(ta);
     if (ok) {
-      showNotification("🔗 Invite link copied to clipboard!");
+      showNotification(msg);
     } else {
       showNotification("⚠️ Could not copy automatically: " + text);
     }
@@ -4863,6 +5007,24 @@ function spawnFallingMaterialDust(tx, ty, btype) {
       color: cols[0], size: 1.5+Math.random()*2, life: 12+Math.random()*10, maxLife: 22, type: 'dust'
     });
   }
+}
+
+// Player-placed sand is deliberately less forgiving than terrain sand: a
+// floating placement has nowhere to settle, so it disperses immediately and
+// consumes the item. This is placement-only; naturally generated dunes still
+// use updateFallingBlocks below and behave like real falling material.
+function spawnUnsupportedSandBurst(tx, ty) {
+  const colors = ['#f4d47e', '#d9ad57', '#a87535', '#76502b'];
+  for (let i = 0; i < 18; i++) {
+    particles.push({
+      x: tx * TILE + TILE / 2 + (Math.random() - 0.5) * 9,
+      y: ty * TILE + TILE / 2 + (Math.random() - 0.5) * 8,
+      vx: (Math.random() - 0.5) * 4.2, vy: -0.6 - Math.random() * 2.2,
+      color: colors[i % colors.length], size: 1 + Math.random() * 2.5,
+      life: 16 + Math.random() * 16, maxLife: 32, type: 'dust'
+    });
+  }
+  particles.push({ x: tx*TILE + TILE/2, y: ty*TILE + TILE/2, vx:0, vy:0, color:'', size:0, life:9, maxLife:9, type:'ring' });
 }
 
 // `clingChance` is the odds a block that could still slide diagonally
@@ -5577,31 +5739,39 @@ function drawBlock(x, y, btype) {
   if (btype === BLOCKS.WATER) return;
 
   if (btype === BLOCKS.PORTAL) {
-    // Swirling vortex look: dark gradient core + a few rotating "petal" arcs +
-    // a pulsing rim, all frameCount-driven so no extra cache/stamp is needed.
-    const cxp = sx + TILE/2, cyp = sy + TILE/2;
-    const baseHue = (frameCount*2 + x*6 + y*6) % 360;
-    const g = ctx.createRadialGradient(cxp, cyp, 0, cxp, cyp, TILE*0.62);
-    g.addColorStop(0, `hsla(${(baseHue+40)%360},90%,18%,0.95)`);
-    g.addColorStop(0.55, `hsla(${baseHue},85%,32%,0.9)`);
-    g.addColorStop(1, `hsla(${(baseHue+280)%360},100%,55%,0)`);
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(cxp, cyp, TILE*0.62, 0, Math.PI*2); ctx.fill();
-    ctx.save();
-    ctx.translate(cxp, cyp);
-    const spin = frameCount*0.05 + (x*1.7 + y*2.3);
-    for (let i=0; i<3; i++) {
-      ctx.save();
-      ctx.rotate(spin + i*(Math.PI*2/3));
-      ctx.strokeStyle = `hsla(${(baseHue+120*i)%360},100%,72%,0.85)`;
-      ctx.lineWidth = 2.2;
-      ctx.beginPath(); ctx.arc(0, 0, TILE*0.4, -0.6, 1.1); ctx.stroke();
-      ctx.restore();
+    // Sandportal: deliberately square, palette-limited pixel art rather than
+    // a smooth colour-wheel vortex. Every portal tile reads as carved sandstone
+    // on its own, while connected tiles form one bright storm gate.
+    const q = Math.max(2, Math.floor(TILE / 14));
+    const n = (dx, dy) => getBlock(x + dx, y + dy) === BLOCKS.PORTAL;
+    const north = n(0, -1), south = n(0, 1), west = n(-1, 0), east = n(1, 0);
+    ctx.fillStyle = '#3b2415'; ctx.fillRect(sx, sy, TILE, TILE);
+    ctx.fillStyle = '#70431d'; ctx.fillRect(sx + q, sy + q, TILE - q * 2, TILE - q * 2);
+    ctx.fillStyle = '#bd7b31'; ctx.fillRect(sx + q * 2, sy + q * 2, TILE - q * 4, TILE - q * 4);
+    // Chunky sandstone chips: deterministic, no shimmer noise.
+    ctx.fillStyle = '#e4b65e';
+    ctx.fillRect(sx + q * 3, sy + q * 3, q * 2, q);
+    ctx.fillRect(sx + TILE - q * 5, sy + q * 5, q, q * 2);
+    ctx.fillStyle = '#7d481d';
+    ctx.fillRect(sx + q * 2, sy + TILE - q * 4, q * 2, q);
+    ctx.fillRect(sx + TILE - q * 4, sy + TILE - q * 3, q, q);
+    // The inner storm is a grid of animated, but still hard-edged, dust bands.
+    const phase = Math.floor(frameCount / 7) % 4;
+    ctx.fillStyle = '#2d1a13'; ctx.fillRect(sx + q * 4, sy + q * 4, TILE - q * 8, TILE - q * 8);
+    ctx.fillStyle = '#f3cf76';
+    for (let row = 0; row < 3; row++) {
+      const band = (row + phase + x + y) % 3;
+      ctx.fillRect(sx + q * (5 + band), sy + q * (5 + row * 2), q * 4, q);
     }
-    ctx.restore();
-    const pulse = Math.sin(frameCount*0.15 + x + y)*0.15 + 0.55;
-    ctx.strokeStyle = `hsla(${(baseHue+200)%360},100%,80%,${pulse})`;
-    ctx.lineWidth = 2; ctx.strokeRect(sx+2, sy+2, TILE-4, TILE-4);
+    ctx.fillStyle = '#fff0ad';
+    ctx.fillRect(sx + TILE / 2 - q, sy + TILE / 2 - q, q * 2, q * 2);
+    // Connected edges lose their heavy inner rim, making the five portal
+    // blocks look like one constructed gate instead of five separate icons.
+    ctx.fillStyle = '#d99a45';
+    if (north) ctx.fillRect(sx + q * 4, sy, TILE - q * 8, q * 3);
+    if (south) ctx.fillRect(sx + q * 4, sy + TILE - q * 3, TILE - q * 8, q * 3);
+    if (west) ctx.fillRect(sx, sy + q * 4, q * 3, TILE - q * 8);
+    if (east) ctx.fillRect(sx + TILE - q * 3, sy + q * 4, q * 3, TILE - q * 8);
     return;
   }
 
@@ -6712,12 +6882,20 @@ function drawSky() {
     }
   }
   // Clouds tint with the sky: white by day, warm pink/orange in the golden
-  // hour, and a dim blue-grey silhouette at night.
+  // hour, and a dim blue-grey silhouette at night, baked into each cloud's
+  // own cached 32x32 sprite (_buildCloudMask/_renderCloudSprite, above the
+  // BLOCKS table) rather than drawn as a gradient every frame.
   let cloudTint = _lerp3([255,255,255], [95,100,130], nightIEased);
   if (goldT > 0.01) cloudTint = _lerp3(cloudTint, [255,190,150], goldT*0.7);
   const cloudHi = _lerp3(cloudTint, [255,255,255], 0.5);   // sunlit top
   const cloudSh = _lerp3(cloudTint, [50,55,70], 0.4);      // shaded belly
   const baseAlpha = biome==="SNOW" ? 0.8 : 0.5;
+  // The tint moves smoothly with the day/night clock, so re-baking a sprite
+  // on every tiny change would be pointless work; only rebuild once a cloud's
+  // tint has drifted into a new bucket.
+  const tintKey = Math.round(nightIEased*20) + '_' + Math.round(goldT*20);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false; // keep the 32x32 pixels crisp, not blurred by upscaling
   for (let c of clouds) {
     c.x += c.speed;
     let drawX = (c.x - drawCamX*0.15) % 2500;
@@ -6725,27 +6903,16 @@ function drawSky() {
     let drawY = c.y + Math.sin(frameCount*0.02+c.seed)*12;
     const cloudAlpha = baseAlpha * (0.45 + c.depth*0.55);
 
-    // Soft belly shadow grounds the whole cluster before the puffs go on top
-    ctx.fillStyle = `rgba(${cloudSh[0]|0},${cloudSh[1]|0},${cloudSh[2]|0},${cloudAlpha*0.35})`;
-    ctx.beginPath();
-    ctx.ellipse(drawX, drawY+10*c.scale, 42*c.scale, 12*c.scale, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // Each puff is its own soft-edged, top-lit gradient blob — gives real
-    // volume and fluffiness instead of a single flat-tinted silhouette —
-    // and drifts a little on its own so the cloud feels alive, not rigid.
-    for (const puff of c.puffs) {
-      const px = drawX + puff.ox*c.scale;
-      const py = drawY + puff.oy*c.scale + Math.sin(frameCount*0.015+puff.phase)*1.2*c.scale;
-      const r = puff.r*c.scale;
-      const g = ctx.createRadialGradient(px-r*0.3, py-r*0.35, r*0.1, px, py, r);
-      g.addColorStop(0, `rgba(${cloudHi[0]|0},${cloudHi[1]|0},${cloudHi[2]|0},${cloudAlpha})`);
-      g.addColorStop(0.65, `rgba(${cloudTint[0]|0},${cloudTint[1]|0},${cloudTint[2]|0},${cloudAlpha})`);
-      g.addColorStop(1, `rgba(${cloudSh[0]|0},${cloudSh[1]|0},${cloudSh[2]|0},0)`);
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.fill();
+    if (c._spriteKey !== tintKey) {
+      c._sprite = _renderCloudSprite(c.mask, cloudHi, cloudTint, cloudSh);
+      c._spriteKey = tintKey;
     }
+    const size = CLOUD_PX * c.scale * 2.2;
+    ctx.globalAlpha = cloudAlpha;
+    ctx.drawImage(c._sprite, drawX - size/2, drawY - size/2, size, size);
   }
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 // =========================================================
@@ -8606,6 +8773,18 @@ function executePlace(wx, wy) {
       const insidePlayer = (wx >= pTx0 && wx <= pTx1 && wy >= pTy0 && wy <= pTy1);
       if (!insidePlayer) {
         const placedBlock = item.block;
+        // A loose sand block may only be placed directly on solid support.
+        // It is intentionally not turned into a falling world block: the
+        // requested rule is that an attempted mid-air placement disappears.
+        if ([BLOCKS.SAND, BLOCKS.ERG_SAND].includes(placedBlock) && !isSolid(getBlock(wx, wy + 1))) {
+          item.count--;
+          spawnUnsupportedSandBurst(wx, wy);
+          playBlockSound(placedBlock);
+          screenShake = Math.max(screenShake, 3);
+          if (item.count <= 0) inventory[selectedSlot] = null;
+          drawHotbar();
+          return;
+        }
         setBlockAndBroadcast(wx,wy,item.block);
         item.count--;
         fireGraphEvent('onPlaceBlock', { block: placedBlock, x: wx, y: wy });
@@ -9024,6 +9203,12 @@ document.getElementById('tc-place').addEventListener('touchcancel',(e)=>{endPlac
 document.addEventListener('keydown',(e)=>{
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (e.key === 'F2') { e.preventDefault(); toggleDebugMenu(); }
+  if (e.key === 'F4') { e.preventDefault(); toggleUIVisibility(); }
+  if (e.key === 'F6') { e.preventDefault(); toggleModEditor(); }
+  if (e.key === 'F8') { e.preventDefault(); toggleCommandConsole(); }
+  if (e.key === 'F10') { e.preventDefault(); generateRandomModCode(); }
+  if (e.key === 'F12') { e.preventDefault(); toggleCommandHelp(); }
   const _pressedKey = e.key.toLowerCase();
   if (_pressedKey === keyBinds.ping) sendPing();
   if (_pressedKey === keyBinds.minimap) toggleMinimap();
@@ -10552,6 +10737,11 @@ function _gameLoopInner(now) {
     }
   }
 
+  if (debugMenuEnabled && now - debugMenuLastUpdate >= 250) {
+    debugMenuLastUpdate = now;
+    updateDebugMenu();
+  }
+
   if (gameState==="INTRO") { updateAndDrawIntro(ctx,dt); requestAnimationFrame(gameLoop); return; }
 
   // The pause menu is drawn on top of the game, but nothing below this guard
@@ -10575,6 +10765,7 @@ function _gameLoopInner(now) {
   }
 
   updatePlayer(dt); updatePhysics(); updateFire(dt); updateAnimals(dt); updateDamageCooldown(dt);
+  if (window.VxDesertPrototype) VxDesertPrototype.update(dt);
   updateGraphRuntime(dt);
   updateSelectedBlockPopup(dt);
   updateDayNightCycle(dt); updateGoldSlimes(dt);
@@ -10678,7 +10869,7 @@ function _gameLoopInner(now) {
   if(!paused && impactFlash>0){ impactFlash*=0.8; if(impactFlash<0.02) impactFlash=0; }
   drawMinimap();
   spawnAmbientSparkles();
-  drawSky(); drawBgHills(); drawCaveBackground(); drawWorld(); drawBlockCracks(); drawPlaceCharge(); drawWaterFluid(); drawAnimals(); drawOtherPlayers(dt); drawParticles(); drawWaterfalls(); drawSplash(); drawWeather(); drawDimForge(); drawDeathDrops(); drawPlayer(); drawSelectedBlockPopup(); drawUnderwaterOverlay(); drawDayNightOverlay(); drawLightingPass();
+  drawSky(); drawBgHills(); drawCaveBackground(); drawWorld(); drawBlockCracks(); drawPlaceCharge(); drawWaterFluid(); drawAnimals(); drawOtherPlayers(dt); drawParticles(); drawWaterfalls(); drawSplash(); drawWeather(); drawDimForge(); drawDeathDrops(); drawPlayer(); if (window.VxDesertPrototype) VxDesertPrototype.draw(); drawSelectedBlockPopup(); drawUnderwaterOverlay(); drawDayNightOverlay(); drawLightingPass();
   // The scene is complete here — sky, terrain, creatures, weather and lighting
   // have all landed. VibrantVox grades that finished image in one pass, which
   // is why it sits exactly at this seam: everything below is the informational
@@ -10696,6 +10887,7 @@ function _gameLoopInner(now) {
   } else if (currentDim === "VOID") {
     ctx.fillStyle = 'rgba(10,0,20,0.12)'; ctx.fillRect(0,0,canvas.width,canvas.height);
   }
+  drawErgStormWarning();
 
   // Pocket-dimension collapse cinematic (rising wave/lava, growing
   // singularity, golden vignette + shockwave) — drawn before the impact
@@ -12242,5 +12434,3 @@ window.addEventListener('DOMContentLoaded', function(){
   window.addEventListener('pagehide',_leaveMultiplayer);
   window._saveInventory=_saveInv;
 })();
-
-
