@@ -559,9 +559,17 @@
       box-shadow: var(--hud-shadow), var(--bevel); margin-bottom: 12px;
       flex-wrap: wrap; gap: 10px;
     }
+    /* Pushed-in "engraved plate" bevel (see the --bevel-in comment above) --
+       a readout is a hole in the panel showing a value, not a raised button,
+       the same reasoning #seed-input already used. Previously a flat
+       var(--surface-2) box with a plain 1px hairline, which read as a
+       generic form control dropped in next to the rest of the HUD's proper
+       block-game chrome instead of matching it. */
     #seed-container {
-      display: flex; gap: 6px; align-items: center;
-      background: var(--surface-2); padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--line-1);
+      display: flex; gap: 8px; align-items: center;
+      background: var(--surface-1); padding: 5px 10px;
+      border-radius: var(--radius-sm); border: var(--px) solid var(--hud-border);
+      box-shadow: var(--bevel-in);
     }
     #seed-input {
       background: var(--surface-1); border: 1px solid var(--line-1); color: var(--text-1);
@@ -606,7 +614,10 @@
     #pos-info { color: var(--text-2); font-family: var(--font-display); font-size: 16px; }
     #weekly-timer { color: var(--text-1); font-family: var(--font-display); font-size: 16px; }
     .vx-world-tag { color: var(--text-3); font-family: var(--font-display); font-size: 8px; }
-    #vx-world-label { color: var(--text-1); font-family: var(--font-display); font-size: 16px; }
+    /* Accent instead of plain --text-1: the world name was the same flat
+       white as every other label in the bar, so it never read as the one
+       piece of information this chip actually exists to show. */
+    #vx-world-label { color: var(--accent-hover); font-family: var(--font-display); font-size: 16px; }
     #hotbar {
       display: flex; justify-content: center; gap: 8px;
       background: var(--hud-bg); backdrop-filter: blur(var(--hud-blur));
