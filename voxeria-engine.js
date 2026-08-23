@@ -5013,18 +5013,47 @@ function spawnFallingMaterialDust(tx, ty, btype) {
 // floating placement has nowhere to settle, so it disperses immediately and
 // consumes the item. This is placement-only; naturally generated dunes still
 // use updateFallingBlocks below and behave like real falling material.
+//
+// The grains use their own gravity-driven array (sandGrains, below) rather
+// than the generic `particles` list — generic 'dust' particles drift upward
+// and fade in place, which read as smoke, not sand. These actually fall and
+// vanish the instant they hit solid ground, like the block's mass really did
+// come apart and drop.
+const sandGrains = [];
 function spawnUnsupportedSandBurst(tx, ty) {
   const colors = ['#f4d47e', '#d9ad57', '#a87535', '#76502b'];
-  for (let i = 0; i < 18; i++) {
-    particles.push({
-      x: tx * TILE + TILE / 2 + (Math.random() - 0.5) * 9,
+  for (let i = 0; i < 24; i++) {
+    sandGrains.push({
+      x: tx * TILE + TILE / 2 + (Math.random() - 0.5) * 10,
       y: ty * TILE + TILE / 2 + (Math.random() - 0.5) * 8,
-      vx: (Math.random() - 0.5) * 4.2, vy: -0.6 - Math.random() * 2.2,
-      color: colors[i % colors.length], size: 1 + Math.random() * 2.5,
-      life: 16 + Math.random() * 16, maxLife: 32, type: 'dust'
+      vx: (Math.random() - 0.5) * 3, vy: -1.5 - Math.random() * 1.5,
+      color: colors[i % colors.length], size: 1.5 + Math.random() * 2,
+      life: 150, // hard timeout (2.5s) in case it's placed over a bottomless drop
     });
   }
   particles.push({ x: tx*TILE + TILE/2, y: ty*TILE + TILE/2, vx:0, vy:0, color:'', size:0, life:9, maxLife:9, type:'ring' });
+}
+
+// Same gravity/landing pattern as updateFallingLeaves/isLeafSupported below —
+// a small dedicated array with real per-frame ground collision, since the
+// generic `particles` array never checks the world at all.
+function updateSandGrains(dt) {
+  for (let i = sandGrains.length - 1; i >= 0; i--) {
+    const g = sandGrains[i];
+    g.life -= dt;
+    g.vy = Math.min(g.vy + 0.35 * dt, 9);
+    g.vx *= Math.pow(0.94, dt);
+    g.x += g.vx * dt;
+    g.y += g.vy * dt;
+    const tx = Math.floor(g.x / TILE), ty = Math.floor(g.y / TILE);
+    if (g.life <= 0 || isSolid(getBlock(tx, ty))) sandGrains.splice(i, 1);
+  }
+}
+function drawSandGrains() {
+  for (const g of sandGrains) {
+    ctx.fillStyle = g.color;
+    ctx.fillRect(g.x - drawCamX - g.size/2, g.y - drawCamY - g.size/2, g.size, g.size);
+  }
 }
 
 // `clingChance` is the odds a block that could still slide diagonally
@@ -10769,7 +10798,7 @@ function _gameLoopInner(now) {
   updateGraphRuntime(dt);
   updateSelectedBlockPopup(dt);
   updateDayNightCycle(dt); updateGoldSlimes(dt);
-  updateWeather(dt); updateWaterfalls(dt); updateSplash(dt); updateItemDrops(dt); updateFallingLeaves(dt);
+  updateWeather(dt); updateWaterfalls(dt); updateSplash(dt); updateItemDrops(dt); updateFallingLeaves(dt); updateSandGrains(dt);
   updateDeathDrops(dt); updatePocketDimension(dt); updateDimForge(dt);
   updateExploredCells();
   // Living-world flora tick — self-throttled to once every 3s internally, so
@@ -10869,7 +10898,7 @@ function _gameLoopInner(now) {
   if(!paused && impactFlash>0){ impactFlash*=0.8; if(impactFlash<0.02) impactFlash=0; }
   drawMinimap();
   spawnAmbientSparkles();
-  drawSky(); drawBgHills(); drawCaveBackground(); drawWorld(); drawBlockCracks(); drawPlaceCharge(); drawWaterFluid(); drawAnimals(); drawOtherPlayers(dt); drawParticles(); drawWaterfalls(); drawSplash(); drawWeather(); drawDimForge(); drawDeathDrops(); drawPlayer(); if (window.VxDesertPrototype) VxDesertPrototype.draw(); drawSelectedBlockPopup(); drawUnderwaterOverlay(); drawDayNightOverlay(); drawLightingPass();
+  drawSky(); drawBgHills(); drawCaveBackground(); drawWorld(); drawBlockCracks(); drawPlaceCharge(); drawWaterFluid(); drawAnimals(); drawOtherPlayers(dt); drawParticles(); drawSandGrains(); drawWaterfalls(); drawSplash(); drawWeather(); drawDimForge(); drawDeathDrops(); drawPlayer(); if (window.VxDesertPrototype) VxDesertPrototype.draw(); drawSelectedBlockPopup(); drawUnderwaterOverlay(); drawDayNightOverlay(); drawLightingPass();
   // The scene is complete here — sky, terrain, creatures, weather and lighting
   // have all landed. VibrantVox grades that finished image in one pass, which
   // is why it sits exactly at this seam: everything below is the informational
