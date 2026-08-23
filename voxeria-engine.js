@@ -4649,7 +4649,19 @@ function resolveCollisionX() {
 
 function resolveCollisionY() {
   player.onGround = false;
-  const tiles = getTiles(player.x + 0.1, player.y, player.w - 0.2, player.h);
+  // getTiles() itself subtracts 0.1 off the bottom edge before flooring (to
+  // avoid grabbing a spurious extra row from float drift) -- but a player
+  // resting exactly on solid ground lands with player.y+player.h within a
+  // fraction of a pixel of the tile boundary below, which that same -0.1 then
+  // floors DOWN past, excluding the very ground tile the feet are on. Losing
+  // that row for one frame reads as onGround flicking true/false every other
+  // frame (whichever way sub-pixel dt jitter tips the boundary), which
+  // cascades into the idle/jump sprite and the landing-squash both re-firing
+  // every frame -- a highly visible stutter, not the intended still idle
+  // pose. Padding the query height clears the boundary with room to spare;
+  // the real contact test right below (player.y+player.h > ty) still does
+  // the actual, precise overlap check.
+  const tiles = getTiles(player.x + 0.1, player.y, player.w - 0.2, player.h + 1);
   for (const t of tiles) {
     if (!isSolid(t.b)) continue;
     const tx = t.x * TILE, ty = t.y * TILE;
