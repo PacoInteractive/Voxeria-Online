@@ -240,7 +240,6 @@ async function initFirebase() {
         ({ initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, initializeFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs, getDoc, query, where, orderBy, limitQuery, increment } = await window.firebaseReady);
         appId = typeof __app_id !== 'undefined' ? __app_id : (firebaseConfig.projectId || 'voxeria-multiplayer-app');
         if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('PASTE_YOUR_')) {
-            document.getElementById('mp-status').innerText = "Offline (Local)";
             console.warn("Voxeria: firebaseConfig still contains placeholder values - multiplayer disabled. Fill in real Firebase credentials to enable it.");
             return;
         }
@@ -264,15 +263,12 @@ async function initFirebase() {
             if (user) {
                 userId = user.uid;
                 isMultiplayerActive = true;
-                document.getElementById('mp-status').style.color = "#00ffaa";
                 startMultiplayerSync();
                 _updateRoomState();
             }
         });
     } catch (e) {
         console.error("Firebase error:", e);
-        document.getElementById('mp-status').innerText = "Offline (Error)";
-        document.getElementById('mp-status').style.color = "#ff5555";
     }
 }
 

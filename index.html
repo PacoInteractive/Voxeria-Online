@@ -605,19 +605,6 @@
     #block-tooltip.visible { opacity: 1; }
     #pos-info { color: var(--text-2); font-family: var(--font-display); font-size: 16px; }
     #weekly-timer { color: var(--text-1); font-family: var(--font-display); font-size: 16px; }
-    #mp-status {
-      color: var(--text-1); font-family: var(--font-display); font-size: 16px;
-      cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm);
-      border: var(--px) solid var(--line-1); background: var(--surface-2);
-      box-shadow: var(--bevel);
-      /* steps(), not ease: a smooth 150ms colour ramp walks through dozens of
-         intermediate tints, which is the same continuous-tone tell as a blur.
-         Two hard steps read as a state change in a game that draws in blocks. */
-      transition: background 0.12s steps(2, end), border-color 0.12s steps(2, end);
-    }
-    /* No :hover / cursor:pointer any more — it stopped being a button when
-       hosting and joining moved into the main menu. */
-    #mp-status { cursor: default; }
     .vx-world-tag { color: var(--text-3); font-family: var(--font-display); font-size: 8px; }
     #vx-world-label { color: var(--text-1); font-family: var(--font-display); font-size: 16px; }
     #hotbar {
@@ -2199,9 +2186,6 @@
     width: 96px; font-size: 10px; padding: 6px 8px; box-sizing: border-box;
   }
   #weekly-timer { display: none; }
-  /* #mp-status stays visible on mobile — it's the only way into the room
-     panel, so hiding it would make multiplayer unreachable on phones. */
-  #mp-status { font-size: 10px; padding: 4px 7px; }
   #controls-hint { display: none; }
   /* Mod banner had no mobile treatment at all, so a long mod name/author
      wrapped onto 2-3 lines at full desktop font size and — stacked under an
@@ -3008,11 +2992,6 @@
       </div>
       <div id="pos-info">X: 0  Y: 0 | Biome: FOREST</div>
       <div id="weekly-timer" title="The shared default world resets on a fixed weekly schedule, same time for every player.">🗓️ New Seed in …</div>
-      <!-- Read-only now: joining and hosting moved to the main menu. Kept in
-           the HUD because the lobby count is genuinely useful mid-game, but it
-           is no longer a button, so there is exactly one place to start or join
-           a session. -->
-      <div id="mp-status" title="Multiplayer status — join or host from the main menu">Waiting for multiplayer...</div>
       <!-- Nur im Arena-Modus sichtbar. Die Sichtbarkeit haengt an
            body[data-vx-mode], das applyModeGating() ohnehin schon setzt --
            damit ist es dieselbe eine Quelle der Wahrheit wie beim
