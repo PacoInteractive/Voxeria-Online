@@ -685,6 +685,17 @@
       background: var(--surface-1); padding: 4px 8px; border-radius: var(--radius-sm);
       letter-spacing: 0.3px;
     }
+    /* Bottom-right HELP button -- see the HTML comment above #vx-help-btn for
+       why its z-index has to clear #vx-menu (100050). */
+    #vx-help-btn {
+      position: fixed; right: calc(12px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom));
+      z-index: 100060; padding: 8px 14px; font-family: var(--font-display); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.5px; color: var(--text-1); background: var(--hud-bg); backdrop-filter: blur(var(--hud-blur));
+      border: 1px solid var(--hud-border); border-radius: var(--hud-radius); box-shadow: var(--hud-shadow);
+      cursor: pointer; transition: filter 0.15s;
+    }
+    #vx-help-btn:hover { filter: brightness(1.15); border-color: var(--accent); }
+    #vx-help-btn:active { box-shadow: var(--bevel-in); }
     /* F2 debug menu -- Minecraft-F3-style readout. pointer-events:none so it
        never steals a click meant for the game underneath it, same reasoning
        as #controls-hint. white-space:pre because updateDebugMenu() below
@@ -3038,6 +3049,7 @@
 
       <div class="gm-section">
         <div class="gm-label">Play</div>
+        <div id="menu-help-btn" onclick="toggleGameMenu(false); openHelpPdf()"><canvas class="vx-icon vx-icon-menu" data-icon="help"></canvas>Help<span class="gm-key">F1</span></div>
         <div id="portal-book-btn" onclick="toggleGameMenu(false); togglePortalBook()"><canvas class="vx-icon vx-icon-menu" data-icon="book"></canvas>Portal Book</div>
         <div id="menu-inventory-btn" onclick="toggleGameMenu(false); toggleInventory(true)"><canvas class="vx-icon vx-icon-menu" data-icon="bag"></canvas>Inventory<span class="gm-key">E</span></div>
         <div id="menu-block-inv-btn" onclick="toggleGameMenu(false); toggleBlockInventory()"><canvas class="vx-icon vx-icon-menu" data-icon="book"></canvas>Block Guide<span class="gm-key">I</span></div>
@@ -4025,6 +4037,13 @@
     <div id="fps-counter">-- FPS</div>
     <div id="debug-menu"></div>
     <div id="vx-console"><input type="text" id="vx-console-input" autocomplete="off" spellcheck="false" placeholder="*command"></div>
+    <!-- Always-reachable controls reference, from both the main menu and
+         in-game -- same PDF as F1 and the pause menu's Help entry (see
+         openHelpPdf() in voxeria-engine.js). z-index sits above #vx-menu's
+         full-screen overlay (100050, see the toast comment above) so it
+         still works before a world is even loaded. -->
+    <button type="button" id="vx-help-btn" onclick="openHelpPdf()" title="Controls reference (F1)">HELP</button>
+    <a id="vx-help-pdf-link" href="Assets/docs/Voxeria_Controls.pdf" download="Voxeria_Controls.pdf" style="display:none"></a>
   </div>
 </div>
   <div id="admin-login-modal">

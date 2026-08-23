@@ -4419,6 +4419,19 @@ function toggleUIVisibility() {
   document.body.classList.toggle('vx-hide-ui', uiHidden);
 }
 
+// F1 / the bottom-right "HELP" button / the pause menu's Help entry — all
+// three trigger this. A real <a download> click rather than window.open():
+// it works identically in the browser build, on itch.io, and inside the
+// packaged Electron app, and it's a genuine save-to-disk instead of a tab
+// the player has to remember to come back to. Not gated by vxCreatorAllowed
+// (unlike F6/F8/F10/F12) -- a controls reference is useful in every mode,
+// including from the main menu before a world is even loaded.
+function openHelpPdf() {
+  const link = document.getElementById('vx-help-pdf-link');
+  if (link) link.click();
+}
+window.openHelpPdf = openHelpPdf;
+
 function _todayDateStr() { return new Date().toISOString().slice(0, 10); }
 
 let damageFlashTimer = 0;      // white/red flash on hit
@@ -9232,6 +9245,7 @@ document.getElementById('tc-place').addEventListener('touchcancel',(e)=>{endPlac
 document.addEventListener('keydown',(e)=>{
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (e.key === 'F1') { e.preventDefault(); openHelpPdf(); }
   if (e.key === 'F2') { e.preventDefault(); toggleDebugMenu(); }
   if (e.key === 'F4') { e.preventDefault(); toggleUIVisibility(); }
   if (e.key === 'F6') { e.preventDefault(); toggleModEditor(); }
@@ -11865,6 +11879,17 @@ function drawIconSpeedLines(cv) {
   for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(starts[i][0], starts[i][1]); c.lineTo(starts[i][0] - dx[i], starts[i][1] + dx[i] * 0.35); c.stroke(); }
 }
 
+function drawIconHelp(cv) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.strokeStyle = VX_ICON_LINE; c.lineWidth = 1.6; c.lineCap = 'round';
+  c.beginPath(); c.arc(8, 8, 6.5, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.arc(8, 6.6, 2.1, Math.PI * 1.1, Math.PI * 2.55); c.stroke();
+  c.beginPath(); c.moveTo(8, 8.7); c.lineTo(8, 9.6); c.stroke();
+  c.fillStyle = VX_ICON_LINE;
+  c.beginPath(); c.arc(8, 11.6, 1, 0, Math.PI * 2); c.fill();
+}
+
 const VX_ICONS = {
   menu: drawIconMenu, book: drawIconBook, shield: drawIconShield,
   puzzle: drawIconPuzzle, palette: drawIconPalette, globe: drawIconGlobe,
@@ -11875,7 +11900,7 @@ const VX_ICONS = {
   stopwatch: drawIconStopwatch, star: drawIconStar, compass: drawIconCompass,
   link: drawIconLink, copy: drawIconCopy, ruler: drawIconRuler,
   pickaxe: drawIconPickaxe, rocket: drawIconRocket, diamond: drawIconDiamond,
-  jumpup: drawIconJumpUp, speedlines: drawIconSpeedLines
+  jumpup: drawIconJumpUp, speedlines: drawIconSpeedLines, help: drawIconHelp
 };
 // The one grid every icon ends up on. The drawIcon* functions above are not
 // consistent about this — 21 of them author at 16px and 8 (menu, book, shield,
