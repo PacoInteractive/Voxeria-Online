@@ -13,7 +13,25 @@
 // the terrain is a pure function of the seed. So a save holds the SEED plus
 // only the blocks the player actually changed. A freshly explored world is a
 // few hundred bytes; it grows with what you build, not with how far you walk.
-// That is also why IndexedDB is not needed yet (see the size guard in save()).
+// That is also why IndexedDB is not needed yet.
+//
+// WHAT HAPPENS WHEN STORAGE DOES RUN OUT
+// It is not enough that this is unlikely. Everything below is built so that
+// the worst case is "this save did not go through and you were told", never
+// "your world is gone". Three rules, and each one closes a hole that was
+// open before:
+//
+//   * Nothing here refuses a save on its own guess. localStorage does not
+//     publish its limit, so a hand-picked ceiling can only be wrong in one of
+//     two directions, and one of them throws away a save the browser would
+//     have accepted. The browser decides; we handle the refusal.
+//   * The index is written under the same protection as the world. It is the
+//     only map from a save to the menu, so an unwritten index is a world that
+//     exists in storage and nowhere on screen. That reads as total loss even
+//     though every byte is still there.
+//   * The player is warned while saving still WORKS, and is pointed at the
+//     one escape that does not touch localStorage at all: exporting the world
+//     to a file.
 //
 // WHY POCKET DIMENSIONS ARE NOT SAVED
 // resetGameAndWorld() and endPocketRun() both clear dimensions[dim] outright -
@@ -25,7 +43,18 @@ window.VxWorlds = (function () {
   const SAVE_VERSION = 1;
   const INDEX_KEY = 'voxeria_worlds';
   const WORLD_PREFIX = 'voxeria_world_';
-  const BYTE_BUDGET = 4 * 1024 * 1024;   // stay clear of the ~5MB localStorage wall
+  // No BYTE_BUDGET any more, on purpose. The old one rejected a save at 4M
+  // characters, but localStorage counts UTF-16, so on Chrome's ~5MB wall that
+  // is roughly 2.6M characters: the guard sat ABOVE the real limit and never
+  // fired. Every real failure went through setItem's exception instead. A
+  // number that cannot be right is worse than no number.
+  //
+  // These two are only for the EARLY WARNING, which is advice rather than a
+  // decision, so being approximate is fine. WARN_CHARS is deliberately well
+  // under any browser's wall, and the scan behind it is skipped entirely
+  // until one world alone is big enough for the question to be real.
+  const WARN_CHARS = 1800000;
+  const SCAN_ABOVE = 300000;
 
   // Each mode carries one half of what Voxeria is. Normal is the guided run:
   // the Portal Book, the dimension ladder, forge-gated armor — a fixed route
@@ -66,8 +95,60 @@ window.VxWorlds = (function () {
     try { return JSON.parse(localStorage.getItem(INDEX_KEY)) || []; }
     catch (e) { return []; }
   }
+  // Returns whether it got through. Every caller has to care: the index is
+  // what the Load menu reads, so a world whose index entry did not land is
+  // invisible even though its data is safely in storage. This used to throw,
+  // and the throw travelled out of save() into the autosave interval, the
+  // visibilitychange handler and beforeunload alike.
   function writeIndex(list) {
-    localStorage.setItem(INDEX_KEY, JSON.stringify(list));
+    try {
+      localStorage.setItem(INDEX_KEY, JSON.stringify(list));
+      return true;
+    } catch (e) {
+      console.warn('Voxeria: could not write the world index', e);
+      return false;
+    }
+  }
+
+  // What we occupy, counted the way localStorage counts: in characters, keys
+  // included. There is no API for how much room is left, so this measures our
+  // own footprint instead of guessing at the wall.
+  function storageChars() {
+    let n = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        n += k.length + (localStorage.getItem(k) || '').length;
+      }
+    } catch (e) { return 0; }
+    return n;
+  }
+
+  // ---- save health -------------------------------------------------------
+  // Saving fails for as long as storage stays full, and the autosave retries
+  // every 20 seconds. Saying so every 20 seconds would bury the one sentence
+  // that matters under two hundred copies of itself, so each state is
+  // announced once, at the moment it changes.
+  let saveBroken = false;
+  let warnedNearFull = false;
+
+  function reportSaveFailed() {
+    if (saveBroken) return;
+    saveBroken = true;
+    showNotification('Could not save: browser storage is full. Your world is still open and playable, but new progress is no longer being written. Open the menu and use "Export current world" to keep it as a file.');
+  }
+  function reportSaveWorking() {
+    if (!saveBroken) return;
+    saveBroken = false;
+    showNotification('Saving works again.');
+  }
+  // Runs only after a save that actually succeeded, so the advice arrives
+  // while there is still something the player can do about it.
+  function warnIfNearlyFull(payloadChars) {
+    if (warnedNearFull || payloadChars < SCAN_ABOVE) return;
+    if (storageChars() < WARN_CHARS) return;
+    warnedNearFull = true;
+    showNotification('This world is getting large and browser storage is running low. Use "Export current world" in the menu to keep a copy as a file.');
   }
 
   // ---- thumbnail -----------------------------------------------------------
@@ -174,21 +255,23 @@ window.VxWorlds = (function () {
     try { payload = JSON.stringify(serialize()); }
     catch (e) { console.warn('Voxeria: could not serialise world', e); return false; }
 
-    if (payload.length > BYTE_BUDGET) {
-      // Deliberately loud rather than silently dropping the save: this is the
-      // point at which the IndexedDB migration in the spec becomes real work
-      // rather than a nice-to-have.
-      showNotification('World too large to save - IndexedDB migration needed');
-      return false;
-    }
-    try {
-      localStorage.setItem(WORLD_PREFIX + currentWorldId, payload);
-    } catch (e) {
-      showNotification('Save failed: browser storage is full');
-      return false;
-    }
+    // Read first, write second. Whether this world is already in the index
+    // decides what a later failure has to undo, and asking afterwards would
+    // be asking about a state we just changed.
     const list = readIndex();
     const row = list.find(w => w.id === currentWorldId);
+    const isNew = !row;
+    const key = WORLD_PREFIX + currentWorldId;
+
+    // No size check of our own: see WARN_CHARS above for why a hand-picked
+    // ceiling could only ever refuse saves the browser would have accepted.
+    try {
+      localStorage.setItem(key, payload);
+    } catch (e) {
+      reportSaveFailed();
+      return false;
+    }
+
     const meta = { id: currentWorldId, name: currentWorldName, mode: gameMode, seed: rawSeedString, savedAt: Date.now() };
     // Only overwrite a stored thumb on success — a transient capture failure
     // (e.g. autosave firing a frame before spawn finished) should never wipe
@@ -198,7 +281,28 @@ window.VxWorlds = (function () {
       if (capturedThumb) meta.thumb = capturedThumb;
     }
     if (row) Object.assign(row, meta); else list.push(meta);
-    writeIndex(list);
+
+    if (!writeIndex(list)) {
+      // The thumbnail is the only large thing in the index and it is pure
+      // decoration. A tile without a picture beats a world missing from the
+      // list, so it is the first thing to go rather than the last.
+      if (meta.thumb || (row && row.thumb)) {
+        delete meta.thumb;
+        if (row) delete row.thumb;
+        if (writeIndex(list)) { reportSaveWorking(); return true; }
+      }
+      // Still no index. For a world that was already listed this is survivable:
+      // its entry still points at the data we just wrote, and only savedAt is
+      // stale. A BRAND NEW world has nothing pointing at it, so leaving the
+      // payload behind would burn the very space that is running out on
+      // something no screen can ever show.
+      if (isNew) { try { localStorage.removeItem(key); } catch (e) {} }
+      reportSaveFailed();
+      return false;
+    }
+
+    reportSaveWorking();
+    warnIfNearlyFull(payload.length);
     return true;
   }
 
@@ -310,6 +414,9 @@ window.VxWorlds = (function () {
   function remove(id) {
     localStorage.removeItem(WORLD_PREFIX + id);
     writeIndex(readIndex().filter(w => w.id !== id));
+    // Space just came free, so the "running low" advice has earned the right
+    // to be said again if it ever applies a second time.
+    warnedNearFull = false;
     renderList();
   }
 
