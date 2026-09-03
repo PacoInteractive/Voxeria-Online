@@ -262,6 +262,13 @@ function localsIn(code) {
 // am globalen Namensraum.
 function usedIn(code) {
   const names = new Set();
+  // Spread und Rest zuerst weg. Vor dem Namen steht dort ein Punkt, und die
+  // Regel unten wirft alles nach einem Punkt raus, weil das ein
+  // Property-Zugriff ist. `...customOreTiers` ist aber kein Zugriff auf ein
+  // Feld, sondern eine ganz normale Lesestelle, und genau die eine ist der
+  // Karte dadurch entgangen. In gueltigem JavaScript sind drei Punkte immer
+  // Spread oder Rest, nie ein Zugriff, das Ersetzen ist also gefahrlos.
+  code = code.replace(/\.\.\./g, ' ');
   const re = /(^|[^.\w$])([A-Za-z_$][\w$]*)(\s*)(:?)/g;
   let m;
   while ((m = re.exec(code))) {
