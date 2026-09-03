@@ -11,23 +11,93 @@
 // share one global scope -- exactly as they did when this was a single file.
 // ============================================================================
 
+
+
+// ============================================================================
+// DIE UEBERSCHREIB-EBENE -- was ein Mod an der Engine verstellen darf.
+// ----------------------------------------------------------------------------
+// Diese sieben standen bis eben in voxeria-modding.js, und die Engine las sie
+// von dort. Das war nicht nur die falsche Richtung, es war ein echter Defekt:
+// zwei der Lesestellen hatten kein typeof davor.
+//
+//   player.vy += GRAVITY * dt * voidGravityScale * ruleGravityScale;
+//   const reskinTo = blockReskin[btype];
+//
+// Nimmt man das <script>-Tag von voxeria-modding.js aus index.html heraus,
+// stirbt die Engine damit im ersten Frame, in dem der Spieler faellt. Ein
+// Mod-System ist aber kein Fundament, es ist ein Aufsatz: das Spiel muss ohne
+// es laufen. Genau das ist jetzt wieder wahr, und es ist nachpruefbar, indem
+// man die Zeile auskommentiert.
+//
+// Wer schreibt was: die Engine legt sie an und liest sie, mehr nicht. Gefuellt
+// werden sie ausschliesslich von voxeria-modding.js, und die Voreinstellung
+// hier ist jeweils exakt "kein Mod aktiv". Deshalb sind es `let` und keine
+// Konstanten: drei davon werden beim Weltwechsel komplett neu gesetzt, nicht
+// geleert.
+//
+// Die drei typeof-Wachen an den Lesestellen sind mit dem Umzug entfallen. Sie
+// waren nie eine Absicherung gegen einen Fehler, sondern nur gegen die
+// Ladereihenfolge, und die spielt hier keine Rolle mehr.
+// ============================================================================
+
+// ============================================================================
+// EIGENSCHAFTEN EINER DIMENSION -- was die Engine ueber sie wissen muss.
+// ----------------------------------------------------------------------------
+// Zwei Stellen tief in der Engine mussten bisher wissen, dass es
+// Pocket-Dimensionen gibt, und lasen dafuer POCKET_DIMS und pocketSeedOffset
+// nach oben aus voxeria-dimensions-progress.js: der Schluessel von
+// seededRandom() und die Frage, ob ein Blockwechsel ueberhaupt zu Firebase
+// geschickt wird.
+//
+// Beides sind Eigenschaften einer Dimension, nicht Wissen ueber ein Feature.
+// Wer eine Dimension baut, traegt sie hier ein.
+//
+// BEWUSST ZWEI Strukturen, obwohl heute dieselben Dimensionen drinstehen. Sie
+// bedeuten nicht dasselbe: "entsteht bei jedem Betreten neu" und "Aenderungen
+// werden nie gespeichert" fallen bei den Pocket-Dimensionen zufaellig
+// zusammen. Eine Struktur fuer beides waere eine Falle fuer die erste
+// Dimension, auf die nur eines von beidem zutrifft.
+// ============================================================================
+
+// Dimension -> Nonce. Eine Dimension, die bei jedem Betreten ein frisches
+// Layout bekommt, traegt hier ihre Nonce ein, damit sie in den Hash von
+// seededRandom() wandert. Wer fehlt, bekommt den unveraenderten Schluessel,
+// und genau deshalb verschiebt sich das Terrain der Overworld nie.
+
+
+// Dimensionen, deren Blockaenderungen niemals gespeichert werden. Ein Schreiben
+// nach Firebase waere dort dauerhafter Muell, den nie jemand zurueckliest.
+
+
+// Rein kosmetisch: Blocktyp -> Blocktyp, dessen Farben stattdessen gezeichnet
+// werden. Der echte Typ und damit Abbau, Physik und Wirtschaft bleiben
+// unberuehrt. Wird pro sichtbarer Kachel und Frame gelesen, also die heisseste
+// Lesestelle der ganzen Ebene.
+let blockReskin = {};
+// Kreatur-Art -> false blockt das Spawnen. Fehlender Eintrag heisst erlaubt,
+// darum ist ein leeres Objekt hier "alles an".
+let creatureToggles = {};
+// Selbstgebaute Kreaturen, {id, rarity, sprite, ...}. Leer heisst: es spawnt
+// nur, was die Engine selbst kennt.
+let customCreatureTypes = [];
+// Blocktyp -> Haerte 1..8, schlaegt BLOCK_HARDNESS.
+let graphBlockHardness = {};
+// Blocktyp -> Klangfamilie, leiht sich die Frequenz des Blocks aus BLOCK_SOUND.
+let graphBlockSoundFamily = {};
+// Faktoren, 1 ist neutral. GRAVITY bleibt dadurch eine echte Konstante.
+let ruleGravityScale = 1;
+let graphYieldMult = 1;
+
   // =========================================================
   // STANDALONE-INITIALISIERUNG (itch.io-Build, kein Platform-SDK)
   // =========================================================
-  // loadProgressFromCloud() touches state (_progressRestoreAttempted) that's
-  // declared with `let` much further down this file. Calling it here during
-  // initial parse would hit those in their temporal dead zone. The platform
-  // SDK used to defer this via its async init(); with the SDK gone we defer
-  // it to DOMContentLoaded, which fires only after the whole script (and all
-  // those declarations) has executed.
-  (function _bootStandaloneProgress() {
-    function run() { try { loadProgressFromCloud(); } catch (e) { console.error("loadProgressFromCloud error:", e); } }
-    if (document.readyState === 'loading') {
-      window.addEventListener('DOMContentLoaded', run);
-    } else {
-      run();
-    }
-  })();
+  // Das Laden des Fortschritts stand hier und musste ueber DOMContentLoaded
+  // verzoegert werden, weil es Zustand anfasst, der weiter unten in
+  // voxeria-dimensions-progress.js mit `let` deklariert wird und beim Parsen
+  // noch in seiner temporalen Todeszone liegt.
+  //
+  // Die Umgehung ist mit umgezogen. Am Ende der eigenen Datei stehend gibt es
+  // das Problem gar nicht mehr, denn dort sind alle Deklarationen durch.
 
   // No platform account system in the standalone build — players always fall
   // back to the generic label; multiplayer identity still works via the
@@ -388,7 +458,8 @@ function startMultiplayerSync() {
         _updateRoomState();
     }, (error) => console.error("Snapshot Error (Players):", error));
     subscribeWorldSync();
-    subscribePocketRuns();
+    // Wer eigene Firebase-Stroeme hat, macht sie jetzt auf.
+    VxHooks.run('multiplayerReady');
 }
 
 // =========================================================
@@ -825,11 +896,8 @@ function fontUI(spec) { return spec + ' ' + FONT_UI_STACK; }
 const FONT_DISPLAY_STACK = "'Silkscreen', 'Courier New', monospace";
 function fontDisplay(spec) { return spec + ' ' + FONT_DISPLAY_STACK; }
 
-const TILE = 28;
 let COLS = Math.floor(1280 / TILE); // ~45
 let ROWS = Math.floor(720 / TILE);  // ~25
-const WORLD_H = 120;
-const CHUNK_W = 32;
 const GRAVITY = 0.4;
 // Master toggle for the subtle 2.5D depth shading in drawBlock() (neighbour-
 // aware rims + ambient-occlusion crevice shadows). Set to false for the old
@@ -2272,22 +2340,39 @@ document.addEventListener('input', function (e) {
 
 // =========================================================
 // INTRO — see updateAndDrawIntro() further down for the actual screen.
-// Simplified rebuild: no falling-block curtain/shake/settle-sound, just a
-// flat progress bar (still real time, not real world-gen work — the old
-// version wasn't tied to actual chunk generation either, it just looked
-// like it was) plus a rotating absurd-progress-text line, matching the
-// early page-load screen's style (see id="early-loading-hint" near the top
-// of <body>) so the game only has one "please wait" visual language instead
-// of two unrelated ones.
+// Two different moments share this one gameState, told apart by introKind:
+//   • "BOOT" — once per page load, before the world-select menu has ever
+//     been shown (see the reordered guard in _gameLoopInner and the
+//     deferred VxWorlds.show() in voxeria-menu-worlds.js). The character
+//     stands on a grass block in a black void and builds a tree next to
+//     itself; the menu only appears once that finishes.
+//   • "WORLDSTART" — every time resetGameAndWorld() actually starts or
+//     loads a world, after the player has already dismissed the menu. Kept
+//     as the original flat-progress-bar screen: replaying the tree-build
+//     vignette on every world load would slow down a returning player for
+//     no reason, so only the very first boot gets it.
 // =========================================================
 let gameState = "INTRO";
+let introKind = "BOOT";
 let introAlpha = 1.0;
 let introPhase = "FALLING";
-let introFillCount = 0;   // 0..TOTAL_INTRO_STEPS, drives the progress bar + the FALLING->FADING switch
-let introTitleT = 0;      // 0..1 pop-in progress of the logo
-let introTipT = 0;        // dt-units elapsed on the current rotating tip line
+let introFillCount = 0;   // 0..TOTAL_INTRO_STEPS, drives the progress bar + the FALLING->FADING switch (WORLDSTART only)
+let introTitleT = 0;      // 0..1 pop-in progress of the logo (WORLDSTART only)
+let introTipT = 0;        // dt-units elapsed on the current rotating tip line (WORLDSTART only)
 let introTipIndex = 0;
 const TOTAL_INTRO_STEPS = 150; // ~2.5s at 60fps (dt is in frame units — see gameLoop)
+
+// -- BOOT scene state (see updateAndDrawIntro's BOOT branch) ----------------
+// A private, self-contained tile space: no getBlock()/dimension involved (see
+// the comment on _introDrawTile below for why), so these coordinates don't
+// correspond to any real world position and are free to be arbitrary.
+const INTRO_GROUND_Y = 40;
+const INTRO_PLAYER_X = 20;
+const INTRO_TREE_X = 22;         // two columns right of the player's own block
+let introBuildPhase = "STAND";   // STAND -> BUILD -> DONE -> FADING
+let introBuildT = 0;             // dt accumulated in the current BOOT phase/step
+let introBuildTiles = null;      // this run's tree, from planTree() — computed once, when BUILD starts
+let introBuildIndex = 0;         // how many of introBuildTiles are currently revealed
 
 let jumpForce = -9;
 let maxReach = 5.0;
@@ -2302,6 +2387,27 @@ let prevJump = false;
 let screenShake = 0;
 let drawCamX = 0;
 let drawCamY = 0;
+
+// ── Kamera, Spawn und der Aufprall-Zaehler ───────────────────────────────────
+// Diese sechs standen in voxeria-boot.js, und die Engine las sie von dort nach
+// oben aus der Datei, die als LETZTE geladen wird. Das war die verkehrteste
+// Richtung im ganzen Projekt: die Kameraposition ist nicht Startcode, sie ist
+// der Kern des Renderers, und resetGameAndWorld() weiter unten setzt genau
+// dieselben sechs Werte ohnehin schon selbst.
+//
+// Der Grund, warum sie ueberhaupt dort standen, bleibt gueltig: die Startwerte
+// brauchen den Weltgenerator, und der laedt spaeter als diese Datei. Deshalb
+// stehen hier nur neutrale Werte. voxeria-boot.js weist die echten zu, sobald
+// alles geladen ist, und bis dahin liest sie niemand: jede Lesestelle sitzt in
+// einer Funktion, die erst nach dem Start laeuft.
+let initialSpawnX = 0;
+let spawnY = 0;
+let camX = 0;
+let camY = 0;
+// Ab wie vielen Blocken Fallhoehe die Landung wummert. fallStartY merkt sich,
+// wo der Fall begann, und ist null, solange keiner laeuft.
+let fallStartY = null;
+const MIN_THUMP_FALL_BLOCKS = 3;
 // Full-screen "camera flash" pulse for big spectacle moments (meteor impacts,
 // lightning strikes) — set the intensity + color, it decays on its own each frame.
 let impactFlash = 0;
@@ -2326,9 +2432,6 @@ let animalSpawnTick = 0;
 const MAX_ANIMALS = 6;
 const ANIMAL_LIMITS = { butterfly: 6 };
 
-// Gold Dimension hazard: 3-5 bouncing "Gold Slime" balls per pocket run —
-// no damage on touch, just a flash-freeze (see player.goldFrozenTimer).
-let goldSlimes = [];
 
 // =========================================================
 // DAY / NIGHT CYCLE
@@ -2410,28 +2513,7 @@ for (let i = 0; i < 20; i++) {
 // =========================================================
 // BLOCKS
 // =========================================================
-const BLOCKS = {
-  AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, WOOD: 4,
-  LEAVES: 5, SAND: 6, WATER: 7, COAL_ORE: 8,
-  IRON_ORE: 9, GOLD_ORE: 10, BEDROCK: 11, LOG: 12,
-  GLASS: 13, PLANKS: 14, TORCH: 15,
-  DIAMOND_ORE: 16, FLOWER: 19, LIGHTER: 20, BG_PLANKS: 21,
-  CACTUS: 23, ICE: 24, RAINBOW_ORE: 25, PORTAL: 26, YELLOW_LIMESTONE: 27,
-  DIAMOND_DYNAMITE: 28, GOLD_BRICK: 29,
-  // Ocean Depth dimension blocks
-  OCEAN_STONE: 31, CORAL: 32, KELP: 33, DEEP_WATER: 34, SEA_LANTERN: 35,
-  // Lava Core dimension blocks
-  MAGMA: 36, LAVA: 37, OBSIDIAN: 38, EMBER_ORE: 39, FIRE_CRYSTAL: 40,
-  // Blither dimension blocks
-  VOID_STONE: 41, VOID_ORE: 42, STAR_DUST: 43, ETHER_CRYSTAL: 44, VOID_GLASS: 45,
-  // Volcano Biome (Overworld)
-  VOLCANIC_ROCK: 46, ASH_DIRT: 47, LAVA_POOL: 48, SULFUR_ORE: 49, CINDER_BLOCK: 50,
-  // Mystic Biome (Overworld)
-  MYSTIC_EARTH: 51, GLOWSHROOM: 52, CRYSTAL_FLOWER: 53, HAZELNUT_WOOD: 54, HAZELNUT_SHELL: 55,
-  MYSTIC_ORE: 56,
-  // The Erg dimension blocks
-  ERG_SAND: 57, ERG_SANDSTONE: 58, ERG_CACTUS: 59
-};
+
 
 const blockColors = {
   0: null,
@@ -2796,13 +2878,13 @@ function playBlockSound(blockType) {
   // A real recorded take beats the synthesized tone whenever one exists and is
   // ready; see BLOCK_SAMPLE_URLS above for which blocks currently have one.
   if (_playBlockSample(blockType, 'mine')) return;
-  // graphBlockSoundFamily (see voxeria-modding.js) lets a mod swap the
+  // graphBlockSoundFamily (die Ueberschreib-Ebene oben in dieser Datei) lets a mod swap the
   // synthesized FAMILY for a block without needing its own frequency tuning —
   // it borrows whatever frequency the block already had (its own baked-in
   // tuning, or a vanilla block's), and only falls back to a plain mid tone if
   // the block had no BLOCK_SOUND entry at all.
   const baseEntry = BLOCK_SOUND[blockType];
-  const entry = (typeof graphBlockSoundFamily !== 'undefined' && graphBlockSoundFamily[blockType])
+  const entry = graphBlockSoundFamily[blockType]
     ? [graphBlockSoundFamily[blockType], baseEntry ? baseEntry[1] : 300]
     : baseEntry;
   const fx = entry && _BLOCK_SOUND_FX[entry[0]];
@@ -2833,6 +2915,30 @@ const RESKIN_ELIGIBLE_IDS = Object.keys(blockColors)
 // See applyArmorStatBonuses() below for how these get applied.
 // =========================================================
 let maxHealth = 12; // 6 hearts (2 HP per heart) — deliberately tight for "hard to master"
+
+// ── Der Spieler ─────────────────────────────────────────────────────────────
+// Stand in voxeria-boot.js, der Datei, die als LETZTE geladen wird, und die
+// Engine las ihn von dort nach oben. Damit hing das zentralste Objekt des
+// Spiels an der Ladereihenfolge, und voxeria-dimensions-progress.js las es
+// ebenfalls von dort, was einen zweiten Ring aufmachte.
+//
+// Der Grund fuer den alten Ort war die Startposition: die braucht den
+// Weltgenerator, der spaeter laedt als diese Datei. Genau darum steht sie hier
+// auf 0/0. voxeria-boot.js setzt sie, sobald der Generator da ist, und bis
+// dahin liest sie niemand.
+//
+// Steht hinter maxHealth, weil health davon ausgeht, und hinter TILE, weil die
+// Trefferbox zwei Kacheln hoch ist.
+const player = {
+  x: 0, y: 0,
+  vx: 0, vy: 0, w: 24, h: TILE * 2, onGround: false, health: maxHealth, // exactly matches PLAYER_FRAME_W/H -- see below
+  scaleX: 1.0, scaleY: 1.0, tilt: 0,
+  facing: 1,            // 1 = right, -1 = left; latched in drawPlayer, see there
+  wetTimer: 0, frozenTimer: 0, goldFrozenTimer: 0,
+  placeAnimTimer: 0, // frames left to show the "place" pose — see executePlace/drawPlayer
+  mineAnimTimer: 0, // frames left to show the mining swing after a single discrete hit — see registerMiningHit/drawPlayer. The continuous desktop hold-to-mine path uses the miningActive flag directly instead, see drawPlayer.
+  color: `hsl(${Math.floor(Math.random() * 360)}, 100%, 70%)`
+};
 const ARMOR_STATS = {
   GOLD:  { luck: 1 },     // Golden Aegis — ancient temple treasure luck
   LAVA:  { health: 2 },   // Obsidian Heat Suit — heavy, protective
@@ -2862,12 +2968,12 @@ const BLOCK_HARDNESS = {
   [BLOCKS.RAINBOW_ORE]: 5, [BLOCKS.STAR_DUST]: 5,
   [BLOCKS.ERG_SANDSTONE]: 2, [BLOCKS.ERG_CACTUS]: 2
 };
-// graphBlockHardness (see voxeria-modding.js, set by the "Set how a block
+// graphBlockHardness (die Ueberschreib-Ebene oben in dieser Datei, set by the "Set how a block
 // mines" mod action) is checked first and is always freshly empty on world
 // load, so a mod's override can never survive into a session that didn't ask
 // for it.
 function getBlockHardness(b) {
-  if (typeof graphBlockHardness !== 'undefined' && graphBlockHardness[b] != null) return graphBlockHardness[b];
+  if (graphBlockHardness[b] != null) return graphBlockHardness[b];
   return BLOCK_HARDNESS[b] || 1;
 }
 
@@ -2878,7 +2984,15 @@ let blockDamage = {};
 // Quick bright pop drawn right where a hit just landed — {wx,wy,life,maxLife}.
 let blockHitFlashes = [];
 
-const dimensions = { "OVERWORLD": new Map(), "GOLD": new Map(), "OCEAN": new Map(), "LAVA": new Map(), "VOID": new Map(), "ERG": new Map() };
+// "MENU" is a seventh, isolated dimension that only the main-menu panorama
+// (see drawMenuPanorama below) ever reads or writes. getChunk() caches by
+// chunk index alone, not by seed, and resetGameAndWorld() only clears these
+// maps when a real world starts or loads — never on a bare "open the menu"
+// while a game is already running. Sharing OVERWORLD's map here would risk
+// the panorama permanently caching the wrong terrain into a chunk index the
+// player's real save had not generated yet. A private map makes that
+// impossible instead of merely unlikely.
+
 
 // =========================================================
 // MINIMAP — detailed pixel map with fog-of-war. Fog is tracked per 4×4 cell,
@@ -2996,7 +3110,7 @@ function drawMinimap() {
 // ── Named world saves (the VxWorlds block near </body> owns the rest) ──────
 // Declared up here because setBlock below writes to worldEdits, and that runs
 // long before the menu script at the end of the document is reached.
-let gameMode = 'normal';          // 'explore' | 'normal'
+
 let currentWorldId = null;        // null while the menu is still up
 let currentWorldName = '';
 // "x,y" -> block id, OVERWORLD only. This is the entire saved world: terrain
@@ -3010,36 +3124,19 @@ function recordWorldEdit(x, y, type) {
   if (currentDim !== 'OVERWORLD') return;   // pocket runs are thrown away by design
   worldEdits.set(x + ',' + y, type);
 }
-let currentDim = "OVERWORLD";
+
 
 // Fixed weekly world cycle — same instant for every player (UTC epoch math), not
 // tied to when any individual player joined or placed a block. Declared here
 // because the default seed below needs it immediately; const bindings aren't
 // usable before their own declaration runs, unlike hoisted function declarations.
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-const WEEKLY_EPOCH = Date.UTC(2024, 0, 1); // fixed Monday 00:00 UTC anchor
 
-function getWeekNumber(now = Date.now()) {
-  return Math.floor((now - WEEKLY_EPOCH) / WEEK_MS);
-}
-
-function getWeeklySeedString(weekNum = getWeekNumber()) {
-  return `WEEKLY-${weekNum}`;
-}
-
-function getNextWeeklyResetTime() {
-  return WEEKLY_EPOCH + (getWeekNumber() + 1) * WEEK_MS;
-}
-
-function isWeeklyAutoSeed(seedRaw) {
-  return /^WEEKLY-\d+$/.test(String(seedRaw));
-}
 
 // Default world seed is the fixed weekly seed — everyone who hasn't picked an
 // explicit custom seed/invite room converges on the same world for the week.
-let rawSeedString = getWeeklySeedString();
-let SEED = seedToNumber(rawSeedString);
-let activeMod = null;
+
+
+
 // Non-null only while a VXL1- loadout is active: the exact piece codes that
 // loadout shipped. Keeps a shared world's blocks independent of whatever the
 // local player happens to have in their own library.
@@ -3058,39 +3155,7 @@ let voidGravityScale = 1.0; // reduced gravity in Blither
 // =========================================================
 // SEED / RNG
 // =========================================================
-function hashCode(str) {
-  let hash = 2166136261;
-  str = String(str);
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
 
-function seedToNumber(value) {
-  const raw = String(value).trim();
-  if (raw !== "" && isFinite(Number(raw))) return Number(raw);
-  return hashCode(raw);
-}
-
-function seededRandom(...parts) {
-  // Pocket dimensions fold in a per-visit nonce so each entry regenerates a
-  // fresh layout; the overworld hash string is left byte-for-byte identical so
-  // its terrain never shifts.
-  const key = POCKET_DIMS.has(currentDim)
-    ? [rawSeedString, currentDim, pocketSeedOffset, ...parts].join('|')
-    : [rawSeedString, currentDim, ...parts].join('|');
-  let h = hashCode(key);
-  h += 0x6D2B79F5;
-  h = Math.imul(h ^ (h >>> 15), h | 1);
-  h ^= h + Math.imul(h ^ (h >>> 7), h | 61);
-  return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
-}
-
-function seededInt(min, max, ...parts) {
-  return Math.floor(seededRandom(...parts) * (max - min + 1)) + min;
-}
 
 
 
@@ -3157,82 +3222,53 @@ function applySeedFromUI() {
   // runs can clean up the seed we're LEAVING once the new one is in place.
   const _prevSeedForCleanup = rawSeedString;
 
-  // A loadout is a mod PLUS a list of custom pieces. Decoded first because a
-  // VXL1- code is not a VXM3- code and isModCode() would reject it.
-  if (isLoadoutCode(inputVal)) {
-    const loadout = decodeLoadoutCode(inputVal);
-    if (!loadout) {
-      showNotification("⚠️ Invalid loadout code");
-      return;
-    }
-    if (!activeMod) realInventorySnapshot = JSON.parse(JSON.stringify(inventory));
-    activeMod = loadout.mod;
-    activeLoadoutPieceCodes = loadout.pieceCodes;
-    window._activeModCode = inputVal;
-    // Must precede resetGameAndWorld(): that clears every dimension, and the
-    // chunks regenerated afterwards read customOreTiers.
-    registerLoadoutPieces(loadout.pieceCodes);
-    rawSeedString = String(loadout.mod.seed || inputVal).slice(0, 60) || String(Date.now() % 9999999);
-    SEED = seedToNumber(rawSeedString);
-    document.getElementById('seed-input').value = inputVal;
-    resetGameAndWorld();
-    updateWeeklyCountdown();
-    restartBgMusicFromSeed();
-    showModBanner(loadout.mod);
-    _updateRoomState();
-    cleanupAbandonedSeed(_prevSeedForCleanup);
-    if (loadout.skipped) showNotification('⚠️ ' + loadout.skipped + ' piece(s) in that loadout were unreadable and were skipped.');
-    return;
-  }
+  // Das Eingabefeld nimmt nicht nur Seeds. Wer sonst noch ein Textformat darin
+  // erkennt, sagt es hier. Bis eben standen dafuer zwei Zweige mitten in dieser
+  // Funktion, die Mod-Codes und Loadout-Codes auspackten: rund sechzig Zeilen,
+  // in denen die Engine wusste, wie ein VXM3- und ein VXL1- Code aufgebaut ist.
+  //
+  // Die drei Zweige waren zu ueber neunzig Prozent identisch. Uebrig bleibt
+  // genau das, was sie unterschied, und das sind vier Dinge:
+  //
+  //   null                     niemand erkennt den Text, es ist ein Seed.
+  //   { error }                erkannt, aber unbrauchbar. Meldung zeigen,
+  //                            abbrechen, die Welt bleibt wie sie ist.
+  //   { seed, display, done }  erkannt. seed ist der Seed, der daraus wird;
+  //                            display, was im Feld stehen bleiben soll;
+  //                            done() laeuft, sobald die Welt steht.
+  //
+  // Der Zuhoerer laeuft VOR resetGameAndWorld(), und das ist Absicht, nicht
+  // Zufall: registerLoadoutPieces() muss davor passieren, weil der Reset jede
+  // Dimension leert und die danach neu erzeugten Chunks customOreTiers lesen.
+  // Wer hier eine Reihenfolge braucht, hat sie damit.
+  //
+  // Auch das Aufraeumen laeuft hierueber. Ein Zuhoerer, der den Text NICHT
+  // erkennt, ist genau in dem Moment dran, in dem ein vorher aktiver Mod
+  // aufhoert zu gelten, und kann sich selbst abbauen, bevor er null zurueckgibt.
+  const claim = VxHooks.filter('seedInput', null, inputVal);
+  if (claim && claim.error) { showNotification(claim.error); return; }
 
-  if (isModCode(inputVal)) {
-    const mod = decodeModCode(inputVal);
-    if (!mod) {
-      showNotification("⚠️ Invalid mod code");
-      return;
-    }
-    // Only snapshot when coming FROM a normal (non-mod) state — chaining
-    // straight from one mod into another must not overwrite the real
-    // inventory captured before the first one.
-    if (!activeMod) realInventorySnapshot = JSON.parse(JSON.stringify(inventory));
-    activeMod = mod;
-    // A plain mod code carries no pieces — drop back to the local library so a
-    // previous loadout's pieces don't linger in this world.
-    activeLoadoutPieceCodes = null;
-    registerLoadoutPieces();
-    window._activeModCode = inputVal; // carried in the shared ?mod= link so friends rebuild this mod
-    rawSeedString = String(mod.seed || inputVal).slice(0, 60) || String(Date.now() % 9999999);
-    SEED = seedToNumber(rawSeedString);
-    document.getElementById('seed-input').value = inputVal;
-    resetGameAndWorld();
-    updateWeeklyCountdown();
-    restartBgMusicFromSeed();
-    showModBanner(mod);
-    _updateRoomState();
-    // Mod seeds are inherently personal and temporary — never registered as a
-    // room, never joined by anyone else — so cleaning up the one we just left
-    // is always safe.
-    cleanupAbandonedSeed(_prevSeedForCleanup);
-    return;
-  }
-
-  activeMod = null;
-  activeLoadoutPieceCodes = null;
-  registerLoadoutPieces();
-  window._activeModCode = null;
-  hideModBanner();
-  rawSeedString = inputVal === "" ? String(Date.now() % 9999999) : inputVal;
+  rawSeedString = claim
+    ? claim.seed
+    : (inputVal === "" ? String(Date.now() % 9999999) : inputVal);
   SEED = seedToNumber(rawSeedString);
-  document.getElementById('seed-input').value = rawSeedString;
+  // Ein erkannter Code bleibt im Feld stehen, wie er getippt wurde. Ein
+  // gewoehnlicher Seed wird durch den erzeugten ersetzt, weil ein leeres Feld
+  // sonst leer bliebe und niemand saehe, in welcher Welt er gelandet ist.
+  document.getElementById('seed-input').value = claim ? claim.display : rawSeedString;
   resetGameAndWorld();
   updateWeeklyCountdown();
   restartBgMusicFromSeed();
+  if (claim && claim.done) claim.done();
   _updateRoomState();
+  // Der verlassene Seed wird aufgeraeumt, sobald der neue steht. Fuer
+  // Mod-Seeds ist das immer sicher: sie sind persoenlich und fluechtig, nie
+  // als Raum registriert und von niemandem betretbar.
   cleanupAbandonedSeed(_prevSeedForCleanup);
 }
 
 function resetGameAndWorld() {
-  if (isMultiplayerActive && db) { subscribeWorldSync(); subscribePocketRuns(); }
+  if (isMultiplayerActive && db) { subscribeWorldSync(); VxHooks.run('multiplayerReady'); }
   dimensions["OVERWORLD"].clear();
   dimensions["GOLD"].clear();
   dimensions["OCEAN"].clear();
@@ -3242,12 +3278,16 @@ function resetGameAndWorld() {
   for (const d in exploredCells) exploredCells[d].clear();
   _minimapLastCell = null;
   currentDim = "OVERWORLD";
-  // Any in-progress pocket run is abandoned on a world reset — clear its state
-  // and hide the collapse timer so nothing leaks into the fresh world.
-  pocketActive = false; pocketCollapsing = false; pocketMeteor = null;
-  pocketEntryInventory = null; pocketTimer = 0; pocketCollapseTimer = 0;
-  if (typeof hidePocketTimer === 'function') hidePocketTimer();
-  if (typeof hideOceanOxygenBar === 'function') hideOceanOxygenBar();
+  // Jedes Feature wirft beim Weltneustart selbst weg, was es angesammelt hat.
+  // Bis eben raeumte die Engine hier den Pocket-Lauf und die Sauerstoff-
+  // Anzeige ab und kannte dafuer neun Namen aus voxeria-dimensions-progress.js
+  // beim Namen, zwei davon nur mit einer typeof-Wache davor.
+  //
+  // Die Stelle ist die alte: hinter currentDim = "OVERWORLD" und vor dem
+  // Aufraeumen der Engine selbst. Wer hier zuhoert, tut es in einer Welt, die
+  // schon auf die Overworld zurueckgesetzt ist, aber deren Blockschaden,
+  // Partikel und Tiere noch stehen.
+  VxHooks.run('worldReset');
   blockDamage = {};
   blockHitFlashes.length = 0;
   burningBlocks.length = 0;
@@ -3258,11 +3298,14 @@ function resetGameAndWorld() {
   damageCooldown = 0;
   selectedBlockPopupTimer = 0; selectedBlockPopupBlock = null;
   lavaDamageTimer = 0;
-  playerOxygen = OXYGEN_MAX; playerDrowning = false;
   voidGravityScale = 1.0;
   damageFlashTimer = 0; comboCount = 0; comboTimer = 0; healFlashTimer = 0;
   animalSpawnTick = 0;
   snowFlakes.length = 0; itemDrops.length = 0; waterfallParticles.length = 0;
+  // Shots in flight belong to the world that fired them, exactly like
+  // particles above: carrying one across a world change would land a hit in a
+  // world where nothing ever attacked.
+  creatureShots.length = 0;
   weather = { type: 'clear', intensity: 0, targetIntensity: 0, timer: 0, nextChange: 600, lightning: 0, thunderTimer: 0, overlay: 0 };
   fallStartY = null;
   teleportCooldown = 0;
@@ -3341,6 +3384,7 @@ function resetGameAndWorld() {
   drawCamX = camX; drawCamY = camY;
 
   gameState = "INTRO";
+  introKind = "WORLDSTART";
   introAlpha = 1.0;
   introPhase = "FALLING";
   introFillCount = 0;
@@ -3354,757 +3398,18 @@ function resetGameAndWorld() {
   // Mods get their "when the world starts" moment only after every reset
   // above has finished, so an action that hands out blocks or changes gravity
   // isn't wiped by the very reset that should have preceded it.
-  fireGraphEvent('onWorldStart', {});
+  VxHooks.run('gameEvent', 'onWorldStart', {});
 }
 
 // =========================================================
 // WORLD GENERATION
 // =========================================================
-// Channel ids keep the noise fields below (terrain, detail, mountains, biome
-// temperature/variety, domain warp) statistically independent even though
-// they all share the same hash function and world SEED.
-// RELIEF/VALLEY/TERRACE/OVERHANG were added with the terrain overhaul; they
-// keep the new fields independent of the five that were already here.
-// BIOME_MIX/PLATEAU/RUGGED came with the sub-zone pass; same rule as before,
-// each new field gets its own channel so it stays independent of the others.
-const NOISE_CH = { TERRAIN: 0, DETAIL: 1, VOLCANO: 2, MOUNTAIN: 3, BIOME_WARP: 4, BIOME_TEMP: 5, BIOME_EXOTIC: 6,
-                   RELIEF: 7, VALLEY: 8, TERRACE: 9, OVERHANG: 10,
-                   BIOME_MIX: 11, PLATEAU: 12, RUGGED: 13,
-                   DENSITY: 14, DENSITY_FINE: 15, FLOAT: 16,
-                   LANDMARK: 17, RUINS: 18, MICRO: 19 };
-
-// ── Per-column caches ─────────────────────────────────────────────────────
-// getBiomeHeight() is NOT only a world-gen function: the parallax background
-// renderer calls it once per visible column per frame (see drawBackgroundHills
-// and the cave backdrop below), which is a few thousand calls a second. It was
-// already 14 noise octaves deep before the sub-zone fields were added on top,
-// so from here on the result is memoised.
-//
-// Direct-mapped rather than a Map: both consumers scan a contiguous run of
-// columns (32 for a chunk, ~50 to 120 for the viewport), so with a table this
-// size collisions inside one pass are effectively nil, and there is no
-// allocation and no unbounded growth to clean up. Negative x is fine, a
-// power-of-two mask on an int32 always lands in range.
-const _HEIGHT_N = 4096;
-const _heightX = new Int32Array(_HEIGHT_N).fill(0x7fffffff);
-const _heightV = new Float32Array(_HEIGHT_N);
-let _heightTok = -1;
-
-const _SNOWCOL_N = 2048;
-const _snowColX = new Int32Array(_SNOWCOL_N).fill(0x7fffffff);
-const _snowColV = new Uint8Array(_SNOWCOL_N);
-let _snowColTok = -1;
-
-const _SNOWW_N = 2048;
-const _snowWX = new Int32Array(_SNOWW_N).fill(0x7fffffff);
-const _snowWV = new Float32Array(_SNOWW_N);
-let _snowWTok = -1;
-
-// Cheap numeric fingerprint of everything the cached values depend on. Checked
-// on every lookup instead of hunting down each of the seven places that assign
-// SEED or activeMod: a stale terrain cache would show up as a world that keeps
-// the old landscape after loading a different save, which is exactly the kind
-// of bug that survives testing because it needs two worlds in one session.
-function _terrainToken() {
-  const w = activeMod && activeMod.world;
-  const hm = (w && w.heightMult) || 1;
-  const bf = !w || !w.biomeFocus ? 0 : (w.biomeFocus === 'SNOW' ? 2 : 1);
-  return ((SEED | 0) ^ Math.imul(Math.round(hm * 1024), 2654435761) ^ (bf * 40503)) | 0;
-}
-
-function hash1D(n, channel) {
-  let h = (n * 374761393 + SEED * 668265263 + channel * 1442695041) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  h = h ^ (h >>> 16);
-  return (h >>> 0) / 4294967296;
-}
-
-// ── 2D value noise ────────────────────────────────────────────────────────
-// Same construction as the 1D trio below, one dimension up. It exists for one
-// reason: a heightmap cannot describe an overhang. A field sampled at (x, y)
-// can, because it answers "is there rock HERE" instead of "where does the rock
-// stop in this column". See the cliff pass in getChunk (voxeria-dimensions-
-// progress.js), which is the only consumer.
-function hash2Di(x, y, channel) {
-  let h = (x * 374761393 + y * 668265263 + SEED * 1442695041 + channel * 2246822519) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  h = h ^ (h >>> 16);
-  return h >>> 0;
-}
-function hash2D(x, y, channel) {
-  return hash2Di(x, y, channel) / 4294967296;
-}
-
-// ── 2D simplex (gradient) noise ───────────────────────────────────────────
-// The value noise above is fine for a height CURVE, where you only ever look
-// at one axis and nobody can see the lattice. A density field is looked at in
-// two dimensions at once, and there value noise gives itself away: its extremes
-// sit on the integer grid, so carved shapes line up into horizontal and
-// vertical streaks. Gradient noise puts zeroes on the lattice instead of
-// extremes, and its cells are triangles rather than squares, so there is no
-// axis for the eye to lock onto.
-//
-// Returns [-1, 1], NOT [0, 1] like fractalNoise1D/2D. Mixing the two up is the
-// obvious way to get this wrong, so the range is stated at both functions.
-const _SIMPLEX_GRAD = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
-const _SIMPLEX_F2 = 0.5 * (Math.sqrt(3) - 1);
-const _SIMPLEX_G2 = (3 - Math.sqrt(3)) / 6;
-function simplex2D(xin, yin, channel) {
-  const s = (xin + yin) * _SIMPLEX_F2;
-  const i = Math.floor(xin + s), j = Math.floor(yin + s);
-  const t = (i + j) * _SIMPLEX_G2;
-  const x0 = xin - (i - t), y0 = yin - (j - t);
-  // Which of the two triangles in this cell the point landed in
-  const i1 = x0 > y0 ? 1 : 0, j1 = x0 > y0 ? 0 : 1;
-  const x1 = x0 - i1 + _SIMPLEX_G2,   y1 = y0 - j1 + _SIMPLEX_G2;
-  const x2 = x0 - 1 + 2 * _SIMPLEX_G2, y2 = y0 - 1 + 2 * _SIMPLEX_G2;
-  let n = 0;
-  for (let c = 0; c < 3; c++) {
-    const xx = c === 0 ? x0 : c === 1 ? x1 : x2;
-    const yy = c === 0 ? y0 : c === 1 ? y1 : y2;
-    let tt = 0.5 - xx * xx - yy * yy;
-    if (tt <= 0) continue;
-    const gi = c === 0 ? hash2Di(i, j, channel)
-             : c === 1 ? hash2Di(i + i1, j + j1, channel)
-             :           hash2Di(i + 1, j + 1, channel);
-    const g = _SIMPLEX_GRAD[gi & 7];
-    tt *= tt;
-    n += tt * tt * (g[0] * xx + g[1] * yy);
-  }
-  return Math.max(-1, Math.min(1, 70 * n));
-}
-
-// Layered simplex. Returns [-1, 1].
-function fractalSimplex2D(x, y, channel, octaves = 3, persistence = 0.5, lacunarity = 2) {
-  let amp = 1, freq = 1, total = 0, maxAmp = 0;
-  for (let o = 0; o < octaves; o++) {
-    total += simplex2D(x * freq, y * freq, channel * 31 + o) * amp;
-    maxAmp += amp;
-    amp *= persistence;
-    freq *= lacunarity;
-  }
-  return total / maxAmp;
-}
-function smoothNoise2D(x, y, channel) {
-  const x0 = Math.floor(x), y0 = Math.floor(y);
-  const tx = x - x0, ty = y - y0;
-  const fx = tx * tx * tx * (tx * (tx * 6 - 15) + 10);
-  const fy = ty * ty * ty * (ty * (ty * 6 - 15) + 10);
-  const v00 = hash2D(x0, y0, channel),     v10 = hash2D(x0 + 1, y0, channel);
-  const v01 = hash2D(x0, y0 + 1, channel), v11 = hash2D(x0 + 1, y0 + 1, channel);
-  const a = v00 + (v10 - v00) * fx;
-  const b = v01 + (v11 - v01) * fx;
-  return a + (b - a) * fy;
-}
-function fractalNoise2D(x, y, channel, octaves = 3, persistence = 0.5, lacunarity = 2) {
-  let amp = 1, freq = 1, total = 0, maxAmp = 0;
-  for (let o = 0; o < octaves; o++) {
-    total += smoothNoise2D(x * freq, y * freq, channel * 31 + o) * amp;
-    maxAmp += amp;
-    amp *= persistence;
-    freq *= lacunarity;
-  }
-  return total / maxAmp;
-}
-
-// Smooth (quintic-interpolated) 1D value noise. Unlike a raw sine wave it
-// never repeats on a short, visually-obvious period.
-function smoothNoise1D(x, channel) {
-  const x0 = Math.floor(x);
-  const t = x - x0;
-  const fade = t * t * t * (t * (t * 6 - 15) + 10);
-  const v0 = hash1D(x0, channel);
-  const v1 = hash1D(x0 + 1, channel);
-  return v0 + (v1 - v0) * fade;
-}
-
-// Layered (fractal) noise: several octaves of smoothNoise1D combined for
-// natural rolling detail. Returns a value in [0, 1).
-function fractalNoise1D(x, channel, octaves = 4, persistence = 0.5, lacunarity = 2) {
-  let amp = 1, freq = 1, total = 0, maxAmp = 0;
-  for (let o = 0; o < octaves; o++) {
-    total += smoothNoise1D(x * freq, channel * 31 + o) * amp;
-    maxAmp += amp;
-    amp *= persistence;
-    freq *= lacunarity;
-  }
-  return total / maxAmp;
-}
-
-function noise(x) {
-  const heightMult = (activeMod && activeMod.world && activeMod.world.heightMult) || 1;
-  const n = fractalNoise1D(x * 0.05, NOISE_CH.TERRAIN, 4, 0.5, 2) * 2 - 1; // [-1, 1]
-  return n * 16 * heightMult;
-}
-
-// Large, irregular mountain ranges that cut across biome borders. Ridged
-// noise (1 - |2n-1|, then sharpened) turns a rolling field into distinct
-// peaks separated by flatter ground instead of uniform hills everywhere.
-function getMountainBoost(x) {
-  const m = fractalNoise1D(x * 0.004, NOISE_CH.MOUNTAIN, 3, 0.5, 2);
-  const ridge = 1 - Math.abs(m * 2 - 1);
-  return Math.pow(ridge, 3) * 40;
-}
-
-// Jungle, Desert, Volcano and Mystic were removed as overworld biomes — only
-// FOREST and SNOW generate now. getBiome() only ever returns one of those two,
-// so every "biome === 'DESERT'" (etc.) branch left elsewhere in the file is
-// now permanently unreachable through normal world-gen; each one was cleaned
-// up at its call site rather than left as dead code. temp is still what tells
-// FOREST from SNOW apart, so that split — and the domain warp that keeps its
-// border from being a straight line — stays; the exotic noise channel that
-// used to pick out Volcano/Mystic pockets is gone.
-const REMOVED_BIOMES = new Set(['DESERT', 'JUNGLE', 'VOLCANO', 'MYSTIC']);
-
-// A mod can pin the whole world to one biome. Read in one place so the climate
-// field, the chunk label and the per-column dithering can never disagree about
-// it. Returns null when no override is active.
-function _biomeOverride() {
-  const w = activeMod && activeMod.world;
-  if (w && w.biomeFocus && !REMOVED_BIOMES.has(w.biomeFocus)) return w.biomeFocus;
-  return null;
-}
-
-// Raw temperature, per BLOCK rather than per chunk. Domain warp distorts the
-// sampling position with its own noise field so the FOREST/SNOW border comes
-// out as an irregular line, not a straight one.
-const SNOW_EDGE = -0.4;          // the threshold the per-chunk version used
-const CLIMATE_BLEND = 128;       // 4 chunks: how wide the transition should read
-function getClimateTemp(x) {
-  const warp = (fractalNoise1D(x * 0.01, NOISE_CH.BIOME_WARP, 2, 0.5, 2) - 0.5) * 250;
-  return fractalNoise1D((x + warp) * 0.0035, NOISE_CH.BIOME_TEMP, 3, 0.5, 2) * 2 - 1;
-}
-
-// How snowy is this exact column, as a smooth 0..1 weight instead of a yes/no.
-//
-// Measured as a TENT-WEIGHTED AVERAGE of the yes/no answer across the
-// surrounding CLIMATE_BLEND blocks, rather than by smoothstepping the
-// temperature itself. Two attempts at the latter came out too narrow: a fixed
-// width in temperature units gives a 20 block transition in one place and a
-// 400 block one in the next, because the domain warp makes the field cross the
-// threshold at wildly different speeds, and dividing by a measured gradient
-// only trades that for a different error, since the warp wobbles faster than
-// any baseline you can measure the slope over (it undershot to ~40 blocks).
-//
-// Averaging the DECISION sidesteps the field's shape entirely. The transition
-// is then as wide as the filter, by construction, wherever it falls. The tent
-// weighting (rather than a flat box) is what makes it an S-curve: a box
-// average of a step is a straight ramp with two corners in it.
-// Three temperature evaluations deep, so this is the one field in the height
-// function worth caching on its own. Rounded to whole blocks even when asked
-// for a fractional one: the temperature field runs at frequency 0.0035, about
-// 286 blocks per cell, so the difference between x and x + 0.4 is far below
-// what a single block of terrain could express.
-function getSnowWeight(x) {
-  const xi = Math.round(x);
-  const slot = xi & (_SNOWW_N - 1);
-  const tok = _terrainToken();
-  if (_snowWTok !== tok) { _snowWX.fill(0x7fffffff); _snowWTok = tok; }
-  if (_snowWX[slot] === xi) return _snowWV[slot];
-  const v = _computeSnowWeight(xi);
-  _snowWX[slot] = xi;
-  _snowWV[slot] = v;
-  return v;
-}
-
-const CLIMATE_STRIDE = 16;   // sample spacing: 9 taps across the tent
-const CLIMATE_SOFT   = 0.07; // how soft each individual tap's yes/no is
-function _computeSnowWeight(x) {
-  const forced = _biomeOverride();
-  if (forced) return forced === 'SNOW' ? 1 : 0;
-  // A tent of half-width R smears a step over 2R, so the reach is half the
-  // width we want the transition to read as.
-  const reach = CLIMATE_BLEND / 2;
-  let sum = 0, wsum = 0;
-  for (let d = -reach; d <= reach; d += CLIMATE_STRIDE) {
-    const w = 1 - Math.abs(d) / (reach + CLIMATE_STRIDE);
-    // Each tap answers softly rather than yes/no. With nine hard taps the
-    // result can only take nine values, and it jumps by up to a fifth the
-    // moment one tap crosses the line: in the stretches where the field
-    // crosses several times over a short distance, that turned an otherwise
-    // wide transition into a handful of visible steps. Softening the taps
-    // costs one extra multiply each and makes the whole thing continuous.
-    const u = Math.max(0, Math.min(1, (SNOW_EDGE + CLIMATE_SOFT - getClimateTemp(x + d)) / (2 * CLIMATE_SOFT)));
-    sum += w * u * u * (3 - 2 * u);
-    wsum += w;
-  }
-  return sum / wsum;
-}
-
-// The yes/no answer for things that draw or plant ONE column: ground texture,
-// trees, snow underfoot.
-//
-// The boundary is DOMAIN WARPED rather than dithered: instead of asking "is
-// this column snowy" it asks the climate field a short distance away, and lets
-// noise decide how far and in which direction. Where that offset wobbles
-// across the boundary the answer flips back and forth, which is what puts
-// isolated pockets of snow out ahead of the snow line and islands of bare
-// forest behind it, over a band tens of blocks deep.
-//
-// The obvious version (compare the weight against a noise value) was tried
-// first and is wrong in a way that is easy to miss: fractal noise is a sum of
-// octaves, so its values bunch up around 0.5 rather than spreading evenly.
-// Thresholding against it jumped from almost no snow at weight 0.25 to 81%
-// snow at weight 0.46, which threw away most of the blend the climate field
-// had just been built to produce. Warping the position has no such bias: at
-// weight 0.5 the answer is 50/50 by construction.
-const CLIMATE_JITTER = 0.55;   // how far the boundary may wander, as a fraction of the blend
-function isSnowColumn(x) {
-  const xi = x | 0;
-  const slot = xi & (_SNOWCOL_N - 1);
-  const tok = _terrainToken();
-  if (_snowColTok !== tok) { _snowColX.fill(0x7fffffff); _snowColTok = tok; }
-  if (_snowColX[slot] === xi) return _snowColV[slot] === 1;
-  let v;
-  const w = getSnowWeight(xi);
-  if (w <= 0) v = 0;
-  else if (w >= 1) v = 1;
-  else {
-    // Frequency matters as much as amplitude here: at 0.02 the offset field
-    // runs on a 50 block wavelength, which is longer than a chunk, so a whole
-    // chunk would tip to snow at once and the patches never appeared. 0.045 is
-    // a ~22 block wavelength, so pockets come out around ten blocks wide: a
-    // stand of trees, not a chunk and not a dither pattern.
-    const j = (fractalNoise1D(xi * 0.045, NOISE_CH.BIOME_MIX, 2, 0.5, 2) - 0.5) * 2 * CLIMATE_BLEND * CLIMATE_JITTER;
-    v = getSnowWeight(xi + j) > 0.5 ? 1 : 0;
-  }
-  _snowColX[slot] = xi;
-  _snowColV[slot] = v;
-  return v === 1;
-}
-
-// The whole-chunk label, for everything that needs one answer for a region
-// rather than for a column: weather, music mood, the HUD readout, structure
-// rolls. Sampled at the chunk CENTRE, so a chunk reports whichever biome
-// actually dominates it.
-function getBiome(cx) {
-  const forced = _biomeOverride();
-  if (forced) return forced;
-  return getSnowWeight(cx * CHUNK_W + (CHUNK_W >> 1)) > 0.5 ? "SNOW" : "FOREST";
-}
-
-// ── The terrain profile ───────────────────────────────────────────────────
-// TERRAIN_BASE is deliberately unchanged at 65: every depth constant in the
-// game is written relative to it (ore minDepth, cave start depth, the
-// background layers' depthOffset), so moving it would quietly re-tune all of
-// them at once.
-const TERRAIN_BASE = 65;
-const TERRAIN_MIN = 6, TERRAIN_MAX = 105;
-
-// "How dramatic is this stretch of world?" A very low frequency field, so it
-// changes over hundreds of blocks rather than tens.
-//
-// This is the piece that was missing. With a single noise field, every part of
-// the world had the same character: hills of the same size, everywhere,
-// forever. Amplitude that varies by REGION is what makes a world read as
-// having places in it, calm lowlands you cross and highlands that announce
-// themselves, instead of one uniform texture.
-//
-// Smoothstepped so most of the world commits to being one or the other rather
-// than spending all its time in a mushy middle.
-function getRelief(x) {
-  const r = fractalNoise1D(x * 0.0012, NOISE_CH.RELIEF, 3, 0.5, 2);
-  const t = Math.max(0, Math.min(1, (r - 0.28) / 0.44));
-  return t * t * (3 - 2 * t);
-}
-
-// Valleys and canyons. Ridged noise again, but used the other way up from
-// getMountainBoost: the ridge line here is where the ground is cut DOWN, and
-// the high power makes the cut narrow with steep sides rather than a wide
-// bowl. Multiplied by relief at the call site, so canyons belong to highlands
-// (a canyon needs something to cut into) and lowlands get gentle dales.
-function getValleyCut(x) {
-  const v = fractalNoise1D(x * 0.0022, NOISE_CH.VALLEY, 3, 0.5, 2);
-  const ridge = 1 - Math.abs(v * 2 - 1);
-  return Math.pow(ridge, 5);
-}
-
-// Mesa country: how strongly this stretch snaps to flat steps. Zero over most
-// of the world, which is the point: terracing is a landmark, and a world
-// where everything is terraced has no landmarks.
-//
-// This is also the only thing in the height function that can produce a
-// genuinely VERTICAL face. Everything else here is smooth noise, and smooth
-// noise moves by well under a block per column: what feels like a steep
-// mountainside is a 60-degree ramp, never a wall. Snapping the height to a
-// coarse grid means that wherever the underlying curve crosses a step
-// boundary, the whole step happens between two adjacent columns. That single
-// jump is what the cliff pass in getChunk then undercuts into an overhang, so
-// this field is what makes overhangs possible at all.
-function getTerraceAmount(x) {
-  const t = fractalNoise1D(x * 0.0016, NOISE_CH.TERRACE, 2, 0.5, 2);
-  // Tuned by measurement, not by eye: this leaves roughly a quarter of the
-  // world terraced at all and about a twentieth strongly so. At the first
-  // setting that produced good-looking cliffs, half the world was stepped and
-  // mesa country had stopped being a place you arrive at.
-  return Math.max(0, Math.min(1, (t - 0.60) / 0.26));
-}
-// Tall enough that a step edge reads as a cliff with a lip rather than as a
-// stair, small enough that a terraced slope is still climbable.
-const TERRACE_STEP = 6;
-
-// ── Sub-zones ─────────────────────────────────────────────────────────────
-// Two more very low frequency axes, deliberately kept SEPARATE from getRelief
-// instead of folded into it. Relief answers "how much height happens here";
-// these two answer "what SHAPE does it take", and that is a different question:
-// a high plateau and a jagged range can carry the same amount of relief and
-// still be two places you would describe differently.
-//
-//   plateau  raises the base level over a broad stretch without adding
-//            roughness, which is what a plateau is: elevation without drama.
-//   rugged   shifts the same amplitude between smooth rolling ground and
-//            craggy, stepped, canyon-cut ground.
-//
-// Crossed with the climate weight, the four named sub-zones fall out without a
-// single new block type or an explicit list of zones anywhere:
-//
-//   snow   + plateau, calm     -> snowy high plateau
-//   snow   + plateau, rugged   -> glacier canyon (a deep cut into high ground)
-//   forest + low,     calm     -> flat valley thicket
-//   any    + plateau, rugged   -> steep high mountains
-// Snow lowers the bar for a plateau, so snowy country leans towards high
-// ground. That is the actual relationship in the world (a snow line IS an
-// altitude) and it is what makes "snowy high plateau" a place you can arrive
-// at rather than a rare coincidence of two unrelated fields: at the same
-// amplitude it roughly doubles how much of the snow country sits up on a
-// shelf, without making plateaus any more common in the forest.
-function getPlateau(x) {
-  const p = fractalNoise1D(x * 0.0009, NOISE_CH.PLATEAU, 2, 0.5, 2);
-  const gate = 0.52 - getSnowWeight(x) * 0.13;
-  const t = Math.max(0, Math.min(1, (p - gate) / 0.30));
-  return t * t * (3 - 2 * t);
-}
-function getRuggedness(x) {
-  const r = fractalNoise1D(x * 0.0018, NOISE_CH.RUGGED, 2, 0.5, 2);
-  const t = Math.max(0, Math.min(1, (r - 0.30) / 0.40));
-  return t * t * (3 - 2 * t);
-}
-
-// The biome argument is gone: snowiness is now a continuous per-column weight
-// (getSnowWeight), so the height field reads it itself instead of being told a
-// yes/no answer that was only ever accurate to the nearest chunk. That alone
-// removes a visible seam from the parallax hills, which used to switch profile
-// at chunk borders because they passed getBiome(cx) in.
-function getBiomeHeight(x) {
-  // Only whole columns are cached. The parallax layers sample at wx * 0.28 and
-  // friends, i.e. at FRACTIONAL x, and quantising those to whole blocks would
-  // make three or four neighbouring screen columns share one height: the
-  // distant hills would come out as visible stair steps instead of a smooth
-  // ridge line. Those calls take the direct path, which is still much cheaper
-  // than it was before getSnowWeight got its own cache below.
-  const xi = x | 0;
-  if (xi !== x) return _computeBiomeHeight(x);
-  const slot = xi & (_HEIGHT_N - 1);
-  const tok = _terrainToken();
-  if (_heightTok !== tok) { _heightX.fill(0x7fffffff); _heightTok = tok; }
-  if (_heightX[slot] === xi) return _heightV[slot];
-  const h = _computeBiomeHeight(xi);
-  _heightX[slot] = xi;
-  _heightV[slot] = h;
-  return h;
-}
-
-function _computeBiomeHeight(x) {
-  const relief  = getRelief(x);
-  const snow    = getSnowWeight(x);
-  const rugged  = getRuggedness(x);
-  const plateau = getPlateau(x);
-
-  const n = noise(x);                                                              // +/-16
-  const detail = (fractalNoise1D(x * 0.15, NOISE_CH.DETAIL, 2, 0.5, 2) * 2 - 1) * 3; // small ripples, [-3,3]
-
-  // Lowlands stay calm and walkable, highlands get the full swing. Snow keeps
-  // the flatter profile it always had, just faded in over the transition band
-  // now rather than switching at a chunk border. At snow = 0 and snow = 1 this
-  // is the same 1.0 / 0.85 it always was.
-  const swing = (0.45 + relief * 0.95) * (1 - snow * 0.15);
-
-  // Ripples are the fine grain of the ground, so they belong to ruggedness:
-  // calm country reads as smooth even where it is tall, craggy country is
-  // broken up even where it is low. Averages out to roughly the old amplitude.
-  let h = TERRAIN_BASE + n * swing + detail * (0.55 + relief * 0.65) * (0.6 + rugged * 0.9);
-
-  // Mountain ranges rise across any biome, but only where the relief field
-  // says a range belongs. Ungated, ridged noise puts a peak in every quiet
-  // meadow and the ranges stop meaning anything. Ruggedness decides whether
-  // that range comes out as peaks or as high rolling ground.
-  h -= getMountainBoost(x) * (0.22 + relief * 0.78) * (0.55 + rugged * 0.75);
-
-  // The plateau shelf. Subtracting raises the ground (y grows downward), and
-  // it is applied FLAT: no noise on it, because a plateau that wobbles is just
-  // a hill. Snow leans into it harder, which is what makes snowy country read
-  // as high country rather than as forest painted white.
-  h -= plateau * (6 + relief * 22) * (0.75 + snow * 0.5);
-
-  // ...and valleys cut back down through all of it. Deeper where the ground is
-  // high and broken, which is the difference between a dale and a canyon: a
-  // canyon needs something to cut INTO. This is what turns a snowy plateau
-  // into a glacier canyon without either being named anywhere.
-  h += getValleyCut(x) * (7 + relief * 23) * (0.7 + rugged * 0.6) * (1 + plateau * 1.8);
-
-  // Flat-topped steps, in the few stretches that get them. Snapping the height
-  // to a coarse grid is what turns a slope into a stack of cliffs and ledges.
-  //
-  // Ruggedness biases WHERE terracing lands without changing how much of it
-  // there is: the multiplier averages 1.0 across the world, so the measured
-  // budget the field was tuned to (roughly 30% terraced, 9% strongly) survives,
-  // it just moves to the stretches where stepped ground belongs.
-  const terrace = Math.min(1, getTerraceAmount(x) * (0.5 + rugged));
-  if (terrace > 0) {
-    h += (Math.round(h / TERRACE_STEP) * TERRACE_STEP - h) * terrace;
-  }
-
-  // Two of the three landmarks are shapes the height curve can carry, so they
-  // are applied here, AFTER terracing: a canyon that then got snapped to a
-  // six-block grid would come out as a staircase, and the point of it is the
-  // sheer drop. Both use a high power of the chunk-wide strength profile, which
-  // is what makes them narrow: sin squared alone would give a wide soft bowl
-  // and a wide soft dome, and neither of those is a landmark.
-  const kind = landmarkChunkKind(Math.floor(x / CHUNK_W));
-  if (kind === 'CANYON' || kind === 'SPIRE') {
-    const s = landmarkStrengthAt(x);
-    // y grows downward: adding sinks the ground, subtracting raises it.
-    if (kind === 'CANYON') h += Math.pow(s, 4) * 30;
-    else                   h -= Math.pow(s, 5) * 20;
-  }
-
-  return Math.max(TERRAIN_MIN, Math.min(TERRAIN_MAX, h));
-}
-
-// ── The density field ─────────────────────────────────────────────────────
-// Everything above is a HEIGHTMAP: one surface row per column, a silhouette you
-// could draw without lifting the pen. An overhang needs two surfaces in one
-// column and cannot be expressed there at all, however dramatic the curve gets.
-//
-// This is the field that answers the other question. Not "where does the rock
-// stop in this column" but "is there rock at this exact spot", which is a
-// question a heightmap cannot be asked. Overhangs, arches, free-standing
-// pillars and cave mouths are all the same answer to it, rather than four
-// special cases bolted onto the silhouette.
-//
-// It replaced two hand-written passes (undercut the cliff foot, then let the
-// top rows stick out over the drop) that between them could only ever produce
-// one shape. They are gone; their tuning constants live on here as the band.
-const DENSITY_UP   = 9;     // rows above the heightmap that may turn to rock
-const DENSITY_DOWN = 22;    // rows below the heightmap that may turn to air
-// How hard the field must push to overrule the heightmap. Calibrated against
-// the actual spread of the noise, not guessed: three octaves of simplex have a
-// standard deviation of 0.305 and only reach 0.89 at the very extreme, so the
-// first setting of 0.52 needed |n| > 0.43 even at full gate and changed 0.1% of
-// the band. Overhangs came out at 1% of columns and arches at none.
-const DENSITY_FLIP = 0.38;
-
-// How much licence the field has in this column. Zero on flat ground, which is
-// what keeps meadows walkable and stops the world turning into sponge.
-//
-// Note the two are NOT symmetric, and that is deliberate. Rock appearing above
-// the surface (gateUp) is a ledge or an arch and only makes sense against a
-// cliff, so it needs real steepness. Air appearing below it (gateDown) is an
-// undercut or a pocket, and gets a standing allowance of 0.35: below the flip
-// threshold on its own, so flat ground is still never touched, but enough that
-// a merely rolling slope can hold a shallow hollow.
-// The knee of the steepness ramp is measured, not chosen by eye. Only 13.6% of
-// columns change height by 1.4 rows or more, and a slope of 2.6 is rare enough
-// to be a landmark. An earlier ramp of (slope - 0.8) / 1.8 therefore sat at
-// about 0.33 on ground that already reads as a cliff, which after multiplying
-// through needed |n| > 0.93 from a field that only reaches 0.89: cliffs got
-// nothing at all. This one is fully open by slope 1.8.
-function densityGates(slope, wx) {
-  const steep = Math.max(0, Math.min(1, (slope - 0.5) / 1.3));
-  let up = steep * 1.6, down = 0.30 + steep * 1.15;
-  // Micro-variance: the same slope does not carve the same way twice. Centred
-  // on 1.0 so the measured budget above is unchanged on average, it just stops
-  // every cliff of a given steepness looking like every other one.
-  const mv = microVariance(wx);
-  up   *= 0.70 + mv * 0.60;
-  down *= 0.80 + mv * 0.40;
-  // The OVERHANG landmark: one chunk where the field is let off the leash.
-  if (landmarkChunkKind(Math.floor(wx / CHUNK_W)) === 'OVERHANG') {
-    const s = landmarkStrengthAt(wx);
-    up   += s * 1.30;
-    down += s * 0.90;
-  }
-  return { up, down };
-}
-
-// True where there should be rock. `sy` is the heightmap surface for this
-// column, and the answer collapses back to the plain heightmap wherever the
-// field has no licence, so this stays a strict extension of what was here.
-function terrainSolidAt(wx, y, sy, gateUp, gateDown) {
-  // `sy` is the surface ROW and is itself rock, not the last row of air above
-  // it. Writing this as y > sy instead lowered the entire world by one block,
-  // which is invisible in any single screenshot and shows up as every measured
-  // ground level being off by one.
-  const below = y >= sy;
-  const d = y - sy;
-  if (d < -DENSITY_UP || d > DENSITY_DOWN) return below;
-  const gate = below ? gateDown : gateUp;
-  if (gate <= 0) return below;
-  // Full licence over the inner half of the band, tapering to none at its
-  // edges. The taper is what stops the carving ending at a horizontal line,
-  // which would read as a seam across the whole world at exactly DENSITY_DOWN
-  // below the ground. The flat middle is what lets an undercut be DEEP: a
-  // plain tent from the surface outwards throttles the field the moment it
-  // gets going, and capped overhangs at three rows.
-  const prof = d <= 0
-    ? (d >= -DENSITY_UP * 0.5   ? 1 : (DENSITY_UP + d) / (DENSITY_UP * 0.5))
-    : (d <=  DENSITY_DOWN * 0.55 ? 1 : (DENSITY_DOWN - d) / (DENSITY_DOWN * 0.45));
-  const g = gate * prof;
-  if (g <= 0) return below;
-  // Sampled at a lower frequency across x than down y, so features come out
-  // wider than they are tall: shelves and ledges, which is what rock does,
-  // rather than round blobs, which is what unstretched noise does. Both
-  // frequencies are also low in absolute terms, because the size of a feature
-  // here IS the size of the overhang: at 0.105 down y a hollow could not be
-  // more than about five rows tall before the field closed it again.
-  // Persistence 0.35, not the usual 0.5. Wherever the gate sits near the flip
-  // threshold (the outer part of the band, by design) a small wobble is enough
-  // to turn a cell, so the finest octave decides those cells on its own: at 0.5
-  // it carried 14% of the amplitude and left one-block fins standing in the
-  // middle of otherwise clean hollows. At 0.35 it carries 8% and adds texture
-  // to an edge instead of drawing its own.
-  const n = fractalSimplex2D(wx * 0.038, y * 0.062, NOISE_CH.DENSITY, 3, 0.35, 2);
-  const delta = n * g;
-  return below ? delta > -DENSITY_FLIP : delta > DENSITY_FLIP;
-}
-
-// Where a piece of rock that touches nothing is allowed to stay. Rare on
-// purpose: a floating island is a landmark, and a world full of them has none.
-// See the support pass in getChunk for why this is a field and not a constant.
-function floatingAllowed(wx) {
-  return fractalNoise1D(wx * 0.0015, NOISE_CH.FLOAT, 2, 0.5, 2) > 0.70;
-}
-
-// ── The feature lattice: spacing without a memory ──────────────────────────
-// A chunk carries the feature if it passes its own gate roll AND outscores
-// every other passing chunk within `radius`. Two winners inside one radius is
-// arithmetically impossible: each would have to outscore the other. So this
-// GUARANTEES a minimum spacing of radius + 1 chunks, without ever storing what
-// was generated where.
-//
-// That last part is the whole point, and it is why this is not the running
-// "already placed nearby" buffer it looks like it should be. Such a buffer
-// makes the result depend on the ORDER chunks are generated in, and that order
-// depends on where the player walks (the spawn search alone builds hundreds of
-// chunks before anyone sees anything). Two players in the same room on the same
-// seed would get different terrain, and a world would come back different after
-// a reload. This is a pure function of the chunk index, so it cannot.
-//
-// Cost is 2 * radius + 1 hash pairs per query, which is why the callers cache
-// their answer per chunk rather than per column.
-function featureWinner(cx, radius, chance, channel) {
-  if (hash1D(cx, channel) >= chance) return false;
-  const mine = hash1D(cx, channel + 977);
-  for (let d = -radius; d <= radius; d++) {
-    if (d === 0) continue;
-    const c = cx + d;
-    if (hash1D(c, channel) >= chance) continue;
-    const s = hash1D(c, channel + 977);
-    // The tie branch is unreachable in practice (two 32-bit hashes colliding)
-    // and still written out, because "in practice" is where a world that
-    // generates differently on two machines comes from.
-    if (s > mine || (s === mine && c < cx)) return false;
-  }
-  return true;
-}
-
-// ── Landmarks ─────────────────────────────────────────────────────────────
-// One lattice for all three kinds rather than one each, so no two landmarks of
-// ANY kind land within five chunks of each other. Separate lattices would let
-// a spire and a canyon share a chunk, and the requirement is that a stretch of
-// world does not repeat itself in a similar form either, not merely in the
-// same form.
-const LANDMARK_RADIUS = 5;
-const LANDMARK_CHANCE = 0.35;   // gate roll; the lattice thins this to ~9% of chunks
-const LANDMARK_KINDS  = ['OVERHANG', 'SPIRE', 'CANYON'];
-
-const _LM_N = 512;
-const _lmCx = new Int32Array(_LM_N).fill(0x7fffffff);
-const _lmV  = new Int8Array(_LM_N);      // -1 none, else index into LANDMARK_KINDS
-let _lmTok = -1;
-
-function landmarkChunkKind(cx) {
-  const slot = cx & (_LM_N - 1);
-  const tok = _terrainToken();
-  if (_lmTok !== tok) { _lmCx.fill(0x7fffffff); _lmTok = tok; }
-  if (_lmCx[slot] !== cx) {
-    let v = -1;
-    // Chunk 0 is left plain: it is where the spawn search starts, and a canyon
-    // or a spire there is the first thing every new world would show.
-    if (cx !== 0 && featureWinner(cx, LANDMARK_RADIUS, LANDMARK_CHANCE, NOISE_CH.LANDMARK)) {
-      v = Math.min(2, Math.floor(hash1D(cx, NOISE_CH.LANDMARK + 1531) * 3));
-    }
-    _lmCx[slot] = cx;
-    _lmV[slot] = v;
-  }
-  const v = _lmV[slot];
-  return v < 0 ? null : LANDMARK_KINDS[v];
-}
-
-// Strength across the chunk: zero at both borders, one in the middle. A
-// landmark that simply switched on at a chunk boundary would end in a vertical
-// wall exactly on the seam, which is the one place a landform must not have an
-// edge. sin squared is zero AND flat at both ends, so it also joins the
-// ordinary terrain without a crease.
-function landmarkStrengthAt(wx) {
-  const cx = Math.floor(wx / CHUNK_W);
-  const kind = landmarkChunkKind(cx);
-  if (!kind) return 0;
-  const s = Math.sin(Math.PI * ((wx - cx * CHUNK_W) / CHUNK_W));
-  return s * s;
-}
-
-// Micro-variance: a chunk-specific hash, interpolated smoothly ACROSS the
-// chunk border rather than stepping at it. The lattice points sit exactly on
-// chunk indices, so every chunk really does get its own seed, and no two
-// stretches of world get the same slope aggressiveness or the same tree
-// spacing; but the value never jumps, so the join is invisible. Reading a raw
-// per-chunk hash instead would put a visible discontinuity on every seam.
-function microVariance(wx) {
-  return smoothNoise1D(wx / CHUNK_W, NOISE_CH.MICRO);
-}
-
-function getSurfaceYAt(wx, targetDim = currentDim) {
-  const oldDim = currentDim;
-  currentDim = targetDim;
-  for (let y = 0; y < WORLD_H; y++) {
-    const b = getBlock(wx, y);
-    if (b !== BLOCKS.AIR && b !== BLOCKS.WATER && b !== BLOCKS.ICE) { currentDim = oldDim; return y; }
-  }
-  currentDim = oldDim;
-  return 30;
-}
-
-function isValidSpawnGround(blockType) {
-  return [BLOCKS.GRASS, BLOCKS.SAND, BLOCKS.DIRT, BLOCKS.STONE,
-          BLOCKS.VOLCANIC_ROCK, BLOCKS.ASH_DIRT, BLOCKS.MYSTIC_EARTH].includes(blockType);
-}
-
-function findSafeSpawnX() {
-  const spawnRangeChunks = 160;
-  const startCx = seededInt(-spawnRangeChunks, spawnRangeChunks, 'spawn-chunk');
-  for (let radius = 0; radius <= spawnRangeChunks; radius++) {
-    const candidates = radius === 0 ? [startCx] : [startCx + radius, startCx - radius];
-    for (const cx of candidates) {
-      const baseX = cx * CHUNK_W + Math.floor(CHUNK_W / 2);
-      for (let dx = -12; dx <= 12; dx++) {
-        const wx = baseX + dx;
-        const sy = getSurfaceYAt(wx, "OVERWORLD");
-        const ground = getBlock(wx, sy);
-        if (isValidSpawnGround(ground) && getBlock(wx, sy-1) === BLOCKS.AIR && getBlock(wx, sy-2) === BLOCKS.AIR) return wx;
-      }
-    }
-  }
-  return 0;
-}
-
-function isGrassOrDirt(worldX, y) {
-  const b = getBlock(worldX, y);
-  return b === BLOCKS.GRASS || b === BLOCKS.DIRT;
-}
-function canSpawnFlowerAt(worldX, surfaceY) {
-  return isGrassOrDirt(worldX, surfaceY) && getBlock(worldX, surfaceY - 1) === BLOCKS.AIR;
-}
+// Verschoben nach voxeria-worldgen.js: die Rauschfelder, die Hoehenkurve,
+// das Dichtefeld, das Feature-Gitter mit den Wahrzeichen, die Spawn-Suche
+// und die seltenen Set-Pieces. Die Block-Zugriffsschicht (getBlock,
+// localSetBlock, setBlock, setBlockAndBroadcast) ist hier geblieben: sie
+// wird vom ganzen Spiel benutzt, nicht nur von der Weltgenerierung.
+// =========================================================
 
 function spawnJuiceBurst(x, y, color = '#ffffff', amount = 12, power = 5) {
   for (let i = 0; i < amount; i++) {
@@ -4121,152 +3426,8 @@ function addJuiceText(x, y, text, color = '#ffffff') {
 }
 
 
-// ── World Director set-pieces (called only from getChunk, OVERWORLD only, so
-// currentDim is already OVERWORLD and localSetBlock writes to the right dim) ──
 
-// A 3-wide, 5-tall block font for hidden messages. '1' = an ink block.
-const _msgFont = {
-  G: ['011','100','101','101','011'],
-  L: ['100','100','100','100','111'],
-  H: ['101','101','111','101','101'],
-  F: ['111','100','110','100','100'],
-  O: ['111','101','101','101','111'],
-  X: ['101','101','010','101','101'],
-  V: ['101','101','101','101','010'],
-  I: ['111','010','010','010','111'],
-};
-const _msgWords = ['HI', 'GG', 'GL', 'LOL', 'VOX', 'GLHF'];
 
-// A short word spelled out in Gold Brick inside a carved pocket, buried
-// shallow enough to stumble on while mining. You can even harvest the letters.
-function placeHiddenMessage(cx, surfaceY) {
-  const word = _msgWords[seededInt(0, _msgWords.length - 1, 'msg-w', cx)];
-  const cols = word.length * 3 + (word.length - 1); // 1-tile gap between glyphs
-  const lX = seededInt(2, Math.max(3, CHUNK_W - cols - 2), 'msg-x', cx);
-  const worldX = cx * CHUNK_W + lX;
-  const topY = surfaceY[lX] + seededInt(10, 22, 'msg-y', cx);
-  if (topY + 5 >= WORLD_H - 4) return;
-  // Carve an air pocket one tile larger all around
-  for (let gy = -1; gy <= 5; gy++) for (let gx = -1; gx <= cols; gx++) {
-    localSetBlock(worldX + gx, topY + gy, BLOCKS.AIR);
-  }
-  // Stamp the glyphs
-  let penX = 0;
-  for (const ch of word) {
-    const glyph = _msgFont[ch];
-    if (glyph) {
-      for (let row = 0; row < 5; row++) for (let col = 0; col < 3; col++) {
-        if (glyph[row][col] === '1') localSetBlock(worldX + penX + col, topY + row, BLOCKS.GOLD_BRICK);
-      }
-    }
-    penX += 4;
-  }
-  // Light it so a passing miner actually notices the glint
-  localSetBlock(worldX - 1, topY, BLOCKS.TORCH);
-  localSetBlock(worldX + cols, topY, BLOCKS.TORCH);
-}
-
-// One of three whimsical, rule-breaking builds. Meant to look "wrong" in a
-// way that reads as intentional and memorable, not as a generation bug.
-function placeMemeStructure(cx, surfaceY, biome) {
-  const pick = seededInt(0, 2, 'meme-pick', cx);
-  const lX = seededInt(4, CHUNK_W - 8, 'meme-x', cx);
-  const worldX = cx * CHUNK_W + lX;
-  const sy = surfaceY[lX];
-  if (sy < 12 || sy > 88) return;
-
-  if (pick === 0) {
-    // ── Monolith: a lone black obelisk with a single glowing gem on top.
-    const h = 10 + seededInt(0, 6, 'mono-h', cx);
-    if (sy - h - 2 < 2) return;
-    for (let dy = 1; dy <= h; dy++) {
-      localSetBlock(worldX, sy - dy, BLOCKS.OBSIDIAN);
-      localSetBlock(worldX + 1, sy - dy, BLOCKS.OBSIDIAN);
-    }
-    localSetBlock(worldX, sy - h - 1, BLOCKS.RAINBOW_ORE);
-    localSetBlock(worldX + 1, sy - h - 1, BLOCKS.RAINBOW_ORE);
-  } else if (pick === 1) {
-    // ── Staircase to nowhere: planks climbing into open sky, ending abruptly.
-    const steps = 8 + seededInt(0, 5, 'stair-n', cx);
-    for (let s = 0; s < steps; s++) {
-      const bx = worldX + s;
-      const by = sy - 1 - s;
-      if (by < 3) break;
-      localSetBlock(bx, by, BLOCKS.PLANKS);
-      localSetBlock(bx, by + 1, BLOCKS.PLANKS); // a little riser under each tread
-    }
-  } else {
-    // ── Upside-down house: a cottage flipped on its head, roof biting the
-    // ground. Drawn from a fixed bitmap so it's unmistakably deliberate.
-    const layout = [
-      ' ##### ', // (was the floor) now the top
-      ' #...# ',
-      ' #...# ',
-      '#######', // wall band
-      ' ##### ', // roof, now pointing down
-      '  ###  ',
-      '   #   ',
-    ];
-    const roofBlock = BLOCKS.PLANKS;
-    for (let row = 0; row < layout.length; row++) {
-      const by = sy - (layout.length - 1) + row;
-      if (by < 2) continue;
-      for (let col = 0; col < layout[row].length; col++) {
-        const ch = layout[row][col];
-        const bx = worldX + col;
-        if (ch === '#') localSetBlock(bx, by, roofBlock);
-        else if (ch === '.') localSetBlock(bx, by, BLOCKS.BG_PLANKS);
-      }
-    }
-    localSetBlock(worldX + 3, sy - 4, BLOCKS.TORCH); // a torch stuck to the "ceiling"
-  }
-}
-
-// ── Mother Lode: the jackpot. A small deep chamber whose walls drip Diamond
-// Ore, with a Rainbow Ore core and a stick of Diamond Dynamite. Deliberately
-// bypasses the per-chunk ore budget (chunkOreWon) — that rule-break is the
-// whole point, and its ~0.3%-of-chunks rarity keeps the economy intact.
-function placeMotherLode(cx, surfaceY) {
-  const lX = seededInt(4, CHUNK_W - 6, 'lode-x', cx);
-  const worldX = cx * CHUNK_W + lX;
-  const cy = surfaceY[lX] + 35 + seededInt(0, 12, 'lode-y', cx);
-  if (cy + 5 >= WORLD_H - 3) return;
-  const rX = 4, rY = 3;
-  // Hollow it out
-  for (let dx = -rX; dx <= rX; dx++) for (let dy = -rY; dy <= rY; dy++) {
-    if ((dx*dx)/(rX*rX) + (dy*dy)/(rY*rY) <= 1) localSetBlock(worldX + dx, cy + dy, BLOCKS.AIR);
-  }
-  // Stud the shell with diamond
-  for (let dx = -rX; dx <= rX; dx++) for (let dy = -rY; dy <= rY; dy++) {
-    const e = (dx*dx)/(rX*rX) + (dy*dy)/(rY*rY);
-    if (e > 1 && e <= 1.8 && seededRandom('lode-d', cx, dx, dy) < 0.6) {
-      if (getBlock(worldX + dx, cy + dy) === BLOCKS.STONE) localSetBlock(worldX + dx, cy + dy, BLOCKS.DIAMOND_ORE);
-    }
-  }
-  // Rainbow core + a dynamite dare + torches
-  localSetBlock(worldX, cy, BLOCKS.RAINBOW_ORE);
-  localSetBlock(worldX - 1, cy, BLOCKS.RAINBOW_ORE);
-  localSetBlock(worldX + 1, cy, BLOCKS.RAINBOW_ORE);
-  localSetBlock(worldX, cy - 1, BLOCKS.DIAMOND_DYNAMITE);
-  localSetBlock(worldX - rX + 1, cy - rY + 1, BLOCKS.TORCH);
-  localSetBlock(worldX + rX - 1, cy - rY + 1, BLOCKS.TORCH);
-}
-
-function getBlock(x, y) {
-  if (y < 0 || y >= WORLD_H) return BLOCKS.AIR;
-  const cx = Math.floor(x / CHUNK_W);
-  let lx = x % CHUNK_W;
-  if (lx < 0) lx += CHUNK_W;
-  return getChunk(cx, currentDim)[y * CHUNK_W + lx];
-}
-
-function localSetBlock(x, y, type, targetDim = currentDim) {
-  if (y < 0 || y >= WORLD_H) return;
-  const cx = Math.floor(x / CHUNK_W);
-  let lx = x % CHUNK_W;
-  if (lx < 0) lx += CHUNK_W;
-  getChunk(cx, targetDim)[y * CHUNK_W + lx] = type;
-}
 
 function setBlock(x, y, type) {
   recordWorldEdit(x, y, type);
@@ -4286,12 +3447,12 @@ function setBlockAndBroadcast(x, y, type, destDim) {
   // local placement + portalDestinations above still happen (the portal works
   // right now), but we skip the Firebase write for portal blocks entirely.
   if (type === BLOCKS.PORTAL) return;
-  // Pocket dimensions are thrown away wholesale on exit (see endPocketRun's
-  // dimensions[dim].clear()), so persisting edits made inside one only ever
-  // wrote permanent garbage into the overworld's collection — nothing ever
-  // read it back. Co-op divers share a layout through the run's `offset`
-  // instead, which needs no block sync at all.
-  if (POCKET_DIMS.has(currentDim)) return;
+  // Eine fluechtige Dimension wird beim Verlassen komplett weggeworfen. Ihre
+  // Aenderungen zu speichern schrieb nur dauerhaften Muell in die Sammlung der
+  // Overworld, den nie jemand zurueckgelesen hat. Wer gemeinsam abtaucht, teilt
+  // sich das Layout ueber die Nonce des Laufs und braucht dafuer keinen
+  // Blockabgleich.
+  if (EPHEMERAL_DIMS.has(currentDim)) return;
   if (isMultiplayerActive && db && userId) {
     const docId = `${currentDim}_${x}_${y}`;
     const payload = { wx: x, wy: y, type, dim: currentDim, userId, ts: Date.now() };
@@ -4583,9 +3744,7 @@ function _invalidateBlockSprites() {
   // here the hotbar and the forge would keep showing the procedural fallback
   // for the rest of the session while the world beside them showed the
   // texture — the exact mismatch this change set out to remove.
-  if (typeof _forgeIconCache !== 'undefined') {
-    for (const k of Object.keys(_forgeIconCache)) delete _forgeIconCache[k];
-  }
+  for (const k of Object.keys(_forgeIconCache)) delete _forgeIconCache[k];
   if (typeof drawHotbar === 'function') drawHotbar();
 }
 
@@ -4856,7 +4015,7 @@ function updatePlayer(dt) {
     if (airJump) spawnAirJumpBurst(player.x + player.w/2, player.y + player.h);
     else spawnPlayerDustPuffBurst(player.x + player.w/2, player.y + player.h);
     playSound('jump');
-    fireGraphEvent('onJump', {});
+    VxHooks.run('gameEvent', 'onJump', {});
   }
   prevJump = jumpPressed;
 
@@ -5287,7 +4446,7 @@ function _rgbaStr(c, a) { return 'rgba(' + (c[0]|0) + ',' + (c[1]|0) + ',' + (c[
 // CDN) cache PNGs by URL, so overwriting Assets/*.png with new art but
 // keeping the same filename leaves players seeing the stale cached image —
 // this suffix forces a fresh fetch each time the value changes.
-const BLOCK_TEXTURE_VERSION = 'v5';
+const BLOCK_TEXTURE_VERSION = 'v6';
 
 function _loadBlockTexture(src, onReady) {
   const img = new Image();
@@ -6534,13 +5693,105 @@ function drawBgHills() {
   ctx.imageSmoothingEnabled = prevSmoothing;
 }
 
+// =========================================================
+// FOREGROUND PARALLAX
+// The counterpart to BG_LAYERS above: silhouettes that sit IN FRONT of the
+// player and scroll faster than the camera. Depth cues behind the character
+// only ever push the world away. A layer in front is what gives the scene a
+// near plane to read against, which is where most of the 3D impression in a
+// 2D side-scroller actually comes from.
+//
+// Each silhouette is baked once into an offscreen canvas WITH its blur already
+// applied, then blitted. ctx.filter='blur()' per frame would re-run the blur
+// for every clump every frame; baking pays for it once at startup instead.
+// =========================================================
+const FG_PARALLAX = 1.45;   // >1, so they slide past faster than the terrain
+const FG_SPACING = 250;     // world px between candidate slots
+const _fgStamps = {};
+
+function _makeFgStamp(kind, tint) {
+  const S = 160;
+  const shape = document.createElement('canvas');
+  shape.width = S; shape.height = S;
+  const c = shape.getContext('2d');
+  c.fillStyle = tint;
+
+  if (kind === 'rock') {
+    // Overlapping ellipses rather than one polygon: a straight-edged silhouette
+    // reads as a mountain or a crown at this scale, and its hard corners survive
+    // the blur below instead of dissolving into a near-plane smudge.
+    for (const [x, y, rx, ry] of [[34, S - 30, 34, 46], [76, S - 44, 42, 58], [120, S - 26, 32, 40], [96, S - 12, 46, 30]]) {
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill();
+    }
+  } else {
+    // Fan of blades springing from a common root at the bottom edge.
+    for (let i = 0; i < 7; i++) {
+      const rootX = 34 + i * 15;
+      const lean = (i - 3) * 17;
+      const len = 74 + ((i * 37) % 5) * 13;
+      c.beginPath();
+      c.moveTo(rootX - 7, S);
+      c.quadraticCurveTo(rootX + lean * 0.4, S - len * 0.6, rootX + lean, S - len);
+      c.quadraticCurveTo(rootX + lean * 0.5, S - len * 0.55, rootX + 7, S);
+      c.closePath(); c.fill();
+    }
+  }
+
+  const out = document.createElement('canvas');
+  out.width = S; out.height = S;
+  const oc = out.getContext('2d');
+  oc.filter = 'blur(3.5px)';
+  oc.drawImage(shape, 0, 0);
+  return out;
+}
+
+function _getFgStamp(kind, tint) {
+  const key = kind + '|' + tint;
+  return _fgStamps[key] || (_fgStamps[key] = _makeFgStamp(kind, tint));
+}
+
+function drawForegroundParallax() {
+  if (currentDim !== "OVERWORLD") return;
+
+  // Underground the near plane is rock, above ground it is vegetation (or
+  // snow-dusted stone in the SNOW biome), the same biome split drawBgHills uses.
+  const playerCol = Math.floor(player.x / TILE);
+  const underground = player.y / TILE > getBiomeHeight(playerCol) + 6;
+  const biome = getBiome(Math.floor(player.x / (CHUNK_W * TILE)));
+  let tint, kindBias;
+  if (underground) { tint = '#1a1a20'; kindBias = 'rock'; }
+  else if (biome === "SNOW") { tint = '#aebccb'; kindBias = 'rock'; }
+  else { tint = '#16301f'; kindBias = 'frond'; }
+
+  const ox = drawCamX * FG_PARALLAX;
+  const first = Math.floor((ox - FG_SPACING) / FG_SPACING);
+  const last = Math.ceil((ox + canvas.width + FG_SPACING) / FG_SPACING);
+
+  ctx.save();
+  for (let i = first; i <= last; i++) {
+    const h = hillHash(i, 4409);
+    if (h % 5 === 0) continue;   // gaps, so the near plane frames the view instead of walling it off
+    const sx = i * FG_SPACING - ox + (h % 110) - 55;
+    const scale = 0.75 + ((h >>> 7) % 70) / 100;
+    const stamp = _getFgStamp(((h >>> 3) % 4 === 0) ? (kindBias === 'rock' ? 'frond' : 'rock') : kindBias, tint);
+    const w = stamp.width * scale, ht = stamp.height * scale;
+    if (sx > canvas.width || sx + w < 0) continue;
+    // Anchored below the bottom edge: only the upper part of each clump
+    // reaches into frame, which is what sells it as passing very close by.
+    ctx.globalAlpha = 0.42;
+    ctx.drawImage(stamp, sx, canvas.height - ht * 0.62, w, ht);
+  }
+  ctx.restore();
+}
+
 // Dark rock backdrop behind underground AIR tiles, so carved-out caves read
 // as hollows inside solid rock instead of transparent windows onto the sky /
 // parallax hills. Purely visual: no block, no collision, no storage or sync.
 // Drawn right before the solid tiles (so they overpaint it) and darkened by
-// the lighting pass afterwards like everything else. OVERWORLD only — the
-// other dimensions supply their own full backdrops (gold fill, deep water,
-// magma ceiling, void sky).
+// the lighting pass afterwards like everything else. OVERWORLD and MENU only
+// (the menu panorama borrows OVERWORLD-style generation, caves included — see
+// drawMenuPanorama) — the other dimensions supply their own full backdrops
+// (gold fill, deep water, magma ceiling, void sky).
 // Flat-colour fallback for whenever a texture below hasn't loaded yet (or
 // failed to) — same safety net _getBlockSprite falls back to for a real
 // block, so a slow connection shows plain rock instead of a hole in the wall.
@@ -6562,7 +5813,7 @@ const CAVE_BG_TEXTURE_SOURCES = [
 const _caveBgTextures = CAVE_BG_TEXTURE_SOURCES.map(src => _loadBlockTexture(src, () => {}));
 
 function drawCaveBackground() {
-  if (currentDim !== "OVERWORLD") return;
+  if (currentDim !== "OVERWORLD" && currentDim !== "MENU") return;
   const startX = Math.floor(camX/TILE) - 1;
   const endX = startX + COLS + 2;
   const startY = Math.max(0, Math.floor(camY/TILE) - 1);
@@ -6604,6 +5855,73 @@ function drawCaveBackground() {
     }
   }
   ctx.imageSmoothingEnabled = prevSmoothing;
+}
+
+// ── Main-menu panorama ───────────────────────────────────────────────────
+// A live strip of real generated terrain scrolling behind the main menu
+// instead of the flat gradient it used to be — see the hook in
+// _gameLoopInner, right where vxMenuIsOpen() short-circuits the frame.
+//
+// Wrapped at a fixed width so dimensions.MENU (its own isolated dimension,
+// see the note next to `dimensions` above) never grows past this many
+// chunks no matter how long someone leaves the menu open.
+const MENU_PANORAMA_WRAP_CHUNKS = 96;
+// World px per dt=1 (a 60fps frame) — the same unit player velocities use
+// elsewhere in this file. Slow and contemplative on purpose, not a scroll race.
+const MENU_PANORAMA_SPEED = 0.6;
+let menuPanoramaX = 0;
+// Set once per lap (null right after a wrap), not every frame: sampling
+// getBiomeHeight() at the new centre EACH frame made the camera bob up and
+// down as the terrain height changed underneath it. A pure left-to-right pan
+// needs one fixed height for the whole lap instead.
+let menuPanoramaCamY = null;
+
+function drawMenuPanorama(dt) {
+  const wrapPx = MENU_PANORAMA_WRAP_CHUNKS * CHUNK_W * TILE;
+  const prevX = menuPanoramaX;
+  menuPanoramaX = (menuPanoramaX + dt * MENU_PANORAMA_SPEED) % wrapPx;
+  if (menuPanoramaCamY === null || menuPanoramaX < prevX) {
+    // First call, or just wrapped back to the start: pick a fresh height for
+    // the upcoming lap from the terrain at its starting point.
+    const startWx = Math.floor((menuPanoramaX + canvas.width / 2) / TILE);
+    menuPanoramaCamY = (Math.floor(getBiomeHeight(startWx)) - ROWS * 0.3) * TILE;
+  }
+
+  // A fixed, always-bright sky rather than the real drawSky(): that one reads
+  // day/night/weather state that has no meaningful value before a world
+  // exists, and could just as easily land the panorama in the middle of a
+  // simulated night. This is decoration, not a clock.
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, 'rgb(100,181,246)');
+  grad.addColorStop(0.6, 'rgb(150,205,250)');
+  grad.addColorStop(1, 'rgb(187,222,251)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const panoCamX = menuPanoramaX;
+  const panoCamY = menuPanoramaCamY;
+
+  // Borrow the real camera/dimension for exactly as long as this draw takes,
+  // then hand them straight back. Safe because nothing else runs during a
+  // menu-open frame (see the guard in _gameLoopInner) — no physics, no other
+  // draw call, nothing left to see camX/currentDim in their swapped state.
+  const realDim = currentDim, realCamX = camX, realCamY = camY,
+        realDrawCamX = drawCamX, realDrawCamY = drawCamY;
+  currentDim = "MENU";
+  camX = drawCamX = panoCamX;
+  camY = drawCamY = panoCamY;
+
+  // Deliberately NOT drawBgHills()/drawForegroundParallax(): the whole point
+  // is close, saturated block colour filling the screen, not the same muted
+  // distant mountain layers the real game already downplays on purpose.
+  // drawCaveBackground() DOES run though — without it, any cave/air pocket
+  // in the scrolling strip shows bare sky instead of a rock wall behind it.
+  drawCaveBackground();
+  drawWorld();
+
+  currentDim = realDim;
+  camX = realCamX; camY = realCamY;
+  drawCamX = realDrawCamX; drawCamY = realDrawCamY;
 }
 
 function drawWorld() {
@@ -7012,11 +6330,19 @@ function spawnAnimalNearPlayer() {
 }
 
 // =========================================================
-// CUSTOM CREATURES — player-painted ambient life (see CREATURE_PIECE_FIELDS).
-// Deliberately harmless: they wander, hop or drift and nothing else. The game
-// has no mob health, no hit detection and no aggro, so a creature that could
-// "attack" would have nothing real to do — that is its own future project,
-// not something faked here.
+// CUSTOM CREATURES — player-painted life (see CREATURE_PIECE_FIELDS).
+//
+// They used to be purely ambient: wander, hop or drift and nothing else,
+// because the game had no mob health, no hit detection and no aggro. All three
+// exist now, in the CREATURE COMBAT section below.
+//
+// The one property that had to survive that change: a creature is STILL
+// ambient unless a mod says otherwise. `health` defaults to 0, and 0 means
+// "cannot be hurt, never attacks" — so every creature ever painted, and every
+// creature code ever shared, behaves exactly as it did before combat existed.
+// A creature becomes dangerous only when "Set up my creature's fight" is run
+// on it (GRAPH_ACTIONS.setCreatureCombat), which is the same route the rest of
+// its behaviour already takes.
 // =========================================================
 const MAX_CUSTOM_CREATURES = 8;
 
@@ -7041,6 +6367,11 @@ function canSpawnCustomCreatureAt(wx, def) {
 function createCustomCreature(def, wx, sy) {
   const dir = Math.random() < 0.5 ? -1 : 1;
   const s = def.size;
+  // Health is read off the definition ONCE, here. A mod that retunes a
+  // creature mid-session (see setCreatureCombat) therefore changes what spawns
+  // from then on rather than silently healing everything already roaming,
+  // which is the same rule setCreatureBehavior follows for speed and size.
+  const hp = Math.max(0, def.health || 0);
   return {
     type: 'custom', def,
     x: wx * TILE, y: (sy - 1) * TILE - s + (def.move === 'fly' ? -14 - Math.random() * 20 : 0),
@@ -7050,7 +6381,13 @@ function createCustomCreature(def, wx, sy) {
     idle: 60 + Math.random() * 140,
     hopCooldown: 30 + Math.random() * 90,
     floatPhase: Math.random() * Math.PI * 2,
-    scaleX: 1, scaleY: 1
+    scaleX: 1, scaleY: 1,
+    // ── Combat state. All inert while hp is 0. ──
+    hp, maxHp: hp,
+    hurtFlash: 0,        // counts down; drives the white flash and the health bar's visibility
+    windUp: 0,           // telegraph before a leap or a shot, so an attack is dodgeable
+    attackCooldown: 0,   // shared by every pattern, so none of them can machine-gun
+    aggro: false
   };
 }
 
@@ -7166,6 +6503,19 @@ function _customCreatureWalk(a, dt, avoidLedges) {
 }
 
 function updateCustomCreature(a, dt) {
+  // Combat runs FIRST and may claim this frame's movement. A charging creature
+  // has already decided where it is going; letting the wander code run after
+  // would immediately overwrite vx with a random patrol direction, and the
+  // charge would read as a twitch. Gravity and collision still run either way,
+  // which is why this returns a flag rather than skipping the mover outright.
+  const combatDrivesMovement = updateCreatureCombat(a, dt);
+  if (combatDrivesMovement) {
+    // Still needs to fall and still needs to be stopped by walls; it just does
+    // not get to pick a new direction on its own this frame.
+    if (a.def.move !== 'fly') { _customCreatureGravity(a, dt); _customCreatureWalk(a, dt, false); }
+    else a.x += a.vx * dt;
+    return;
+  }
   (CUSTOM_CREATURE_MOVES[a.def.move] || CUSTOM_CREATURE_MOVES.patrol)(a, dt);
   if (a.def.traits.trail && Math.random() < 0.12 * dt) {
     particles.push({
@@ -7186,17 +6536,371 @@ function drawCustomCreature(a) {
     ctx.shadowColor = 'rgba(255,255,200,0.9)';
     ctx.shadowBlur = 12;
   }
+  // The wind-up tell. A creature about to leap or fire glows red for a beat
+  // BEFORE it does, which is what makes an attack dodgeable rather than
+  // something that simply happens to you. Drawn as a shadow rather than an
+  // overlay so it reads through the player's own artwork whatever they painted.
+  if (a.windUp > 0) {
+    ctx.shadowColor = 'rgba(255,80,60,0.95)';
+    ctx.shadowBlur = 8 + Math.sin(frameCount * 0.5) * 5;
+  }
   // Painted at 32x32 but drawn at the creature's own size — pixelated on
   // purpose so the player's individual pixels stay readable.
   ctx.imageSmoothingEnabled = false;
+  // The hit flash. ctx.filter rather than a white rectangle on top: a rectangle
+  // would have to know the sprite's silhouette to avoid painting the
+  // transparent corners, and the sprite is the player's own art, so its
+  // silhouette is whatever they drew. brightness() follows the alpha for free.
+  // Same mechanism drawForegroundParallax already relies on.
+  if (a.hurtFlash > 0) ctx.filter = 'brightness(3.2) saturate(0.25)';
   ctx.drawImage(a.def.canvas, -a.w / 2, -a.h / 2, a.w, a.h);
   ctx.restore();
+  drawCreatureHealthBar(a, sx, sy);
+}
+
+// Shown only while a creature is hurt or has recently been hit, never at full
+// health: a bar over every ambient butterfly in the world would turn a quiet
+// meadow into a status readout. Fades with the same hurtFlash timer that
+// drives the flash, so the two belong to one visible "it just took a hit".
+function drawCreatureHealthBar(a, sx, sy) {
+  if (!a.maxHp || a.hp >= a.maxHp) return;
+  const w = Math.max(18, a.w), h = 3;
+  const x = sx + a.w / 2 - w / 2, y = sy - 7;
+  const frac = Math.max(0, a.hp / a.maxHp);
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+  // Green to red across the bar's own fill, so "nearly dead" is readable at a
+  // glance without reading the length.
+  ctx.fillStyle = frac > 0.5 ? '#5ce46b' : frac > 0.25 ? '#ffd54a' : '#ff4a4a';
+  ctx.fillRect(x, y, w * frac, h);
+  ctx.restore();
+}
+
+// =========================================================
+// CREATURE COMBAT — health, attack patterns, projectiles, death
+// =========================================================
+// Everything here is gated on a creature having health at all. `hp === 0` is
+// the ambient creature the game shipped with for its whole life, and it takes
+// the early return in updateCreatureCombat before any of this costs anything,
+// so a world full of butterflies pays nothing for a system it does not use.
+//
+// The patterns are a dispatch table keyed by name, exactly like
+// CUSTOM_CREATURE_MOVES above: a new attack style is a new entry, not another
+// branch threaded through the update loop. Movement and attacking are kept
+// SEPARATE tables on purpose — a flyer that charges and a walker that charges
+// are the same attack over different locomotion, and folding the two together
+// would have meant one entry per combination.
+
+const CREATURE_AGGRO_FORGET = 1.6;  // chase range as a multiple of aggro range, so a creature does not un-aggro the instant you step back
+const CREATURE_HIT_COOLDOWN = 45;   // frames between contact hits on the player (~0.75s), matches the engine's own damage cadence
+const CREATURE_KNOCKBACK = 4.2;
+const CREATURE_SHOT_SPEED = 3.4;
+const CREATURE_SHOT_LIFE = 150;
+const MAX_CREATURE_SHOTS = 40;
+const PLAYER_SWING_COOLDOWN_MS = 380;  // how fast the player can land hits by holding the button
+
+// Live projectiles, from the `shoot` pattern. A flat array cleared with the
+// world, like particles and itemDrops: nothing here is ever persisted or
+// synced, it is a thing in flight for two seconds.
+let creatureShots = [];
+let _playerLastSwingAt = 0;
+
+function creatureCombatActive(a) {
+  return a.type === 'custom' && a.maxHp > 0;
+}
+
+// Centre-to-centre distance in pixels, the one measure every pattern below
+// agrees on. Uses body centres rather than corners so a big creature and a
+// small one aggro at the same real distance instead of the big one reaching
+// further by virtue of being wide.
+function creaturePlayerDist(a) {
+  const dx = (player.x + player.w / 2) - (a.x + a.w / 2);
+  const dy = (player.y + player.h / 2) - (a.y + a.h / 2);
+  return { dx, dy, d: Math.hypot(dx, dy) };
+}
+
+function creatureTouchesPlayer(a) {
+  return a.x < player.x + player.w && a.x + a.w > player.x &&
+         a.y < player.y + player.h && a.y + a.h > player.y;
+}
+
+// One doorway for "this creature hurts the player", so every pattern shares
+// the cooldown and the feedback. Routed through takeDamage(), which means a
+// mod's "Before the player is hurt" chain can cancel or rescale a creature hit
+// exactly like it can a lava hit — the hook does not need to know creatures
+// exist.
+function creatureHitPlayer(a) {
+  if (a.attackCooldown > 0) return false;
+  const dmg = Math.max(1, Math.round(a.def.damage || 1));
+  a.attackCooldown = CREATURE_HIT_COOLDOWN;
+  takeDamage(dmg);
+  // Knocked away from the creature, not in its facing direction: being shoved
+  // backwards is what tells you where the hit came from.
+  const { dx } = creaturePlayerDist(a);
+  player.vx = (dx >= 0 ? 1 : -1) * CREATURE_KNOCKBACK;
+  player.vy = Math.min(player.vy, -3);
+  spawnJuiceBurst(player.x + player.w / 2, player.y + player.h / 2, '#ff6b6b', 10, 5);
+  playSound('bite');
+  VxHooks.run('gameEvent', 'onCreature', { how: 'attacks', creature: a.def, x: Math.floor(a.x / TILE), y: Math.floor(a.y / TILE), amount: dmg });
+  return true;
+}
+
+const CUSTOM_CREATURE_ATTACKS = {
+  // Has health, never fights back. Not a wasted entry: this is the target
+  // dummy, the breakable egg, the crystal a wave-defence mod wants the player
+  // to protect. "Can be killed" and "can kill you" are separate powers, and a
+  // system that only offered both at once could not express either alone.
+  none() {},
+
+  // Dangerous to stand next to, and nothing more. No chase, no aim: it hurts
+  // whatever walks into it, which is the whole behaviour of a spike, a slime,
+  // or anything a player is meant to route around rather than fight.
+  touch(a) {
+    if (creatureTouchesPlayer(a)) creatureHitPlayer(a);
+  },
+
+  // Runs at you. Movement is overridden rather than added to: while charging,
+  // the creature's own patrol/hop wander is exactly what must NOT happen, or
+  // it would drift off mid-charge.
+  charge(a, dt) {
+    if (!a.aggro) return;
+    const { dx } = creaturePlayerDist(a);
+    a.dir = dx >= 0 ? 1 : -1;
+    a.vx = a.dir * a.def.speed * 2.1;
+    if (creatureTouchesPlayer(a)) creatureHitPlayer(a);
+  },
+
+  // Crouches, then jumps at you. The crouch IS the mechanic: 24 frames of
+  // visible squash during which the creature is standing still and can be hit
+  // for free, which is what turns a leaper into something you fight rather
+  // than something you flee.
+  leap(a, dt) {
+    if (!a.aggro) return;
+    if (creatureTouchesPlayer(a)) creatureHitPlayer(a);
+    if (a.windUp > 0) {
+      a.windUp -= dt;
+      a.vx = 0;
+      a.scaleX = 1.35; a.scaleY = 0.7;   // held, not eased, so the tell is unmistakable
+      if (a.windUp <= 0) {
+        const { dx } = creaturePlayerDist(a);
+        a.dir = dx >= 0 ? 1 : -1;
+        a.vx = a.dir * a.def.speed * 3.4;
+        a.vy = -8.5;
+        a.onGround = false;
+        playSound('jump');
+      }
+      return;
+    }
+    if (a.onGround && a.attackCooldown <= 0) { a.windUp = 24; }
+  },
+
+  // Fires a projectile. Also telegraphed, and also only while it can actually
+  // see the player: a creature shooting through a wall is the single most
+  // common way a ranged enemy stops reading as an enemy and starts reading as
+  // a bug.
+  shoot(a, dt) {
+    if (!a.aggro) return;
+    if (creatureTouchesPlayer(a)) creatureHitPlayer(a);
+    if (a.windUp > 0) {
+      a.windUp -= dt;
+      if (a.windUp <= 0 && creatureCanSeePlayer(a)) creatureFireShot(a);
+      return;
+    }
+    if (a.attackCooldown <= 0 && creatureCanSeePlayer(a)) {
+      a.windUp = 20;
+      a.attackCooldown = CREATURE_HIT_COOLDOWN * 2;
+    }
+  }
+};
+
+// A cheap line-of-sight walk along the straight line to the player, one sample
+// per half tile. Not a real raycast: at this range the difference is invisible
+// and the cost of getting it exactly right is a per-frame DDA over a field
+// that is already answering block queries for everything else on screen.
+function creatureCanSeePlayer(a) {
+  const { dx, dy, d } = creaturePlayerDist(a);
+  if (d < 1) return true;
+  const steps = Math.min(64, Math.ceil(d / (TILE * 0.5)));
+  const cx = a.x + a.w / 2, cy = a.y + a.h / 2;
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const tx = Math.floor((cx + dx * t) / TILE);
+    const ty = Math.floor((cy + dy * t) / TILE);
+    if (isSolid(getBlock(tx, ty))) return false;
+  }
+  return true;
+}
+
+function creatureFireShot(a) {
+  if (creatureShots.length >= MAX_CREATURE_SHOTS) return;
+  const { dx, dy, d } = creaturePlayerDist(a);
+  if (d < 1) return;
+  const ux = dx / d, uy = dy / d;
+  // The muzzle sits OUTSIDE the body, not at its centre. Measured the hard
+  // way: a creature standing against a tree trunk spawned its shot inside that
+  // trunk's tile, and updateCreatureShots killed it on the very next frame —
+  // the attack fired, cost its cooldown, and nothing ever came out. Anything
+  // standing next to terrain (which is most things) hit this.
+  const muzzle = a.w / 2 + 5;
+  creatureShots.push({
+    x: a.x + a.w / 2 + ux * muzzle, y: a.y + a.h / 2 + uy * muzzle,
+    vx: ux * CREATURE_SHOT_SPEED,
+    vy: uy * CREATURE_SHOT_SPEED,
+    life: CREATURE_SHOT_LIFE,
+    damage: Math.max(1, Math.round(a.def.damage || 1)),
+    // Aimed where the player WAS, not where they will be. A shot that tracks is
+    // unfair in a game where the only dodge is moving sideways.
+    color: '#ff7a4a'
+  });
+  playSound('bite');
+}
+
+function updateCreatureShots(dt) {
+  if (!creatureShots.length) return;
+  for (let i = creatureShots.length - 1; i >= 0; i--) {
+    const s = creatureShots[i];
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.life -= dt;
+    const tx = Math.floor(s.x / TILE), ty = Math.floor(s.y / TILE);
+    // Dies on terrain, on the player, or on old age — in that order, so a shot
+    // that arrives on the same frame it expires still lands.
+    if (s.life <= 0 || isSolid(getBlock(tx, ty))) {
+      spawnJuiceBurst(s.x, s.y, s.color, 6, 3);
+      creatureShots.splice(i, 1);
+      continue;
+    }
+    if (s.x > player.x && s.x < player.x + player.w && s.y > player.y && s.y < player.y + player.h) {
+      takeDamage(s.damage);
+      spawnJuiceBurst(s.x, s.y, '#ff6b6b', 12, 5);
+      creatureShots.splice(i, 1);
+    }
+  }
+}
+
+function drawCreatureShots() {
+  if (!creatureShots.length) return;
+  ctx.save();
+  for (const s of creatureShots) {
+    const sx = s.x - drawCamX, sy = s.y - drawCamY;
+    ctx.fillStyle = s.color;
+    ctx.shadowColor = s.color; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(sx, sy, 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// The per-frame combat tick, run from updateCustomCreature. Returns true when
+// the creature has taken over its own movement this frame (a charge, a held
+// leap wind-up), which is the signal for the caller to skip the wander code
+// that would otherwise fight it for control of vx.
+function updateCreatureCombat(a, dt) {
+  if (!creatureCombatActive(a)) return false;
+
+  if (a.hurtFlash > 0) a.hurtFlash -= dt;
+  if (a.attackCooldown > 0) a.attackCooldown -= dt;
+
+  const { d } = creaturePlayerDist(a);
+  const aggroPx = (a.def.aggro || 0) * TILE;
+  // Hysteresis: a creature aggros at its stated range and only gives up
+  // meaningfully further out. Without the gap it would flicker in and out of
+  // the chase every few frames while the player walks the boundary, and a
+  // charge that restarts every frame never actually moves.
+  if (aggroPx > 0) {
+    if (!a.aggro && d <= aggroPx) a.aggro = true;
+    else if (a.aggro && d > aggroPx * CREATURE_AGGRO_FORGET) a.aggro = false;
+  } else {
+    a.aggro = false;
+  }
+
+  const pattern = a.def.attack || 'none';
+  const fn = CUSTOM_CREATURE_ATTACKS[pattern] || CUSTOM_CREATURE_ATTACKS.none;
+  fn(a, dt);
+
+  return a.aggro && (pattern === 'charge' || (pattern === 'leap' && a.windUp > 0));
+}
+
+// ── Being hit ─────────────────────────────────────────────────────────────
+// The only way a creature loses health. Returns true if the hit killed it, so
+// the caller knows whether the creature it was holding still exists.
+function hurtCreature(a, damage) {
+  if (!creatureCombatActive(a)) return false;
+  a.hp -= Math.max(1, Math.round(damage));
+  a.hurtFlash = 12;
+  a.scaleX = 1.3; a.scaleY = 0.72;
+  // Knocked away from the player, and woken up: hitting something from outside
+  // its aggro range has to make it notice, or a ranged creature could be
+  // whittled down by a player standing one pixel out of reach.
+  const { dx } = creaturePlayerDist(a);
+  a.vx = (dx >= 0 ? -1 : 1) * 2.4;
+  if (a.def.move !== 'fly' && a.onGround) a.vy = -3;
+  a.aggro = true;
+  spawnJuiceBurst(a.x + a.w / 2, a.y + a.h / 2, '#ffd54a', 8, 4);
+  playSound('hurt');
+  VxHooks.run('gameEvent', 'onCreature', { how: 'is hurt', creature: a.def,
+                                 x: Math.floor(a.x / TILE), y: Math.floor(a.y / TILE), amount: damage });
+  if (a.hp <= 0) { killCreature(a); return true; }
+  return false;
+}
+
+function killCreature(a) {
+  const idx = animals.indexOf(a);
+  if (idx !== -1) animals.splice(idx, 1);
+  spawnJuiceBurst(a.x + a.w / 2, a.y + a.h / 2, '#ffffff', 20, 7);
+  spawnJuiceBurst(a.x + a.w / 2, a.y + a.h / 2, '#ff8a4a', 14, 6);
+  addJuiceText(a.x + a.w / 2, a.y, a.def.name || 'defeated', '#ffd54a');
+  playSound('explode');
+  screenShake = Math.max(screenShake, 4);
+  // Fired AFTER the creature is off the list, so a chain that counts
+  // "creatures nearby" in response reads the world as it is once this one is
+  // gone rather than counting the corpse.
+  VxHooks.run('gameEvent', 'onCreature', { how: 'dies', creature: a.def,
+                                 x: Math.floor(a.x / TILE), y: Math.floor(a.y / TILE) });
+}
+
+// ── The player's swing ────────────────────────────────────────────────────
+// Which creature, if any, the cursor is over. Nearest-centre wins rather than
+// first-in-array, so overlapping creatures resolve to the one actually aimed
+// at instead of whichever happened to spawn first.
+function creatureAtWorldPoint(px, py) {
+  let best = null, bestD = Infinity;
+  for (const a of animals) {
+    if (!creatureCombatActive(a)) continue;
+    if (px < a.x || px > a.x + a.w || py < a.y || py > a.y + a.h) continue;
+    const d = Math.hypot(px - (a.x + a.w / 2), py - (a.y + a.h / 2));
+    if (d < bestD) { bestD = d; best = a; }
+  }
+  return best;
+}
+
+// Called from updateMiningHold before any block work. Returns true when a
+// creature took the swing, which is what stops the same button from also
+// chewing through the wall behind it.
+function tryPlayerSwingAtCreature(now) {
+  const px = mouseScreenX + camX, py = mouseScreenY + camY;
+  const target = creatureAtWorldPoint(px, py);
+  if (!target) return false;
+  if (!isInRange(Math.floor(px / TILE), Math.floor(py / TILE))) return false;
+  if (now - _playerLastSwingAt < PLAYER_SWING_COOLDOWN_MS) return true; // on target, just not ready — still blocks mining
+  _playerLastSwingAt = now;
+  // Mining yield doubles as swing strength: a mod that hands out a stronger
+  // pickaxe should hit harder with it, and inventing a second, parallel
+  // "attack power" stat that nothing else in the game feeds would be a knob
+  // with one consumer.
+  hurtCreature(target, Math.max(1, graphYieldMult));
+  return true;
 }
 
 function updateAnimals(dt) {
   animalSpawnTick++;
   if (animalSpawnTick % 150 === 0) spawnAnimalNearPlayer();
   if (animalSpawnTick % 90 === 0) spawnCustomCreatureNearPlayer();
+  // Driven from here rather than from the game loop: a projectile is a thing a
+  // creature did, so it lives and dies with the creature system. Returns
+  // immediately while the array is empty, which is every frame in a world
+  // where nothing shoots.
+  updateCreatureShots(dt);
   for (let i=animals.length-1; i>=0; i--) {
     const a = animals[i];
     if (Math.abs(a.x-player.x) > TILE*150 || currentDim !== "OVERWORLD") { animals.splice(i,1); continue; }
@@ -7263,124 +6967,16 @@ function drawAnimals() {
     if (a.type==='butterfly') drawButterfly(a);
     else if (a.type==='custom') drawCustomCreature(a);
   }
-  drawGoldSlimes();
+  // After the creatures, so a shot leaving a muzzle passes in front of the
+  // thing that fired it rather than behind it.
+  drawCreatureShots();
+  // Fremde Kreaturen, an genau dieser Stelle der Ebenen: hinter den Tieren und
+  // ihren Schuessen, also noch VOR Partikeln, Wetter und Spieler. Die Position
+  // ist hier die Bedeutung, deshalb ein eigener Punkt und nicht 'drawWorld'
+  // weiter unten in der Kette.
+  VxHooks.run('drawCreatures');
 }
 
-// =========================================================
-// GOLD SLIMES — bouncing yellow balls with eyes, unique to the Gold
-// Dimension pocket run. No damage on touch, just a 5s flash-freeze (see
-// player.goldFrozenTimer / GOLD_FREEZE_DURATION). Spawned once per run in
-// beginPocketRun, cleared in endPocketRun.
-// =========================================================
-function spawnGoldSlimes() {
-  goldSlimes = [];
-  const count = seededInt(3, 5, 'gs-count');
-  for (let i = 0; i < count; i++) {
-    let wx, tries = 0;
-    do { wx = seededInt(POCKET_LEFT + 20, POCKET_RIGHT - 20, 'gs-x', i, tries++); }
-    while (Math.abs(wx - POCKET_ENTRY_X) < 14 && tries < 8); // steer clear of the landing spot
-    const sy = goldSurfaceY(wx);
-    goldSlimes.push({
-      x: wx * TILE, y: (sy - 3) * TILE,
-      vx: (seededRandom('gs-dir', i) < 0.5 ? -1 : 1) * (0.6 + seededRandom('gs-spd', i) * 0.5),
-      vy: 0, w: 30, h: 30, onGround: false,
-      hopCooldown: 30 + seededInt(0, 60, 'gs-hop', i),
-      scaleX: 1, scaleY: 1, // squash/stretch, punched by triggerLandingSquash/triggerTurnSquash and eased by updateCreatureSquash — same shared juice helpers the animals use
-      blink: Math.floor(seededRandom('gs-blink', i) * 160) + 40
-    });
-  }
-}
-
-function updateGoldSlimes(dt) {
-  if (!pocketActive || currentDim !== "GOLD" || pocketCollapsing) return;
-  for (const s of goldSlimes) {
-    s.blink -= dt;
-    if (s.blink <= 0) s.blink = 140 + Math.random() * 80;
-    updateCreatureSquash(s, dt);
-
-    s.vy += GRAVITY * 0.75 * dt;
-    if (s.vy > 8) s.vy = 8;
-    const nextX = s.x + s.vx * dt;
-    const footY = Math.floor((s.y + s.h - 2) / TILE);
-    const sideX = Math.floor((nextX + (s.vx > 0 ? s.w : 0)) / TILE);
-    if (isSolid(getBlock(sideX, footY)) || isSolid(getBlock(sideX, footY - 1))) { s.vx *= -1; triggerTurnSquash(s); }
-    else s.x = nextX;
-    // Belt-and-braces wall so a terrain gap near the pocket's edge can't let
-    // one wander into the bedrock border.
-    if (s.x < POCKET_LEFT * TILE) { s.x = POCKET_LEFT * TILE; s.vx = Math.abs(s.vx); }
-    if (s.x + s.w > (POCKET_RIGHT + 1) * TILE) { s.x = (POCKET_RIGHT + 1) * TILE - s.w; s.vx = -Math.abs(s.vx); }
-
-    s.y += s.vy * dt;
-    const wasOnGround = s.onGround;
-    s.onGround = false;
-    const left = Math.floor((s.x + 3) / TILE), right = Math.floor((s.x + s.w - 3) / TILE), bottom = Math.floor((s.y + s.h) / TILE);
-    for (let tx = left; tx <= right; tx++) {
-      if (isSolid(getBlock(tx, bottom)) && s.vy >= 0) { s.y = bottom * TILE - s.h; s.vy = 0; s.onGround = true; break; }
-    }
-    if (!wasOnGround && s.onGround) {
-      triggerLandingSquash(s);
-      spawnDustBurst(s.x + s.w / 2, s.y + s.h);
-      screenShake = Math.max(screenShake, 3);
-    }
-    s.hopCooldown -= dt;
-    if (s.onGround && s.hopCooldown <= 0) {
-      s.vy = -9;
-      s.scaleX = 1.35; s.scaleY = 0.6; // anticipation squat right before the leap, eases back out via updateCreatureSquash
-      s.hopCooldown = 50 + Math.random() * 70;
-    }
-
-    // Touch = flash-frozen in gold, not damage.
-    if (player.goldFrozenTimer <= 0 && player.frozenTimer <= 0 && !deathPending &&
-        player.x + player.w > s.x && player.x < s.x + s.w &&
-        player.y + player.h > s.y && player.y < s.y + s.h) {
-      player.goldFrozenTimer = GOLD_FREEZE_DURATION;
-      player.vx = 0; player.vy = 0;
-      addJuiceText(player.x + player.w / 2, player.y, '✨ Frozen in Gold!', '#ffd700');
-      spawnJuiceBurst(player.x + player.w / 2, player.y + player.h / 2, '#ffd700', 18, 7);
-      screenShake = Math.max(screenShake, 6);
-      playSound('hurt');
-    }
-  }
-}
-
-function drawGoldSlimes() {
-  if (!pocketActive || currentDim !== "GOLD") return;
-  for (const s of goldSlimes) {
-    const sx = s.x - drawCamX, sy = s.y - drawCamY;
-    // A subtle always-on jelly wobble on top of the event-driven squash, so
-    // it reads as squishy rubber even between hops.
-    const wob = Math.sin(frameCount * 0.1 + s.x * 0.05) * 0.05;
-    ctx.save();
-    ctx.translate(sx + s.w / 2, sy + s.h / 2);
-    ctx.scale(s.scaleX * (1 + wob), s.scaleY * (1 - wob));
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.beginPath(); ctx.ellipse(0, s.h / 2 - 2, s.w * 0.45, 4, 0, 0, Math.PI * 2); ctx.fill();
-    const grad = ctx.createRadialGradient(-s.w * 0.15, -s.h * 0.2, s.w * 0.05, 0, 0, s.w * 0.55);
-    grad.addColorStop(0, '#fff4b0');
-    grad.addColorStop(0.45, '#ffd700');
-    grad.addColorStop(1, '#c99400');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.ellipse(0, 0, s.w / 2, s.h / 2, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.beginPath(); ctx.ellipse(-s.w * 0.18, -s.h * 0.22, s.w * 0.22, s.h * 0.14, -0.4, 0, Math.PI * 2); ctx.fill();
-    const blinking = s.blink < 8;
-    const eyeR = s.w * 0.15, eyeDX = s.w * 0.19, eyeY = -s.h * 0.04;
-    if (blinking) {
-      ctx.strokeStyle = '#4a3300'; ctx.lineWidth = s.w * 0.06;
-      ctx.beginPath(); ctx.moveTo(-eyeDX - eyeR, eyeY); ctx.lineTo(-eyeDX + eyeR, eyeY);
-      ctx.moveTo(eyeDX - eyeR, eyeY); ctx.lineTo(eyeDX + eyeR, eyeY); ctx.stroke();
-    } else {
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(-eyeDX, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(eyeDX, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#1a1a1a';
-      const pupilR = eyeR * 0.55;
-      ctx.beginPath(); ctx.arc(-eyeDX + eyeR * 0.2, eyeY + eyeR * 0.2, pupilR, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(eyeDX + eyeR * 0.2, eyeY + eyeR * 0.2, pupilR, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.restore();
-  }
-}
 
 function drawOtherPlayers(dt) {
   if (!mpVisible) return;
@@ -8271,6 +7867,18 @@ function drawHover() {
   ctx.strokeRect(sx-boxScale, sy-boxScale, TILE+boxScale*2, TILE+boxScale*2);
 }
 
+// Same rect-on-a-16x16-grid technique as the mod-editor's own pixel icons
+// (see NG_ICONS/_ngPx in voxeria-modding.js) -- a HUD heart and a graph-node
+// heart glyph are the same shape everywhere in this game now, not two
+// independently-drawn hearts that could quietly drift apart.
+const HEART_PIXELS = [[3,3,4,3],[9,3,4,3],[2,5,12,3],[3,8,10,2],[4,10,8,2],[6,12,4,2]];
+function _drawHeartIcon(cv, fillStyle) {
+  cv.width = 16; cv.height = 16;
+  const c = cv.getContext('2d');
+  c.fillStyle = fillStyle;
+  for (const [x,y,w,h] of HEART_PIXELS) c.fillRect(x, y, w, h);
+}
+
 function drawHealth() {
   const hel=document.getElementById('health');
   const maxHearts=Math.ceil(maxHealth/2);
@@ -8280,9 +7888,13 @@ function drawHealth() {
   for (let i=existing.length-1;i>=maxHearts;i--) existing[i].remove();
   for (let i=0;i<maxHearts;i++) {
     let h=existing[i];
-    if (!h) { h=document.createElement('span'); h.className='heart'; hel.appendChild(h); }
-    if (i<filledHearts || i===crackedHeart) { h.className='heart'; h.textContent='♥'; }
-    else { h.className='heart empty'; h.textContent='♥'; }
+    if (!h) { h=document.createElement('canvas'); h.className='heart'; hel.appendChild(h); }
+    const filled = i<filledHearts || i===crackedHeart;
+    h.className = filled ? 'heart' : 'heart empty';
+    // rgba, not a dimmer opaque red: the empty state was always meant to read
+    // as a faded-out heart against the HUD panel behind it, not a differently
+    // coloured solid one.
+    _drawHeartIcon(h, filled ? '#ff4757' : 'rgba(255,255,255,0.25)');
   }
 }
 
@@ -8345,23 +7957,23 @@ function spawnPortalOpenBurst(cx, cy, color, big) {
 let deathPending = false;
 function handlePlayerDeath() {
   if (deathPending) return;
-  // Dying inside a pocket dimension doesn't scatter a death-drop (the whole
-  // world is about to be destroyed) — the run simply ends: this-run loot is
-  // forfeited and the player is thrown back to the overworld.
-  if (pocketActive) {
-    if (pocketCollapsing) return; // the collapse cinematic already owns the ending
-    deathPending = true;
-    fireGraphEvent('onDeath', {});
-    spawnPlayerExplosion();
-    showNotification('💀 You died! Hurled back to the surface.');
-    setTimeout(() => { endPocketRun(true); deathPending = false; }, 1400);
-    return;
-  }
+  // Ein Feature darf den Tod fuer sich beanspruchen. Wer true zurueckgibt, hat
+  // das Sterben vollstaendig selbst erledigt und die Engine haelt sich raus.
+  //
+  // Hier stand bis eben der Pocket-Zweig: wer in einer Pocket-Dimension stirbt,
+  // laesst keine Blocke fallen, weil die ganze Welt gleich zerstoert wird, und
+  // wird stattdessen an die Oberflaeche zurueckgeworfen. Das ist eine Regel
+  // ueber Dimensionen, keine Regel ueber Sterben.
+  //
+  // Absichtlich VOR deathPending = true: der Zuhoerer setzt es selbst, wenn er
+  // uebernimmt, und laesst es unangetastet, wenn er nur abwinkt, weil ein
+  // laufendes Einsturz-Kino das Ende laengst besitzt.
+  if (VxHooks.filter('playerDeath', false)) return;
   deathPending = true;
   // Fired only after deathPending is latched: an onDeath chain that ends up
   // damaging the player again must re-enter this function and hit the guard
   // above, not start a second death sequence.
-  fireGraphEvent('onDeath', {});
+  VxHooks.run('gameEvent', 'onDeath', {});
   spawnPlayerExplosion();
   const lostBlocks = dropBlocksOnDeath();
   showNotification(lostBlocks > 0 ? `💀 You exploded and dropped ${lostBlocks} blocks. Go get them back!` : "💀 You died! Respawning...");
@@ -8417,7 +8029,7 @@ function takeDamage(amount) {
   playSound('hurt');
   // Fired here rather than inside the two branches above so it lands once per
   // hit that actually got past the cooldown, whichever path drew the hearts.
-  fireGraphEvent('onHurt', { amount });
+  VxHooks.run('gameEvent', 'onHurt', { amount });
 }
 
 // Slot i's keybind label: 1..9 for slots 0-8, "0" for the 10th slot (index 9) —
@@ -8657,20 +8269,12 @@ function breakSingleBlock(wx, wy, isSuper) {
     // client the tile is usually already AIR there, so the debris colour has
     // to travel with it rather than be looked up on arrival.
     _myAct.br = wx+','+wy+','+b; _myAct.mx = null; _myAct.my = null; _myAct.mp = 0; _myAct.ts = Date.now();
-    // Gold Dimension timed-run hazards: mining raw Gold Ore without the
-    // Golden Aegis equipped destabilizes the whole pocket instantly — no
-    // second chance. Mining a Gold Brick from the temple instead shaves time
-    // off the collapse timer, a deliberate "the ruins are alive" risk/reward
-    // the other three pocket dims don't have.
-    if (currentDim === "GOLD" && pocketActive && !pocketCollapsing) {
-      if (b === BLOCKS.GOLD_ORE && !equippedArmor.has('GOLD')) {
-        startPocketCollapse();
-      } else if (b === BLOCKS.GOLD_BRICK) {
-        pocketTimer = Math.max(0, pocketTimer - 900); // -15s
-        updatePocketTimerHud();
-        addJuiceText(wx*TILE+TILE/2, wy*TILE, '⏳ -15s!', '#ffcc33');
-      }
-    }
+    // Gegenstueck zu 'blockPlaced': ein abgebauter Block kann anderswo etwas
+    // ausloesen. Hier hing bis eben die Zeitlauf-Regel der Gold-Dimension
+    // direkt im Abbau-Code der Engine, obwohl sie nur eine von vier
+    // Pocket-Dimensionen betrifft. Der Blocktyp wandert diesmal mit, denn er
+    // ist der Grund fuer das Ereignis und im Weltgitter steht dort jetzt AIR.
+    VxHooks.run('blockMined', wx, wy, b);
     playBlockSound(b);
     // The block is gone now -- let the crunch land, then cut the destroy
     // sample's tail short instead of letting it ring out for its full
@@ -8714,7 +8318,7 @@ function breakSingleBlock(wx, wy, isSuper) {
     if (addToInventory(b, dropCount) && !hadItem) { if(!isSuper||Math.random()<0.2) showNotification("🎉 "+(blockNames[b]||"Block")); }
     // Fired last, once the break is fully resolved, so a mod's actions see
     // the finished state (drops collected, tile already air).
-    fireGraphEvent('onMineBlock', { block: b, x: wx, y: wy });
+    VxHooks.run('gameEvent', 'onMineBlock', { block: b, x: wx, y: wy });
   }
 }
 
@@ -8791,6 +8395,10 @@ function registerMiningHit(wx, wy) {
 function executeMine(wx, wy) {
   if (player.frozenTimer > 0 || player.goldFrozenTimer > 0) return; // encased solid — can't swing a pickaxe
   if (!isInRange(wx,wy)) { triggerOutOfRangeFeedback(); return; }
+  // The touch path's equivalent of the swing check in updateMiningHold: a tap
+  // on a creature is a hit, not a dig. Same cooldown, so tapping fast is not
+  // faster than holding on desktop.
+  if (tryPlayerSwingAtCreature(performance.now())) return;
   if (hasSuperPickaxe) { for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) breakSingleBlock(wx+dx,wy+dy,true); }
   else registerMiningHit(wx,wy);
   drawHotbar();}
@@ -8837,7 +8445,7 @@ function executePlace(wx, wy) {
         }
         setBlockAndBroadcast(wx,wy,item.block);
         item.count--;
-        fireGraphEvent('onPlaceBlock', { block: placedBlock, x: wx, y: wy });
+        VxHooks.run('gameEvent', 'onPlaceBlock', { block: placedBlock, x: wx, y: wy });
         // Grass gets its own recorded sample instead of the generic 'place'
         // tone -- see loadGrassPlaceSound. Falls back to the generic tone if the
         // sample hasn't decoded yet or failed, same as the destroy side.
@@ -8881,10 +8489,17 @@ function executePlace(wx, wy) {
           showHintOnce('leaf_support', '🍃 Leaves need a tree nearby',
             'A Leaves block only stays put with a Log or Wood block within about 5 blocks. Build closer to a trunk.');
         }
-        checkPortal(wx,wy);
-        // Armor is built the same way portals are: the block you just placed
-        // may have completed an altar. Gated to the right dimension inside.
-        checkArmorAltar(wx,wy);
+        // Ein gesetzter Block kann ein Bauwerk vollendet haben: ein Portal
+        // oder, nach demselben Prinzip, einen Ruestungsaltar. Welche das sind,
+        // weiss die Engine absichtlich nicht mehr, sie meldet nur die
+        // Platzierung. Ob die Dimension ueberhaupt passt, entscheidet jeder
+        // Zuhoerer fuer sich.
+        //
+        // Nur die Koordinate, nicht der Blocktyp: einen Zeile weiter oben kann
+        // eine unfundierte Leaves-Platzierung bereits wieder zu AIR geworden
+        // sein, item.block waere dann eine Luege. Wer den Typ braucht, liest
+        // ihn mit getBlock(wx, wy) und bekommt, was wirklich dort liegt.
+        VxHooks.run('blockPlaced', wx, wy);
         if (item.count<=0) { inventory[selectedSlot] = null; }
         drawHotbar();      }
     }
@@ -8949,6 +8564,17 @@ function updateMiningHold(now) {
   miningPrevAt = now;
 
   if (player.frozenTimer > 0 || player.goldFrozenTimer > 0) { _cancelMiningCharge(); return; }
+
+  // A creature under the cursor takes the swing instead of the wall behind it.
+  // Checked before every block path below, including the super pickaxe: aiming
+  // at something alive and watching it mine the scenery instead would be the
+  // one reading of the input nobody intends.
+  if (tryPlayerSwingAtCreature(now)) {
+    miningHittingBlock = true;   // the swing pose belongs on the player either way
+    if (miningWx !== null) { delete blockDamage[miningWx + ',' + miningWy]; miningWx = miningWy = null; }
+    miningProgressMs = 0;
+    return;
+  }
 
   const { wx, wy } = getMouseWorldCoords();
 
@@ -9256,10 +8882,16 @@ document.addEventListener('keydown',(e)=>{
   if (e.key === 'F1') { e.preventDefault(); openHelpPdf(); }
   if (e.key === 'F2') { e.preventDefault(); toggleDebugMenu(); }
   if (e.key === 'F4') { e.preventDefault(); toggleUIVisibility(); }
-  if (e.key === 'F6') { e.preventDefault(); toggleModEditor(); }
-  if (e.key === 'F8') { e.preventDefault(); toggleCommandConsole(); }
-  if (e.key === 'F10') { e.preventDefault(); generateRandomModCode(); }
-  if (e.key === 'F12') { e.preventDefault(); toggleCommandHelp(); }
+  // F1, F2 und F4 oben gehoeren der Engine selbst. F6, F8, F10 und F12 taten
+  // das nie: das waren Mod-Editor, Konsole, Zufallscode und Hilfe, also vier
+  // Tasten eines Aufsatzes, fest verdrahtet in der Tastatur der Engine.
+  //
+  // Jetzt fragt sie nur noch, ob jemand die Taste haben will. Wer true
+  // zurueckgibt, hat sie verbraucht und bekommt das preventDefault dafuer;
+  // wer nichts zurueckgibt, hat sie nicht angefasst. Der erste Zuhoerer
+  // gewinnt, deshalb bekommt jeder weitere das bisherige Ergebnis als ersten
+  // Parameter und kann sich raushalten.
+  if (VxHooks.filter('keyDown', false, e.key, e)) e.preventDefault();
   const _pressedKey = e.key.toLowerCase();
   if (_pressedKey === keyBinds.ping) sendPing();
   if (_pressedKey === keyBinds.minimap) toggleMinimap();
@@ -9639,9 +9271,9 @@ function updateDayNightCycle(dt) {
 
   if (dayPhase === 'night' && prevPhase !== 'night') {
     showNotification("🌙 Night is falling...");
-    fireGraphEvent('onNightfall', {});
+    VxHooks.run('gameEvent', 'onNightfall', {});
   }
-  if (dayPhase === 'day' && prevPhase !== 'day') fireGraphEvent('onDaybreak', {});
+  if (dayPhase === 'day' && prevPhase !== 'day') VxHooks.run('gameEvent', 'onDaybreak', {});
 }
 
 function getNightIntensity() {
@@ -10216,6 +9848,13 @@ const INTRO_TIPS = [
   "Counting Every Block in The Erg"
 ];
 
+// Dispatches to whichever screen this particular "INTRO" is — see the
+// introKind comment above its declaration.
+function updateAndDrawIntro(ctx, dt) {
+  if (introKind === "BOOT") { _updateAndDrawIntroBoot(ctx, dt); return; }
+  _updateAndDrawIntroWorldstart(ctx, dt);
+}
+
 // REBUILT much simpler than the previous version (no falling-block curtain,
 // no screen shake, no per-landing settle sound/dust) to match the pixel-art,
 // steps()-flavoured pass done on the early page-load screen and the main
@@ -10223,7 +9862,7 @@ const INTRO_TIPS = [
 // The progress bar is still just a timer, same as the old version (never
 // actually tied to real chunk generation), it just no longer pretends to be
 // falling blocks about it.
-function updateAndDrawIntro(ctx, dt) {
+function _updateAndDrawIntroWorldstart(ctx, dt) {
   const W = canvas.width, H = canvas.height;
   const revealA = introPhase === "FADING" ? _introEaseInOutCubic(Math.max(0, introAlpha)) : 1;
 
@@ -10291,6 +9930,178 @@ function updateAndDrawIntro(ctx, dt) {
   ctx.restore();
 }
 
+// -- BOOT scene --------------------------------------------------------------
+// Plays once, before the world-select menu has ever been shown (see the
+// reordered guard in _gameLoopInner and the deferred VxWorlds.show() in
+// voxeria-menu-worlds.js). No text at all: the character stands on a grass
+// block in a black void, then builds a tree next to itself one block at a
+// time, and the menu only appears once the tree is finished.
+//
+// Deliberately bypasses getBlock()/drawBlock() entirely rather than writing
+// these tiles into a real dimension: every dimension key getChunk() knows
+// about (OVERWORLD, the pockets, even the menu panorama's own "MENU") is
+// generated terrain, not blank space — touching any of them here would
+// carve this vignette out of a real hillside instead of a clean void, and
+// could easily do it inside a chunk index a real save cares about. Tiles are
+// blitted straight from the same _blockTextures images real blocks use
+// (falling back to their flat blockColors like drawBgHills does), and
+// planTree() is called with a getAt that always answers BLOCKS.AIR, which is
+// all it needs to lay out a full, real tree shape with no world behind it.
+function _introDrawTile(wx, wy, tex, fallbackHex) {
+  const sx = wx * TILE - drawCamX, sy = wy * TILE - drawCamY;
+  if (tex && tex.ready) ctx.drawImage(tex, sx, sy, TILE, TILE);
+  else { ctx.fillStyle = fallbackHex; ctx.fillRect(sx, sy, TILE, TILE); }
+}
+
+// Absolute last resort if planTree() somehow keeps returning null (it only
+// can when its own random canopy rolls leave it with under 4 leaves — see
+// planTree's comment — astronomically unlikely, but this scene must never
+// hang waiting for a tree that never arrives).
+function _introFallbackTree(x, groundY) {
+  const tiles = [];
+  for (let dy = 1; dy <= 5; dy++) tiles.push({ x, y: groundY - dy, b: BLOCKS.LOG });
+  const topY = groundY - 5;
+  for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 1; dy++) {
+    if (Math.abs(dx) + Math.abs(dy) <= 3) tiles.push({ x: x + dx, y: topY + dy, b: BLOCKS.LEAVES });
+  }
+  return tiles;
+}
+
+// Wall-clock (not dt/frame based) ceiling on the whole BOOT scene, set the
+// moment it first runs. This is the same kind of safety net
+// #early-loading-hint's own 15s setTimeout is, for the same reason: a player
+// on their very first screen must never be able to get stuck behind this,
+// no matter what — a slow machine, a frame that keeps throwing, a browser
+// tab that was backgrounded through the whole thing. If real time runs out,
+// _updateAndDrawIntroBoot force-finishes on its own next call instead of
+// waiting for the normal STAND→BUILD→DONE→FADING chain to get there.
+let _introBootDeadline = null;
+const INTRO_BOOT_MAX_MS = 12000;
+
+// The full-screen black cover from the top of <body> (id="early-loading-hint",
+// z-index 999999) used to be removed only in _introBootFinish(), i.e. only
+// after this whole scene had already played. Everything below was therefore
+// drawn underneath an opaque black div, so the player saw nothing but black
+// until the menu appeared. It is dropped after this scene's very first
+// finished frame instead: that frame opens on the same flat black the cover
+// itself was, so the handoff stays invisible, and from then on the tree
+// actually gets built on screen.
+let _introBootHintCleared = false;
+function _introBootClearLoadingHint() {
+  if (_introBootHintCleared) return;
+  _introBootHintCleared = true;
+  const elh = document.getElementById('early-loading-hint');
+  if (elh) elh.remove();
+}
+
+function _introBootFinish() {
+  gameState = "PLAYING";
+  _introBootClearLoadingHint();
+  // The menu was deliberately never shown while this scene played (see
+  // voxeria-menu-worlds.js) — this is what finally reveals it.
+  if (window.VxWorlds && typeof window.VxWorlds.show === 'function') window.VxWorlds.show();
+}
+
+function _updateAndDrawIntroBoot(ctx, dt) {
+  const W = canvas.width, H = canvas.height;
+  if (_introBootDeadline === null) _introBootDeadline = performance.now() + INTRO_BOOT_MAX_MS;
+  if (performance.now() > _introBootDeadline) { _introBootFinish(); return; }
+
+  // -- advance the scene ----------------------------------------------
+  // Wrapped defensively: planTree() with this scene's always-AIR getAt
+  // shouldn't be able to throw (see its own comment), but this scene is the
+  // very first thing a new player sees, so "shouldn't" isn't good enough —
+  // any failure here falls back to a hand-built tree rather than leaving
+  // introBuildPhase pointed at "BUILD" with introBuildTiles still null,
+  // which would otherwise re-throw on every single frame after (an infinite,
+  // silently-caught loop in gameLoop's own try/catch — a permanently frozen
+  // scene the player just sees as a dead screen).
+  try {
+    if (introBuildPhase === "STAND") {
+      introBuildT += dt;
+      if (introBuildT > 45) {
+        let tiles = null, attempts = 0;
+        while (!tiles && attempts < 20) { tiles = planTree(INTRO_TREE_X, INTRO_GROUND_Y, 'FOREST', Math.random, () => BLOCKS.AIR); attempts++; }
+        introBuildTiles = tiles || _introFallbackTree(INTRO_TREE_X, INTRO_GROUND_Y);
+        introBuildPhase = "BUILD"; introBuildT = 0; introBuildIndex = 0;
+      }
+    } else if (introBuildPhase === "BUILD") {
+      introBuildT += dt;
+      const next = introBuildTiles[introBuildIndex];
+      // Trunk logs land one at a time, slow enough to read as deliberate
+      // placement; the canopy reveals in little clumps of 3, faster, since
+      // watching every single leaf appear on its own would just feel slow.
+      const isLeaf = next && next.b === BLOCKS.LEAVES;
+      const pace = isLeaf ? 9 : 16;
+      if (introBuildT > pace && introBuildIndex < introBuildTiles.length) {
+        introBuildT = 0;
+        introBuildIndex = Math.min(introBuildTiles.length, introBuildIndex + (isLeaf ? 3 : 1));
+        player.placeAnimTimer = 14; // same duration executePlace() uses for a real placement
+        player.facing = 1;
+      }
+      if (introBuildIndex >= introBuildTiles.length) { introBuildPhase = "DONE"; introBuildT = 0; }
+    } else if (introBuildPhase === "DONE") {
+      introBuildT += dt;
+      if (introBuildT > 40) introBuildPhase = "FADING";
+    } else if (introBuildPhase === "FADING") {
+      introAlpha -= 0.01 * dt;
+      if (introAlpha <= 0) { _introBootFinish(); return; }
+    }
+  } catch (e) {
+    console.error("BOOT intro advance failed, skipping straight to the menu:", e);
+    _introBootFinish();
+    return;
+  }
+
+  // -- draw -------------------------------------------------------------
+  const revealA = introBuildPhase === "FADING" ? _introEaseInOutCubic(Math.max(0, introAlpha)) : 1;
+  ctx.save();
+  // Borrow drawCamX/Y and the real player's position/facing for exactly as
+  // long as this draw takes, same pattern drawMenuPanorama() uses for camX/
+  // camY — safe because nothing else reads or advances player state while
+  // gameState is "INTRO" (see the BOOT guard in _gameLoopInner). The
+  // try/finally is what actually makes that safe: without it, a throw
+  // anywhere in the drawing below (a bad texture, drawPlayer() itself) would
+  // skip the restore lines after it and leave the REAL player's position
+  // permanently hijacked into this scene's coordinates once gameplay starts.
+  const realDrawCamX = drawCamX, realDrawCamY = drawCamY, realPX = player.x, realPY = player.y, realFacing = player.facing;
+  try {
+    ctx.globalAlpha = revealA;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    drawCamX = INTRO_TREE_X * TILE - W * 0.5 - TILE;
+    drawCamY = INTRO_GROUND_Y * TILE - H * 0.78;
+    player.x = INTRO_PLAYER_X * TILE;
+    player.y = (INTRO_GROUND_Y - 2) * TILE;
+    player.facing = 1;
+
+    const grassTex = _blockTextures[BLOCKS.GRASS], grassCol = blockColors[BLOCKS.GRASS][0];
+    _introDrawTile(INTRO_PLAYER_X, INTRO_GROUND_Y, grassTex, grassCol);
+    _introDrawTile(INTRO_TREE_X, INTRO_GROUND_Y, grassTex, grassCol);
+
+    if (introBuildTiles) {
+      const logTex = _blockTextures[BLOCKS.LOG], logCol = blockColors[BLOCKS.LOG][0];
+      const leafTex = _blockTextures[BLOCKS.LEAVES], leafCol = blockColors[BLOCKS.LEAVES][0];
+      for (let i = 0; i < introBuildIndex; i++) {
+        const t = introBuildTiles[i];
+        _introDrawTile(t.x, t.y, t.b === BLOCKS.LOG ? logTex : leafTex, t.b === BLOCKS.LOG ? logCol : leafCol);
+      }
+    }
+
+    drawPlayer();
+  } finally {
+    drawCamX = realDrawCamX; drawCamY = realDrawCamY;
+    player.x = realPX; player.y = realPY; player.facing = realFacing;
+    ctx.restore();
+  }
+
+  // Only now, with one complete frame of this scene sitting on the canvas:
+  // clearing the cover before the draw above would let a slow first frame
+  // flash whatever the canvas happened to hold beforehand.
+  _introBootClearLoadingHint();
+}
+
 let prevTime=performance.now();
 let lastPosSync=0;
 // Transient "what am I doing right now" state, broadcast inside the existing
@@ -10344,132 +10155,7 @@ function updateWeeklyCountdown() {
 setInterval(updateWeeklyCountdown, 30000);
 updateWeeklyCountdown();
 
-// =========================================================
-// TREES — one shared shape generator
-// =========================================================
-// planTree() returns the finished tile list of a tree ({x, y, b} entries, all
-// LOG tiles first and bottom-up, then the canopy) without touching the world
-// itself, so both callers can apply it the way that suits them:
-//   • world generation (getChunk's decoration loop) paints the whole list at
-//     once with localSetBlock, i.e. terrain, not a recorded player edit;
-//   • the sapling growth below reveals the same list one tile at a time with
-//     setBlock, so a tree visibly grows out of the ground.
-// Logs coming first in the list is what makes that safe: a half-grown tree is
-// always a bare trunk, never a leaf waiting for the trunk that holds it up.
-//
-// Two geometry rules every shape here has to respect, because the rest of the
-// engine assumes them:
-//   • every LEAVES tile stays within Manhattan distance TREE_LEAF_REACH of one
-//     of this tree's own LOG tiles — that's exactly the radius isLeafSupported()
-//     accepts, so a canopy can never decay the moment it's finished. Tiles that
-//     would sit further out are dropped rather than drawn, which is also what
-//     keeps the crowns rounded instead of square;
-//   • no leaf sits more than 3 columns beside or 5 rows above its trunk, the
-//     window _leafTreeTrunkX() scans when it resolves the one shared canopy
-//     colour per tree.
-const TREE_LEAF_REACH = 5;
 
-// Minimum trunk-to-trunk gap, shared by world generation (getChunk's
-// decoration loop) and the sapling-growth spacing check below. Forest crowns
-// reach up to 3 columns past their own trunk (see rx above), so anything
-// closer than double that plus a little air lets two crowns interlock into
-// one solid, hard-edged mass instead of reading as two separate trees — and
-// since each tree's canopy colour is picked independently (see
-// _leafTreeTrunkX), an interlocked pair shows a sharp, wrong-looking seam
-// where one tree's colour abruptly cuts into the other's.
-const TREE_MIN_SPACING = 6;
-
-// Trees used to be one fixed silhouette per biome — every Forest tree a 4-high
-// trunk under the same diamond, every Snow tree the same 4-tier cone. Height,
-// crown width, raggedness and (in the Forest) a branch or two now vary per
-// tree, drawn from the caller's rand() so world-gen trees stay fully seeded
-// and reproducible while grown ones are free to be random.
-function planTree(x, groundY, kind, rand, getAt) {
-  const get = getAt || getBlock;
-  const snow = kind === 'SNOW';
-  const h = snow ? 5 + Math.floor(rand() * 3)   // 5..7 — conifers run taller
-                 : 4 + Math.floor(rand() * 4);  // 4..7
-  const topY = groundY - h;                     // the trunk's topmost log
-  if (topY - 5 < 2) return null;                // no headroom for the crown
-
-  // The trunk needs a clear column; the canopy just skips whatever is in its
-  // way, so a tree can still nestle against a hillside or another tree.
-  for (let dy = 1; dy <= h; dy++) {
-    if (get(x, groundY - dy) !== BLOCKS.AIR) return null;
-  }
-
-  const logs = [];
-  for (let dy = 1; dy <= h; dy++) logs.push({ x, y: groundY - dy, b: BLOCKS.LOG });
-
-  // Forest trees grow 1-2 stubby side branches near the crown once they're
-  // tall enough to carry them. They read as branches, and they also widen the
-  // area that counts as "supported" for the leaves hanging off that side.
-  if (!snow && h >= 5) {
-    let side = rand() < 0.5 ? -1 : 1;
-    const branches = h >= 6 ? 2 : 1;
-    for (let i = 0; i < branches; i++) {
-      const bx = x + side, by = topY + 1 + i;
-      if (get(bx, by) === BLOCKS.AIR) logs.push({ x: bx, y: by, b: BLOCKS.LOG });
-      side = -side;
-    }
-  }
-
-  const nearLog = (lx, ly) => {
-    let best = 99;
-    for (const l of logs) {
-      const d = Math.abs(l.x - lx) + Math.abs(l.y - ly);
-      if (d < best) best = d;
-    }
-    return best;
-  };
-  const leaves = [];
-  const addLeaf = (lx, ly) => {
-    if (get(lx, ly) !== BLOCKS.AIR) return;
-    if (nearLog(lx, ly) > TREE_LEAF_REACH) return;
-    if (leaves.some(l => l.x === lx && l.y === ly)) return;
-    leaves.push({ x: lx, y: ly, b: BLOCKS.LEAVES });
-  };
-
-  if (snow) {
-    // Conifer: tiers that narrow toward a single capping leaf. Two rows share
-    // the same radius on the way up so the silhouette steps rather than slopes
-    // evenly, and the widest skirt hangs one row below the trunk's top.
-    const radii = h >= 6 ? [3, 2, 2, 1, 1, 0] : [3, 2, 2, 1, 0];
-    for (let i = 0; i < radii.length; i++) {
-      const ly = topY + 1 - i;
-      const rad = radii[i];
-      for (let dx = -rad; dx <= rad; dx++) {
-        // Nick the odd tip off the widest rows — a perfectly straight cone
-        // edge is what made every old Snow tree look stamped from the same
-        // mould. The trunk column itself is never skipped.
-        if (dx !== 0 && Math.abs(dx) === rad && rad > 1 && rand() < 0.3) continue;
-        addLeaf(x + dx, ly);
-      }
-    }
-  } else {
-    // Forest: an ellipse centred just above the trunk's top log, with a ragged
-    // outer ring. The wider crown only shows up on some trees, so a stand of
-    // Forest trees has both slim and broad ones in it.
-    const rx = rand() < 0.45 ? 3 : 2;
-    const ry = rand() < 0.35 ? 3 : 2;
-    const cy = topY - (ry - 1);
-    for (let dy = -ry; dy <= ry; dy++) {
-      for (let dx = -rx; dx <= rx; dx++) {
-        const ex = dx / (rx + 0.4), ey = dy / (ry + 0.4);
-        const d2 = ex * ex + ey * ey;
-        if (d2 > 1) continue;
-        if (d2 > 0.55 && rand() < 0.3) continue;   // ragged edge
-        addLeaf(x + dx, cy + dy);
-      }
-    }
-    // A leaf directly on top of the trunk guarantees the crown never ends up
-    // with a bald spot over its own stem, however the jitter above rolled.
-    addLeaf(x, topY - 1);
-  }
-
-  if (leaves.length < 4) return null;             // too boxed in to be a tree
-  return logs.concat(leaves);
-}
 
 // =========================================================
 // LIVING WORLD — cellular-automaton growth tick
@@ -10758,13 +10444,24 @@ function _gameLoopInner(now) {
   const dt=Math.min((now-prevTime)/16.67,3);
   prevTime=now; frameCount++;
 
+  // The very first boot, before the world-select menu has ever been shown:
+  // this has to win over the vxMenuIsOpen() guard right below, because at
+  // this point in the page's life #vx-menu is deliberately NOT open yet
+  // (see the deferred VxWorlds.show() in voxeria-menu-worlds.js) — the whole
+  // point of introKind "BOOT" is to run before the menu exists at all, so it
+  // can't wait behind a check for the menu already being open. Every later
+  // "INTRO" (introKind "WORLDSTART", from resetGameAndWorld) still falls
+  // through to the ordinary gameState==="INTRO" check further down, since by
+  // then the menu was already dismissed by the player's own click.
+  if (gameState === "INTRO" && introKind === "BOOT") { updateAndDrawIntro(ctx, dt); requestAnimationFrame(gameLoop); return; }
+
   // Main menu open: the overlay covers the whole screen and the player is not
   // in a world, so NOTHING below this may run — no physics, no mobs, no
   // weather, no multiplayer sync, no drawing. prevTime is already updated
   // above, so the frame after the menu closes gets a normal-sized dt instead
   // of one huge catch-up step. The loop itself keeps spinning and resumes on
   // its own the moment the menu goes away.
-  if (vxMenuIsOpen()) { requestAnimationFrame(gameLoop); return; }
+  if (vxMenuIsOpen()) { drawMenuPanorama(dt); requestAnimationFrame(gameLoop); return; }
 
   // Feed the resolution engine every frame — including intro frames, so its
   // rolling average is already warm by the time it's allowed to act on it.
@@ -10816,12 +10513,20 @@ function _gameLoopInner(now) {
   }
 
   updatePlayer(dt); updatePhysics(); updateFire(dt); updateAnimals(dt); updateDamageCooldown(dt);
-  if (window.VxDesertPrototype) VxDesertPrototype.update(dt);
-  updateGraphRuntime(dt);
+  // ZWEI Update-Punkte, nicht einer, und der Unterschied ist reine Reihenfolge.
+  // Hier haengen die Systeme, die vor Tageszeit, Wetter und Drops laufen
+  // muessen: der Prototyp bewegt eigene Kreaturen, die Graph-Runtime feuert
+  // Mod-Ereignisse fuer den gerade simulierten Frame. Alles, was erst danach
+  // drankam, haengt weiter unten an 'updateLate'. Ein einziger Punkt waere
+  // kuerzer und wuerde die Reihenfolge stillschweigend verschieben, und
+  // genau das ist die Sorte Aenderung, die man erst drei Wochen spaeter als
+  // Bug wiedersieht.
+  VxHooks.run('update', dt);
   updateSelectedBlockPopup(dt);
-  updateDayNightCycle(dt); updateGoldSlimes(dt);
+  updateDayNightCycle(dt);
   updateWeather(dt); updateWaterfalls(dt); updateSplash(dt); updateItemDrops(dt); updateFallingLeaves(dt); updateSandGrains(dt);
-  updateDeathDrops(dt); updatePocketDimension(dt); updateDimForge(dt);
+  updateDeathDrops(dt);
+  VxHooks.run('updateLate', dt);
   updateExploredCells();
   // Living-world flora tick — self-throttled to once every 3s internally, so
   // it's safe (and cheapest) to just call every frame like the rest.
@@ -10873,7 +10578,10 @@ function _gameLoopInner(now) {
 
   if(teleportCooldown>0) teleportCooldown--;
   let pxCenter=Math.floor(player.x/TILE+0.5), pyCenter=Math.floor(player.y/TILE+1.0);
-  if(getBlock(pxCenter,pyCenter)===BLOCKS.PORTAL&&teleportCooldown<=0) doTeleport();
+  // Was ein Portalblock ist, weiss die Engine (BLOCKS.PORTAL), und die Sperre
+  // danach gehoert ihr auch. Was beim Hineintreten passiert, weiss sie nicht
+  // mehr: wohin es geht, entscheidet die Datei, die die Dimensionen kennt.
+  if(getBlock(pxCenter,pyCenter)===BLOCKS.PORTAL&&teleportCooldown<=0) VxHooks.run('enterPortal');
 
   if(isMultiplayerActive&&mpVisible&&userId&&db&&(now-lastPosSync>100)){
     // Digging state goes stale on its own — without this a player who stops
@@ -10920,7 +10628,13 @@ function _gameLoopInner(now) {
   if(!paused && impactFlash>0){ impactFlash*=0.8; if(impactFlash<0.02) impactFlash=0; }
   drawMinimap();
   spawnAmbientSparkles();
-  drawSky(); drawBgHills(); drawCaveBackground(); drawWorld(); drawBlockCracks(); drawPlaceCharge(); drawWaterFluid(); drawAnimals(); drawOtherPlayers(dt); drawParticles(); drawSandGrains(); drawWaterfalls(); drawSplash(); drawWeather(); drawDimForge(); drawDeathDrops(); drawPlayer(); if (window.VxDesertPrototype) VxDesertPrototype.draw(); drawSelectedBlockPopup(); drawUnderwaterOverlay(); drawDayNightOverlay(); drawLightingPass();
+  // Die zwei VxHooks-Punkte hier ersetzen drawDimForge() und den
+  // VxDesertPrototype-Aufruf an exakt ihren alten Plaetzen in der Kette. Die
+  // Position IST hier die Bedeutung: 'drawWorld' liegt hinter dem Wetter und
+  // vor den Death-Drops, also noch in der Welt; 'drawAfterPlayer' liegt hinter
+  // dem Spieler und vor der Vordergrund-Parallaxe, also alles, was den Spieler
+  // verdecken darf, aber nicht die Kulisse davor.
+  drawSky(); drawBgHills(); drawCaveBackground(); drawWorld(); drawBlockCracks(); drawPlaceCharge(); drawWaterFluid(); drawAnimals(); drawOtherPlayers(dt); drawParticles(); drawSandGrains(); drawWaterfalls(); drawSplash(); drawWeather(); VxHooks.run('drawWorld'); drawDeathDrops(); drawPlayer(); VxHooks.run('drawAfterPlayer'); drawForegroundParallax(); drawSelectedBlockPopup(); drawUnderwaterOverlay(); drawDayNightOverlay(); drawLightingPass();
   // The scene is complete here — sky, terrain, creatures, weather and lighting
   // have all landed. VibrantVox grades that finished image in one pass, which
   // is why it sits exactly at this seam: everything below is the informational
@@ -10938,12 +10652,13 @@ function _gameLoopInner(now) {
   } else if (currentDim === "VOID") {
     ctx.fillStyle = 'rgba(10,0,20,0.12)'; ctx.fillRect(0,0,canvas.width,canvas.height);
   }
-  drawErgStormWarning();
-
-  // Pocket-dimension collapse cinematic (rising wave/lava, growing
-  // singularity, golden vignette + shockwave) — drawn before the impact
-  // flash so a meteor/wave impact's flash still punches through on top of it.
-  drawPocketCollapseOverlay();
+  // Bildschirmfuellende Effekte einer Dimension: die Erg-Sturm-Warnung und
+  // das Pocket-Collapse-Kino (steigende Welle/Lava, wachsende Singularitaet,
+  // goldene Vignette samt Schockwelle). Beide liegen bewusst VOR dem
+  // Impact-Flash weiter unten, damit der Blitz eines Meteoreinschlags noch
+  // durch sie hindurchschlaegt. Wer sich hier eintraegt, zeichnet ueber die
+  // fertige Szene, aber unter die Informationsebene.
+  VxHooks.run('drawOverlay');
 
   // Camera-flash pulse for meteor impacts / lightning strikes — drawn last so
   // it punches through everything for one bright instant, then decays away.
@@ -11101,231 +10816,17 @@ function _biRenderGrids(body) {
   }
 }
 
-// One tile shape for everything the player clicks in this book: image on the
-// left, name (plus an optional sub-line) on the right.
-function _pbTile(opts) {
-  const tile = document.createElement('div');
-  tile.className = 'pb-tile' + (opts.onClick ? ' clickable' : '') + (opts.locked ? ' locked' : '');
-  if (opts.lockGlyph) {
-    const l = document.createElement('div');
-    l.className = 'pb-tile-lock';
-    l.textContent = opts.lockGlyph;
-    tile.appendChild(l);
-  } else if (opts.img) {
-    opts.img.className = 'pb-tile-img';
-    tile.appendChild(opts.img);
-  }
-  const txt = document.createElement('div');
-  txt.className = 'pb-tile-text';
-  const nm = document.createElement('div');
-  nm.className = 'pb-tile-name';
-  nm.textContent = opts.name;
-  if (opts.nameColor) nm.style.color = opts.nameColor;
-  txt.appendChild(nm);
-  if (opts.sub) {
-    const s = document.createElement('div');
-    s.className = 'pb-tile-sub';
-    s.textContent = opts.sub;
-    txt.appendChild(s);
-  }
-  tile.appendChild(txt);
-  if (opts.onClick) {
-    const chev = document.createElement('div');
-    chev.className = 'pb-tile-chev';
-    chev.textContent = '›';
-    tile.appendChild(chev);
-    tile.onclick = opts.onClick;
-  }
-  return tile;
-}
 
-function _pbBack(label, onClick) {
-  const b = document.createElement('button');
-  b.className = 'pb-back';
-  b.textContent = '‹ ' + label;
-  b.onclick = onClick;
-  return b;
-}
-
-function _pbLabel(text) {
-  const el = document.createElement('div');
-  el.className = 'pb-label';
-  el.textContent = text;
-  return el;
-}
-
-// Recipe for each dimension's generated preview scene: the sky ramp it sits
-// under, the blocks its terrain is made of (surface → deeper), the rarer blocks
-// scattered through it, and the colour of its ambient glow. All drawn with the
-// game's real block palette, so the card previews what the realm actually
-// looks like rather than being decorative art made up separately.
-const PB_DIM_SCENE = {
-  GOLD:  { sky: ['#432a07', '#8a5f18', '#e0a233'],
-           ground: [BLOCKS.YELLOW_LIMESTONE, BLOCKS.GOLD_BRICK, BLOCKS.OBSIDIAN],
-           accents: [BLOCKS.EMBER_ORE, BLOCKS.RAINBOW_ORE, BLOCKS.GOLD_ORE],
-           glow: 'rgba(255,190,80,0.34)' },
-  LAVA:  { sky: ['#190603', '#4d1206', '#ad2c09'],
-           ground: [BLOCKS.VOLCANIC_ROCK, BLOCKS.MAGMA, BLOCKS.OBSIDIAN],
-           accents: [BLOCKS.LAVA, BLOCKS.FIRE_CRYSTAL, BLOCKS.EMBER_ORE],
-           glow: 'rgba(255,90,30,0.4)' },
-  OCEAN: { sky: ['#02121f', '#064063', '#0b73a0'],
-           ground: [BLOCKS.CORAL, BLOCKS.OCEAN_STONE, BLOCKS.OCEAN_STONE],
-           accents: [BLOCKS.SEA_LANTERN, BLOCKS.KELP, BLOCKS.CORAL],
-           glow: 'rgba(80,200,255,0.3)' },
-  VOID:  { sky: ['#07030e', '#1c0a35', '#37135e'],
-           ground: [BLOCKS.VOID_STONE, BLOCKS.VOID_GLASS, BLOCKS.VOID_STONE],
-           accents: [BLOCKS.VOID_ORE, BLOCKS.STAR_DUST, BLOCKS.ETHER_CRYSTAL],
-           glow: 'rgba(160,110,255,0.36)' },
-  ERG:   { sky: ['#7a4a12', '#c9862f', '#e8c468'],
-           ground: [BLOCKS.ERG_SAND, BLOCKS.ERG_SAND, BLOCKS.ERG_SANDSTONE],
-           accents: [BLOCKS.ERG_CACTUS],
-           glow: 'rgba(232,196,104,0.32)' }
-};
-
-// Small deterministic PRNG so a dimension's card looks identical every time
-// the book is opened, instead of reshuffling on every render.
-function _pbSceneRand(seed) {
-  let s = (seed >>> 0) || 1;
-  return function () {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  };
-}
-
-function drawDimScene(canvas, dimId) {
-  const W = 400, H = 140;
-  canvas.width = W; canvas.height = H;
-  const c = canvas.getContext('2d');
-  const cfg = PB_DIM_SCENE[dimId];
-  if (!cfg) { c.fillStyle = '#111'; c.fillRect(0, 0, W, H); return; }
-
-  const g = c.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, cfg.sky[0]); g.addColorStop(0.55, cfg.sky[1]); g.addColorStop(1, cfg.sky[2]);
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-
-  const rnd = _pbSceneRand(hashCode('scene-' + dimId));
-
-  // Ambient light blooms — these are what survive the blur most and give each
-  // realm its colour at a glance.
-  for (let i = 0; i < 5; i++) {
-    const gx = rnd() * W, gy = H * 0.1 + rnd() * H * 0.6, gr = 38 + rnd() * 78;
-    const rg = c.createRadialGradient(gx, gy, 0, gx, gy, gr);
-    rg.addColorStop(0, cfg.glow); rg.addColorStop(1, 'rgba(0,0,0,0)');
-    c.fillStyle = rg;
-    c.beginPath(); c.arc(gx, gy, gr, 0, Math.PI * 2); c.fill();
-  }
-
-  const S = 16;
-  const colsN = Math.ceil(W / S), rowsN = Math.ceil(H / S);
-  function blockAt(px, py, btype) {
-    const col = blockColors[btype];
-    if (!col) return;
-    c.fillStyle = col[0]; c.fillRect(px, py, S, S);
-    c.fillStyle = col[2]; c.fillRect(px, py, S, 3);
-    c.fillStyle = col[1]; c.fillRect(px, py + S - 3, S, 3);
-    c.fillStyle = col[3]; c.fillRect(px + S - 3, py, 3, S);
-  }
-  const pick = arr => arr[Math.floor(rnd() * arr.length)];
-
-  if (dimId === 'VOID') {
-    // Floating islands rather than continuous ground — that IS the Blither.
-    let x = 0;
-    while (x < colsN) {
-      const w = 2 + Math.floor(rnd() * 4);
-      const top = 2 + Math.floor(rnd() * 4);
-      const depth = 1 + Math.floor(rnd() * 2);
-      for (let i = 0; i < w && x + i < colsN; i++) {
-        for (let d = 0; d < depth; d++) {
-          const base = d === 0 ? cfg.ground[0] : cfg.ground[1];
-          blockAt((x + i) * S, (top + d) * S, rnd() < 0.16 ? pick(cfg.accents) : base);
-        }
-      }
-      x += w + 1 + Math.floor(rnd() * 2);
-    }
-  } else {
-    let h = Math.floor(rowsN * 0.5);
-    for (let cx = 0; cx < colsN; cx++) {
-      h += Math.floor(rnd() * 3) - 1;
-      h = Math.max(Math.floor(rowsN * 0.3), Math.min(rowsN - 1, h));
-      for (let ry = h; ry < rowsN; ry++) {
-        let bt = ry === h ? cfg.ground[0] : (ry < h + 2 ? cfg.ground[1] : cfg.ground[2]);
-        if (ry > h && rnd() < 0.09) bt = pick(cfg.accents);
-        blockAt(cx * S, ry * S, bt);
-      }
-    }
-  }
-}
-
-// Renders any rectangular recipe grid (0 = empty cell) into a canvas. Shared by
-// the portal recipes (3x3 plus-shape) and the armor altars (5x3), so both read
-// as the same kind of diagram instead of two different visual languages.
-function _drawRecipeGrid(canvas, grid) {
-  const rc = canvas.getContext('2d');
-  const S = 16; // cell size
-  const PAD = 4;
-  const rows = grid.length, cols0 = grid[0].length;
-  canvas.width = S * cols0 + PAD * (cols0 + 1);
-  canvas.height = S * rows + PAD * (rows + 1);
-  rc.fillStyle = 'rgba(0,0,0,0.4)';
-  rc.fillRect(0, 0, canvas.width, canvas.height);
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols0; col++) {
-      const btype = grid[row][col];
-      const bx = PAD + col * (S + PAD);
-      const by = PAD + row * (S + PAD);
-      if (btype === 0) {
-        rc.fillStyle = 'rgba(255,255,255,0.05)';
-        rc.fillRect(bx, by, S, S);
-        continue;
-      }
-      const cols = blockColors[btype];
-      if (cols) {
-        rc.fillStyle = cols[0]; rc.fillRect(bx, by, S, S);
-        rc.fillStyle = cols[2]; rc.fillRect(bx, by, S, 2);
-        rc.fillStyle = cols[3]; rc.fillRect(bx+S-2, by, 2, S);
-        rc.fillStyle = cols[1]; rc.fillRect(bx, by+S-2, S, 2);
-        rc.fillStyle = cols[1]; rc.fillRect(bx, by, 2, S);
-        if (btype === BLOCKS.RAINBOW_ORE) {
-          rc.fillStyle = '#55ffff'; rc.fillRect(bx+3,by+3,3,3); rc.fillRect(bx+9,by+7,3,3); rc.fillRect(bx+3,by+9,3,3);
-        } else if (ORE_SPECKLE_IDS.has(btype)) {
-          // Without this, ores whose base/shadow match their dimension's plain
-          // rock (e.g. Gold/Diamond/Coal share Stone's grey, or Ember Ore
-          // shares Magma Rock's tone) render as an almost-plain colored square
-          // here — the accent color is otherwise just a barely-visible 2px rim.
-          rc.fillStyle = cols[3]; rc.fillRect(bx+3,by+3,3,3); rc.fillRect(bx+9,by+7,3,3); rc.fillRect(bx+3,by+9,3,3);
-        }
-      }
-      rc.strokeStyle = 'rgba(255,255,255,0.15)'; rc.lineWidth = 0.5; rc.strokeRect(bx, by, S, S);
-    }
-  }
-}
-
-function drawRecipePreview(canvas, centerBlock, crossBlock) {
-  _drawRecipeGrid(canvas, [
-    [0, crossBlock, 0],
-    [crossBlock, centerBlock, crossBlock],
-    [0, crossBlock, 0]
-  ]);
-}
-
-// The armor altar. The grid is DERIVED from ARMOR_PATTERN rather than written
-// out again, so the diagram the player is asked to copy can never drift out of
-// sync with the shape checkArmorAltar actually looks for.
-function drawAltarPreview(canvas, baseBlock, coreBlock) {
-  const xs = ARMOR_PATTERN.map(p => p[0]).concat(0);
-  const ys = ARMOR_PATTERN.map(p => p[1]).concat(0);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const grid = [];
-  for (let y = minY; y <= maxY; y++) {
-    const row = [];
-    for (let x = minX; x <= maxX; x++) row.push(0);
-    grid.push(row);
-  }
-  for (const [ox, oy] of ARMOR_PATTERN) grid[oy - minY][ox - minX] = baseBlock;
-  grid[0 - minY][0 - minX] = coreBlock;
-  _drawRecipeGrid(canvas, grid);
+// Cache der 36x36-Icons, die drawBlockMini() erzeugt. Stand bis eben in
+// voxeria-dimensions-progress.js, obwohl der Cache-Leerer schon immer hier lag
+// (siehe die Schleife ueber _forgeIconCache weiter oben) und der Popup ueber
+// dem Spieler ihn ebenso benutzt wie die Schmiede. Der Cache gehoert dorthin,
+// wo die Funktion steht, die er zwischenspeichert.
+const _forgeIconCache = {};
+function _forgeIcon(block) {
+  let c = _forgeIconCache[block];
+  if (!c) { c = document.createElement('canvas'); drawBlockMini(c, block); _forgeIconCache[block] = c; }
+  return c;
 }
 
 function drawBlockMini(canvas, btype) {
@@ -11377,166 +10878,6 @@ function drawBlockMini(canvas, btype) {
   rc.strokeStyle='rgba(255,255,255,0.15)'; rc.lineWidth=1; rc.strokeRect(2,2,32,32);
 }
 
-function renderPortalBook() {
-  const body = document.getElementById('pb-body');
-  body.innerHTML = '';
-  if (pbView === 'armor' && pbViewDim) { _pbRenderArmor(body, pbViewDim); return; }
-  if (pbView === 'dim' && pbViewDim) { _pbRenderDim(body, pbViewDim); return; }
-  _pbRenderDims(body);
-}
-
-// Level 1 — one tile per dimension. Undiscovered ones stay blacked out; you
-// uncover them by entering the dimension before them in the chain.
-function _pbRenderDims(body) {
-  PORTAL_DEFS.forEach(def => {
-    const revealed = isDimRevealed(def.id);
-    const card = document.createElement('div');
-    card.className = 'pb-dim-card' + (revealed ? '' : ' locked');
-
-    const scene = document.createElement('canvas');
-    scene.className = 'pb-dim-scene';
-    drawDimScene(scene, def.id);
-    card.appendChild(scene);
-
-    const veil = document.createElement('div');
-    veil.className = 'pb-dim-veil';
-    card.appendChild(veil);
-
-    const label = document.createElement('div');
-    label.className = 'pb-dim-label';
-    const title = document.createElement('div');
-    title.className = 'pb-dim-title';
-    title.textContent = revealed ? def.name : '? ? ?';
-    if (revealed) title.style.color = def.color;
-    label.appendChild(title);
-
-    const noteText = !revealed
-      ? 'Discover the dimension before this one'
-      : (currentDim === def.id ? '◉ You are here' : null);
-    if (noteText) {
-      const note = document.createElement('div');
-      note.className = 'pb-dim-note';
-      note.textContent = noteText;
-      label.appendChild(note);
-    }
-    card.appendChild(label);
-
-    if (revealed) card.onclick = () => pbGoto('dim', def.id);
-    body.appendChild(card);
-  });
-}
-
-// Level 2 — one dimension: how to open its portal, then the armor it builds.
-function _pbRenderDim(body, dimId) {
-  const def = PORTAL_DEFS.find(d => d.id === dimId);
-  if (!def) { pbGoto('dims'); return; }
-  body.appendChild(_pbBack('All dimensions', () => pbGoto('dims')));
-
-  const banner = document.createElement('div');
-  banner.className = 'pb-dim-card compact';
-  const bScene = document.createElement('canvas');
-  bScene.className = 'pb-dim-scene';
-  drawDimScene(bScene, def.id);
-  const bVeil = document.createElement('div');
-  bVeil.className = 'pb-dim-veil';
-  const bLabel = document.createElement('div');
-  bLabel.className = 'pb-dim-label';
-  const bTitle = document.createElement('div');
-  bTitle.className = 'pb-dim-title';
-  bTitle.textContent = def.name;
-  bTitle.style.color = def.color;
-  bLabel.appendChild(bTitle);
-  banner.appendChild(bScene); banner.appendChild(bVeil); banner.appendChild(bLabel);
-  body.appendChild(banner);
-
-  const desc = document.createElement('div');
-  desc.className = 'pb-desc';
-  desc.textContent = def.desc;
-  body.appendChild(desc);
-
-  body.appendChild(_pbLabel('Portal Recipe'));
-  const panel = document.createElement('div');
-  panel.className = 'pb-panel';
-  const rc = document.createElement('canvas');
-  drawRecipePreview(rc, def.recipe.center, def.recipe.cross);
-  const ptxt = document.createElement('div');
-  ptxt.className = 'pb-panel-text';
-  ptxt.innerHTML = 'Center: <b>' + escapeHtml(def.centerLabel) + '</b><br>' +
-                   'Cross: <b>' + escapeHtml(def.crossLabel) + '</b>';
-  panel.appendChild(rc); panel.appendChild(ptxt);
-  body.appendChild(panel);
-
-  // The armor this realm makes (FORGE_OUTPUT: always the piece you need for the
-  // NEXT dimension, which is why it's found one realm early).
-  const recId = FORGE_OUTPUT[dimId];
-  const r = recId ? CRAFTING_RECIPES.find(x => x.id === recId) : null;
-  if (r) {
-    body.appendChild(_pbLabel('Armor built here'));
-    const img = document.createElement('canvas');
-    img.width = 60; img.height = 60;
-    drawArmorPreview(img, r.dim);
-    body.appendChild(_pbTile({
-      img, name: r.name,
-      sub: craftedArmor.has(r.dim) ? '✓ Already built' : 'Not built yet',
-      onClick: () => pbGoto('armor', dimId)
-    }));
-  }
-}
-
-// Level 3 — how to build one armor piece: the altar shape, nothing else.
-function _pbRenderArmor(body, dimId) {
-  const recId = FORGE_OUTPUT[dimId];
-  const r = recId ? CRAFTING_RECIPES.find(x => x.id === recId) : null;
-  const def = PORTAL_DEFS.find(d => d.id === dimId);
-  if (!r) { pbGoto('dim', dimId); return; }
-  body.appendChild(_pbBack(def ? def.name : 'Back', () => pbGoto('dim', dimId)));
-
-  const head = document.createElement('div');
-  head.className = 'pb-detail-head';
-  const ico = document.createElement('canvas');
-  ico.width = 60; ico.height = 60;
-  ico.className = 'pb-tile-img';
-  drawArmorPreview(ico, r.dim);
-  const nm = document.createElement('div');
-  nm.className = 'pb-detail-name';
-  nm.textContent = r.name;
-  head.appendChild(ico); head.appendChild(nm);
-  body.appendChild(head);
-
-  const eff = document.createElement('div');
-  eff.className = 'pb-desc';
-  eff.textContent = r.effect + ' (-' + Math.round(ARMOR_DEFENSE[r.dim] * 100) + '% DMG while equipped)';
-  body.appendChild(eff);
-
-  body.appendChild(_pbLabel('How to build it'));
-  const panel = document.createElement('div');
-  panel.className = 'pb-panel';
-  const shape = document.createElement('canvas');
-  drawAltarPreview(shape, r.base, r.core);
-  const txt = document.createElement('div');
-  txt.className = 'pb-panel-text';
-  const haveBase = countInInventory(r.base), haveCore = countInInventory(r.core);
-  const needBase = r.mats[r.base], needCore = r.mats[r.core];
-  txt.innerHTML =
-    'Place the blocks in exactly this shape while you are in the <b>' + escapeHtml(r.forge.dim) + '</b> Dimension. They turn into the armor on the spot.<br>' +
-    '<span class="' + (haveBase >= needBase ? 'cm-ok' : 'cm-short') + '">' +
-      escapeHtml(blockNames[r.base] || 'Block') + ' ' + Math.min(haveBase, needBase) + '/' + needBase + '</span> · ' +
-    '<span class="' + (haveCore >= needCore ? 'cm-ok' : 'cm-short') + '">' +
-      escapeHtml(blockNames[r.core] || 'Block') + ' ' + Math.min(haveCore, needCore) + '/' + needCore + ' (core)</span>';
-  panel.appendChild(shape); panel.appendChild(txt);
-  body.appendChild(panel);
-
-  // Wearing it is the only thing there's still a button for.
-  if (craftedArmor.has(r.dim)) {
-    const btn = document.createElement('button');
-    btn.className = 'craft-btn';
-    const equipped = equippedArmor.has(r.dim);
-    btn.classList.add(equipped ? 'equipped' : 'stowed');
-    btn.textContent = equipped ? 'Equipped (click to remove)' : 'Stowed (click to wear)';
-    btn.onclick = () => toggleArmorEquip(r.dim);
-    body.appendChild(btn);
-  }
-}
 
 // =========================================================
 // CUSTOM ICON SET — replaces the raw Unicode emoji that used to sit in the
@@ -12047,27 +11388,6 @@ function isHazardProtected() {
   return hasHazardImmunity || hazardPotionTimer > 0 || equippedArmor.has(currentDim);
 }
 
-// Toggles a crafted armor piece between worn and stowed. No-op if you don't
-// actually own it yet (equipping is only ever a display/protection choice
-// over what's already been crafted, never a way to skip crafting).
-function toggleArmorEquip(dim) {
-  if (!craftedArmor.has(dim)) return;
-  if (equippedArmor.has(dim)) {
-    equippedArmor.delete(dim);
-    showNotification('👕 Unequipped ' + dim + ' armor.');
-  } else {
-    equippedArmor.add(dim);
-    showNotification('🛡️ Equipped ' + dim + ' armor.');
-  }
-  syncProgressToCloud();
-  drawHotbar();
-  updateDefenseBadge();
-  applyArmorStatBonuses();
-  // Armor state shows up on every level of the book (the "already built"
-  // sub-line on a dimension tile, the equip button on the armor view), so
-  // refresh whichever view happens to be open.
-  if (document.getElementById('portal-book-modal').classList.contains('open')) renderPortalBook();
-}
 
 // recipe.mats: { blockId: amount, ... }. type 'armor' grants dimension armor
 // (dim = the dimension it protects).

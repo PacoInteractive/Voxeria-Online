@@ -8,13 +8,15 @@ Es ist jetzt aufgeteilt — inhaltlich identisch, nur auf mehrere Dateien vertei
 | Datei | Inhalt | Wer arbeitet dran |
 |---|---|---|
 | `index.html` | Grundgerüst: `<head>`, das komplette Stylesheet, die gesamte UI-Markup (HUD, Modals, Hauptmenü) und am Ende die `<script src>`-Tags | gemeinsam |
-| `voxeria-engine.js` | Renderer, Physik, Kollision, Overworld-Generierung, Input, Audio/Musik, Multiplayer (Firebase), HUD, Crafting, Wetter, Licht | **nicht anfassen** ohne Absprache |
-| `voxeria-dimensions-progress.js` | Pocket-Dimensionen, Dimensions-Weltgenerierung (`getChunk`), Run-Lifecycle, Portal-Buch, Dimensions-Schmieden, Fortschritts-Speicherung | **Dimensionen & Fortschritt** |
+| `voxeria-engine.js` | Renderer, Physik, Kollision, Input, Audio/Musik, Multiplayer (Firebase), HUD, Crafting, Wetter, Licht, Block-Zugriffsschicht (`getBlock`/`setBlock`) | **nicht anfassen** ohne Absprache |
+| `voxeria-worldgen.js` | Die komplette Weltgenerierung: Rauschfelder, Höhenkurve, Dichtefeld, Feature-Gitter mit den drei Wahrzeichen, Spawn-Suche, Set-Pieces und `getChunk` | **Weltgenerierung** |
+| `voxeria-dimensions-progress.js` | Pocket-Dimensionen (`generatePocketChunk`), Run-Lifecycle, Portal-Buch, Dimensions-Schmieden, Fortschritts-Speicherung | **Dimensionen & Fortschritt** |
 | `voxeria-modding.js` | Mod-Codes, Pieces, Function Graphs + Runtime, Mod-Sprites, Mod-Builder, Pixel-Editor, Block-/Creature-Designer, Node-Editor | **Modding** |
 | `voxeria-menu-worlds.js` | Hauptmenü + benannte Welt-Speicherstände (`window.VxWorlds`) | gemeinsam |
 | `voxeria-arena.js` | Arena-Modus: Match mit Phasen/Uhr/Punkten, Host-Wahl, Runden-Reset (`window.VxArena`) | **Arena** |
 | `voxeria-coop-mods.js` | Geteilte Mods im Raum + farbige Autoren-Zuordnung (`window.VxCoopMods`) | **Koop-Mods** |
 | `voxeria-devtools.js` | Verstecktes Entwickler-Werkzeug (Strg+Shift+E, UI-Layout-Editor) | nur intern |
+| `voxeria-tests.js` | `voxeriaSelfTest()`: eine Konsolen-Prüfung für die Dinge, die schon einmal kaputt waren (ruft auch `modSelfTest()` und `worldGenSelfTest()`) | nur intern |
 | `voxeria-boot.js` | Spawnpunkt, `player`-Objekt, Kamera, und die Zeile, die das Spiel startet | **muss zuletzt geladen werden** |
 
 `Assets/` enthält die Block-Texturen (PNG) und, in `Assets/sfx/`, die
@@ -68,15 +70,43 @@ stand. Eine Funktion aus `voxeria-engine.js` kann ohne `import` direkt aus
 **Die Ladereihenfolge in `index.html` ist deshalb wichtig:**
 
 ```
+voxeria-core.js          <- MUSS die erste sein (siehe unten)
 voxeria-engine.js
+voxeria-worldgen.js      <- nach engine, vor dimensions-progress (siehe unten)
 voxeria-dimensions-progress.js
 voxeria-modding.js
 voxeria-menu-worlds.js
 voxeria-arena.js         <- nach menu-worlds (siehe unten)
 voxeria-coop-mods.js
 voxeria-devtools.js
+voxeria-tests.js         <- nach allem, was es prüft (siehe unten)
 voxeria-boot.js          <- muss letzte bleiben
 ```
+
+Warum `voxeria-core.js` als erste: Es ist das Fundament, auf dem alle anderen
+stehen. `BLOCKS`, die Weltgeometrie (`TILE`, `WORLD_H`, `CHUNK_W`), der
+Dimensions-Speicher, die Seed-Mathematik samt `seededRandom()`, der
+Sitzungszustand (`gameMode`, `activeMod`) und `VxHooks` selbst. Die Datei
+ruft nichts auf und kennt weder Renderer noch Weltgenerator noch Mod-System.
+
+Sie ist entstanden, weil zwischen `voxeria-engine.js` und
+`voxeria-worldgen.js` ein Ring lag, der sich **nicht** mit einem Hook lösen
+liess. Die Engine ruft den Generator 42 Mal, und das ist die richtige Richtung:
+ein Renderer braucht Terrain. Umgekehrt las der Generator dreizehn Namen aus der
+Engine, und die meisten gehörten keinem von beiden. `BLOCKS`, `CHUNK_W`,
+`seededRandom`: das ist gemeinsame Sprache, kein Dienst, den einer dem anderen
+leistet. Ein Ring aus gemeinsamer Sprache löst man nur, indem die Sprache ein
+eigenes Zuhause bekommt.
+
+Faustregel für neuen Code dort: wenn es ein Canvas, ein DOM-Element oder
+Firebase braucht, gehört es **nicht** hinein. `COLS` und `ROWS` stehen
+deshalb bewusst weiter in der Engine, das ist die Grösse des Fensters und nicht
+die der Welt.
+
+Warum `voxeria-tests.js` so spät: Die Datei liest beim Aufruf `VxTerminal`,
+`modSelfTest()` und `worldGenSelfTest()`, muss also nach allen dreien geladen
+sein. Sie definiert beim Laden nur eine Funktion und kostet den Seitenstart
+nichts, bis jemand in der Konsole `voxeriaSelfTest()` tippt.
 
 Warum `voxeria-arena.js` nach `voxeria-menu-worlds.js`: Der Arena-Modus trägt
 sich beim Laden selbst in die dort exportierte `MODES`-Tabelle ein, statt dass
@@ -84,10 +114,184 @@ sich beim Laden selbst in die dort exportierte `MODES`-Tabelle ein, statt dass
 ausmacht, in genau einer Datei — entfernt man das `<script>`-Tag, ist der Modus
 restlos weg.
 
+Warum `voxeria-worldgen.js` dort steht: Es liest von `voxeria-engine.js`
+`BLOCKS`, `CHUNK_W`, `WORLD_H`, `dimensions` und die Seed-Zufallsfunktionen,
+muss also danach kommen. Vor `voxeria-dimensions-progress.js` steht es, weil
+dessen Pocket- und Arena-Generatoren von `getChunk()` aufgerufen werden.
+
 Warum `voxeria-boot.js` zuletzt: Beim Start wird der Spieler gespawnt, und dafür
-fragt das Spiel den Weltgenerator nach Terrain. Der Weltgenerator liegt in
-`voxeria-dimensions-progress.js`. Würde der Boot-Code früher laufen, griffe er
-auf eine Dimensions-Ebene zu, die es noch gar nicht gibt.
+fragt das Spiel den Weltgenerator nach Terrain. Der liegt jetzt in
+`voxeria-worldgen.js`. Würde der Boot-Code früher laufen, griffe er auf eine
+Dimensions-Ebene zu, die es noch gar nicht gibt.
+
+Die Datei **deklariert dabei nichts mehr**. `player`, `camX`, `camY`,
+`initialSpawnX`, `spawnY`, `fallStartY` und `MIN_THUMP_FALL_BLOCKS` stehen in
+`voxeria-engine.js`, wo sie hingehören: die Kameraposition und das
+Spieler-Objekt sind der Kern des Renderers, kein Startcode. Vorher las die
+Engine sie aus der Datei, die als letzte geladen wird, und
+`voxeria-dimensions-progress.js` tat dasselbe.
+
+`voxeria-boot.js` **weist nur noch zu**, weil die Startwerte den Weltgenerator
+brauchen. Bis dahin stehen in der Engine neutrale Werte, und die liest niemand:
+jede Lesestelle sitzt in einer Funktion, die erst nach dem Start läuft.
+
+### In welche Richtung darf ein Aufruf zeigen?
+
+Der Satz oben, dass jede Datei jede andere direkt aufrufen kann, ist technisch
+wahr und war lange auch die gelebte Praxis. Genau daraus ist ein Problem
+gewachsen: `voxeria-engine.js` rief irgendwann selbst Funktionen aus Dateien
+auf, die erst nach ihr geladen werden. Damit gab es keine unterste Schicht
+mehr, sondern einen Ring. Nichts ließ sich einzeln öffnen, testen oder
+ersetzen, weil kein Teil ohne den Rest lief.
+
+Nachzählen lässt sich das jederzeit:
+
+```
+npm run check          Syntax aller ausgelieferten Dateien + Abhängigkeitskarte
+npm run check:deps     nur die Karte
+npm run check:cycles   nur die Ringe, also die offene Arbeit
+node tools/check.js why engine dimensions-progress
+```
+
+`cycles` ist der wichtigste davon. Er zeigt nicht, wer wen liest, sondern wo
+daraus ein **Ring** wird, und nur der ist das Problem: A benutzt B ist gesund,
+A benutzt B und B benutzt A heisst, dass keines von beiden allein laufen,
+laden oder getestet werden kann. Die kleinere der beiden Zahlen eines Paars
+ist meistens die Arbeit, denn sie zeigt die Richtung, die falsch herum ist.
+
+`npm run check` prüft ausserdem, ob ein Name mit `let`, `const` oder `class` in
+**zwei** Dateien auf Spaltenposition 0 steht. Das ist der eine Fehler, den
+`node --check` prinzipiell nicht finden kann: es prüft jede Datei für sich,
+aber zur Laufzeit teilen sich alle einen globalen Scope, und zwei `let camX`
+sind dann ein sofortiger `SyntaxError`, der das ganze Spiel beim Laden anhält.
+`function` und `var` sind ausgenommen, denn genau davon lebt das Umhüllen in
+`voxeria-modding.js` und `voxeria-arena.js`.
+
+`why` listet für zwei Dateien vollständig auf, welche fremden Namen jede von
+der anderen liest.
+
+**Die Regel lautet: Aufrufe zeigen nach unten.** Ein Feature darf die Engine
+benutzen. Die Engine darf kein Feature beim Namen kennen. Wo sie trotzdem
+etwas zum passenden Zeitpunkt anstoßen muss, macht sie einen benannten Punkt
+auf und das Feature trägt sich dort ein:
+
+```js
+// voxeria-engine.js  -- macht den Punkt auf, kennt niemanden
+VxHooks.run('updateLate', dt);
+
+// voxeria-dimensions-progress.js  -- trägt sich ein
+VxHooks.on('updateLate', updatePocketDimension);
+```
+
+Vorhandene Punkte:
+
+| Punkt | wann | Form |
+|---|---|---|
+| `update` | Simulation, früh im Frame (vor Tageszeit und Wetter) | `run(dt)` |
+| `updateLate` | Simulation, spät im Frame | `run(dt)` |
+| `drawCreatures` | am Ende von `drawAnimals()`, vor den Partikeln | `run()` |
+| `drawWorld` | in der Zeichenkette, hinter dem Wetter | `run()` |
+| `drawAfterPlayer` | hinter dem Spieler, vor der Vordergrund-Parallaxe | `run()` |
+| `drawOverlay` | über der fertigen Szene, unter dem Impact-Flash | `run()` |
+| `blockPlaced` | nach einer erfolgreichen Platzierung | `run(wx, wy)` |
+| `blockMined` | nach einem erfolgreichen Abbau | `run(wx, wy, block)` |
+| `enterPortal` | Spieler steht in einem Portalblock, Sperre abgelaufen | `run()` |
+| `worldReset` | Weltneustart, nach `currentDim = "OVERWORLD"` | `run()` |
+| `generateChunk` | ein Chunk einer fremden Dimension entsteht | `filter(null, cx, chunk)` |
+| `multiplayerReady` | Firebase verbunden, eigene Ströme öffnen | `run()` |
+| `gameEvent` | Sprung, Tod, Treffer, Abbau, Tagesanbruch, … | `run(typ, ctx)` |
+| `keyDown` | Taste gedrückt, Fokus nicht in einem Eingabefeld | `filter(false, key, e)` |
+| `seedInput` | Text im Seed-Feld, vor dem Weltneustart | `filter(null, text)` |
+| `playerDeath` | bevor die Engine das Sterben abwickelt | `filter(false)` |
+
+Die drei `filter`-Punkte haben alle dieselbe Absprache: wer den Vorgang für
+sich beansprucht, gibt etwas zurück, wer sich raushält, gibt nichts zurück.
+Bei `playerDeath` heisst `true` "ich habe das Sterben vollständig übernommen,
+misch dich nicht ein".
+
+`VxHooks.debug()` in der Konsole zeigt, wer gerade woran hängt.
+
+Zwei Details, die man leicht übersieht:
+
+* Der dritte Parameter von `on(name, fn, order)` bestimmt die Reihenfolge,
+  kleiner zuerst. Ohne ihn entschiede die Reihenfolge der `<script>`-Tags, und
+  dann hinge der Spielablauf wieder an `index.html` statt an der Datei, die es
+  angeht.
+* `VxHooks.filter(name, wert, ...)` ist die zweite Form, für Punkte, an denen
+  ein Wert verändert statt nur gemeldet wird. `keyDown` ist das Beispiel: wer
+  `true` zurückgibt, hat die Taste verbraucht und bekommt das `preventDefault`
+  dafür, wer nichts zurückgibt, lässt sie liegen.
+
+Der aufwendigste der Punkte ist `seedInput`, und er lohnt einen eigenen Blick.
+Das Eingabefeld nimmt nicht nur Seeds, sondern auch Mod- und Loadout-Codes.
+Dafür standen rund sechzig Zeilen in `applySeedFromUI()`, in denen die Engine
+wusste, wie ein `VXM3-` und ein `VXL1-` Code aufgebaut ist. Die drei Zweige
+waren zu über neunzig Prozent identisch. Ein Zuhörer antwortet jetzt mit einem
+von drei Dingen:
+
+```
+null                      niemand erkennt den Text, es ist ein Seed
+{ error }                 erkannt, aber unbrauchbar: Meldung, Abbruch,
+                          die Welt bleibt stehen
+{ seed, display, done }   erkannt. seed wird der Seed, display bleibt im
+                          Feld stehen, done() läuft sobald die Welt steht
+```
+
+Der Zuhörer läuft garantiert **vor** `resetGameAndWorld()`. Das ist die
+Reihenfolge, auf die `registerLoadoutPieces()` angewiesen ist: der Reset leert
+jede Dimension, und die danach neu erzeugten Chunks lesen `customOreTiers`.
+
+Auch das Aufräumen läuft hierüber. Wer den Text *nicht* erkennt, ist genau in
+dem Moment dran, in dem ein vorher aktiver Mod aufhört zu gelten, und kann sich
+abbauen, bevor er `null` zurückgibt.
+
+Für den umgekehrten Fall, dass ein Feature einen Ausgang ändern will, den die
+Engine sonst schon gefällt hätte, bleibt das Umhüllen bestehen: siehe
+`installGraphHooks()` in `voxeria-modding.js`.
+
+### Die Überschreib-Ebene
+
+Sieben Werte oben in `voxeria-engine.js` sind der andere Weg: keine Aufrufe,
+sondern Daten, die die Engine liest und ein Mod füllt.
+
+```
+blockReskin            Blocktyp -> Blocktyp, rein kosmetisch
+creatureToggles        Kreatur-Art -> false blockt das Spawnen
+customCreatureTypes    selbstgebaute Kreaturen
+graphBlockHardness     Blocktyp -> Härte 1..8
+graphBlockSoundFamily  Blocktyp -> Klangfamilie
+ruleGravityScale       Faktor, 1 ist neutral
+graphYieldMult         Faktor, 1 ist neutral
+```
+
+Sie standen früher in `voxeria-modding.js`, und zwei der Lesestellen in der
+Engine hatten kein `typeof` davor. Ein Build ohne das Mod-Skript starb damit im
+ersten Frame, in dem der Spieler fällt. Die Voreinstellung hier ist jeweils
+exakt "kein Mod aktiv", deshalb braucht keine Lesestelle mehr eine Wache.
+
+**Kein `filter` dafür.** `blockReskin` wird pro sichtbarer Kachel und Frame
+gelesen, das sind Zehntausende Aufrufe pro Sekunde. Ein Hook mit Schleife und
+`try` an dieser Stelle wäre der einzige Punkt der ganzen Umstellung, der
+messbar kostet, und für eine reine Tabellenabfrage kauft er nichts.
+
+### Eigenschaften einer Dimension
+
+Nach demselben Muster, zwei Strukturen weiter oben in `voxeria-engine.js`:
+
+```
+DIM_SEED_SALT[dim]   Nonce, die in den Hash von seededRandom() wandert.
+                     Wer drinsteht, bekommt bei jedem Betreten ein frisches
+                     Layout. Wer fehlt, bekommt den unveränderten Schlüssel.
+EPHEMERAL_DIMS       Dimensionen, deren Blockänderungen nie gespeichert werden.
+```
+
+Wer eine Dimension baut, trägt sie dort ein. `voxeria-dimensions-progress.js`
+macht das für seine Pocket-Dimensionen in zwei Zeilen neben `POCKET_DIMS`.
+
+**Bewusst zwei Strukturen**, obwohl heute dieselben Dimensionen drinstehen.
+"Entsteht bei jedem Betreten neu" und "wird nie gespeichert" fallen bei den
+Pocket-Dimensionen zufällig zusammen. Eine Struktur für beides wäre eine Falle
+für die erste Dimension, auf die nur eines von beidem zutrifft.
 
 ### Praktische Regel
 
@@ -207,6 +411,167 @@ Gebaut wird mit **eigenen Blöcken**: der Block-Katalog hängt einen Abschnitt
 Streifen in der Farbe seines Erfinders. Arena gibt Blöcke frei wie Exploration
 — ein Welt-Editor, in dem man das Material erst abbauen muss, wäre widersinnig,
 zumal die leere Arena nichts zum Abbauen enthält.
+
+## Das Panorama hinter dem Hauptmenü
+
+Der Startbildschirm war ein flacher schwarz-lila Verlauf, keine Farbe, kein
+Hinweis darauf, dass dahinter eine echte, bunte Welt existiert. Jetzt läuft
+echtes, prozedural erzeugtes Gelände (Erde, Stein, Gras, Bäume) im Hintergrund
+langsam von links nach rechts durch, `drawMenuPanorama()` in
+`voxeria-engine.js`, aufgerufen aus `_gameLoopInner` genau dort, wo
+`vxMenuIsOpen()` sonst den ganzen Frame überspringt.
+
+**Das eigentliche Risiko dabei, und warum es keins ist:** `getChunk(cx, dim)`
+cacht in `dimensions[dim]`, nur nach Chunk-Index, nicht nach Seed.
+`resetGameAndWorld()` leert diese Karten nur beim echten Start/Laden einer
+Welt, nicht beim bloßen Öffnen des Menüs mitten im Spiel. Würde das Panorama
+`dimensions.OVERWORLD` mitbenutzen, könnte es beim Scrollen einen noch nicht
+besuchten Chunk-Index dauerhaft mit dem falschen Gelände belegen, ein echter
+Speicherfehler im Spielstand. Deshalb bekommt das Panorama eine **eigene,
+siebte Dimension** `dimensions.MENU`, die kein echter Spielcode je liest.
+Nachgemessen (nicht nur angenommen): derselbe Chunk-Index gleichzeitig in
+`OVERWORLD` und in `MENU` erzeugt, mit einem Marker-Block in der echten Welt
+davor und danach verglichen, byte-identisch, weil es zwei komplett getrennte
+`Uint8Array`-Objekte sind.
+
+Weitere Details:
+
+- **Begrenzt statt endlos:** die Kamera läuft über einen festen Streifen von
+  `MENU_PANORAMA_WRAP_CHUNKS` = 96 Chunks und springt dann an den Anfang
+  zurück (Modulo auf die Streifenbreite in Pixeln). `dimensions.MENU` wächst
+  dadurch nie über einen festen Rahmen hinaus, egal wie lange das Menü offen
+  bleibt.
+- **Kein zweites Seed-System:** benutzt einfach das ohnehin schon vorhandene
+  globale `SEED`, das schon vor der ersten Weltwahl einen sinnvollen Wert hat
+  (Wochen-Seed). Erfüllt "irgendein Seed", ohne eine zweite Quelle zu bauen.
+- **Kamerahöhe folgt dem Gelände:** `getBiomeHeight()` an der Bildmitte
+  bestimmt, wie weit die Kamera nach unten verschoben wird, so dass die
+  Oberfläche im oberen Drittel des Bildes sitzt. Erde und Stein füllen den
+  Großteil der Fläche, nicht Himmel.
+- **Bewusst kein `drawSky()`, `drawBgHills()` oder `drawForegroundParallax()`:**
+  ein fester, einfacher Himmelverlauf statt des echten (der an Tag/Nacht/Wetter
+  hängt, was vor einer echten Welt nichts Sinnvolles hergibt), und keine der
+  gedämpften fernen Bergketten, die das echte Spiel bewusst zurückhält. Genau
+  das war der Punkt: nahes, farbiges Blockmaterial soll den Bildschirm füllen.
+  `drawCaveBackground()` läuft dagegen bewusst mit (seit 2026-09-01,
+  `currentDim !== "OVERWORLD" && currentDim !== "MENU"`-Sperre): ohne sie
+  zeigte eine Höhle im scrollenden Streifen einfach blauen Himmel statt einer
+  Felswand dahinter.
+- **`currentDim`/`camX`/`camY`/`drawCamX`/`drawCamY` werden für die Dauer
+  eines einzelnen Aufrufs umgelegt und direkt danach zurückgeschrieben.**
+  Sicher, weil während eines Menü-offen-Frames sonst nichts läuft (Physik,
+  Sync, jede andere Zeichnung sind schon durch `vxMenuIsOpen()` übersprungen).
+- **`#vx-menu` ist jetzt durchsichtig** (ein dunkel getönter Verlauf statt
+  `#0b0d14` blickdicht), `index.html`. `.vx-panel` (die Knopfliste) behält
+  ihren eigenen deckenden Hintergrund.
+- **Die normale Spiel-HUD wird eigens ausgeblendet**, nicht über
+  `body.vx-hide-ui` (das ist die F4-Einstellung des Spielers, die das Öffnen
+  des Menüs weder lesen noch überschreiben darf), sondern über eine eigene
+  Klasse `body.vx-menu-open`, gesetzt in `VxWorlds.show()`/`hide()`
+  (`voxeria-menu-worlds.js`), mit derselben CSS-Regelform wie F4 nutzt.
+
+## Die BOOT-Szene vor dem Hauptmenü
+
+Der allererste Ladebildschirm (bevor das Hauptmenü überhaupt zum ersten Mal
+erscheint) zeigte nur den Schriftzug „VOXERIA" plus eine rotierende
+Scherz-Fortschrittszeile — reiner Text auf dunklem Verlauf, kein Bezug zum
+eigentlichen Spiel. Ersetzt (2026-09-01) durch eine kurze, textlose Szene:
+der Charakter steht auf einem Grasblock in einem schwarzen Leerraum und baut
+sich rechts daneben einen echten Baum, Block für Block. Erst wenn der Baum
+fertig ist, blendet die Szene aus und das Hauptmenü erscheint.
+
+**Zwei Momente teilen sich einen gameState, `introKind` trennt sie:**
+`updateAndDrawIntro()` in `voxeria-engine.js` verzweigt nach `introKind` in
+`_updateAndDrawIntroBoot()` (neu, nur beim allerersten Laden) oder
+`_updateAndDrawIntroWorldstart()` (die alte Text+Balken-Fassung, unverändert,
+läuft bei jedem `resetGameAndWorld()`-Aufruf — also jedes Mal, wenn tatsächlich
+eine Welt gestartet oder geladen wird). Die BOOT-Szene bei jedem Weltstart
+erneut abzuspielen hätte wiederkehrende Spieler unnötig ausgebremst.
+
+**Warum die BOOT-Szene vor `vxMenuIsOpen()` gewinnen muss:** normalerweise
+überspringt `if (vxMenuIsOpen()) { drawMenuPanorama(dt); return; }` in
+`_gameLoopInner` den gesamten restlichen Frame, sobald `#vx-menu` die Klasse
+`show` trägt — und die trug sie bisher schon ab `DOMContentLoaded`. Die
+Intro-Prüfung stand danach und lief deshalb beim allerersten Laden **nie**,
+das eigentliche „langweilige" Ladebild war die separate, reine HTML/CSS-Karte
+`#early-loading-hint` (siehe unten), nicht `updateAndDrawIntro()`. Für die
+neue Szene musste die Reihenfolge sich ändern: `gameState==="INTRO" &&
+introKind==="BOOT"` wird jetzt VOR dem `vxMenuIsOpen()`-Guard geprüft, und
+`voxeria-menu-worlds.js` ruft beim `DOMContentLoaded` nicht mehr das volle
+`show()` auf (das würde `#vx-menu` sofort sichtbar machen), sondern setzt nur
+noch `body.vx-menu-open` direkt (blendet die echte Spiel-HUD aus, dieselbe
+Klasse wie beim Panorama oben). Das echte `show()` kommt erst aus
+`_updateAndDrawIntroBoot()` selbst, in dem Moment, in dem die Szene fertig
+ausgeblendet hat.
+
+**Keine echte Welt, kein `getBlock()`:** jede Dimension, die `getChunk()`
+kennt (auch `dimensions.MENU` vom Panorama oben), generiert beim ersten
+Zugriff auf einen neuen Chunk-Index vollständiges Gelände — nichts davon ist
+„einfach leer". Die Szene hätte also nie einen sauberen schwarzen Leerraum
+ergeben, egal welche Dimension man wählt. Statt dessen zeichnet
+`_introDrawTile()` die Block-Texturen (`_blockTextures[...]`, dieselben PNGs
+wie im echten Spiel, Fallback auf `blockColors`) direkt auf eine selbst
+gewählte, komplett erfundene Kachel-Position — kein `dimensions`-Eintrag,
+kein `getChunk()`, kein `getBlock()` beteiligt. `planTree()` (siehe unten bei
+den Bäumen) bekommt dafür ein `getAt`, das immer `BLOCKS.AIR` zurückgibt, was
+für eine vollständige, echte Baumform genügt.
+
+**Kamera/Spieler geliehen, nicht dupliziert:** `drawCamX`/`drawCamY` und
+`player.x`/`player.y`/`player.facing` werden für die Dauer eines einzelnen
+Aufrufs auf die Szene umgelegt und direkt danach zurückgeschrieben — dasselbe
+Leih-Muster wie beim Panorama, sicher aus demselben Grund (während
+`gameState==="INTRO"` läuft sonst nichts, das diese Werte lesen könnte).
+`player.placeAnimTimer = 14` bei jedem neu enthüllten Blocktile ist derselbe
+Wert, den `executePlace()` für eine echte Platzierung benutzt, damit die
+„Platzieren"-Pose exakt gleich aussieht.
+
+**Darf nie hängen bleiben:** `_updateAndDrawIntroBoot()` selbst hat noch eine
+eigene, wall-clock-basierte Obergrenze (`INTRO_BOOT_MAX_MS` = 12s, unabhängig
+von `dt`/Framerate) und ein `try`/`catch` um den Fortschritts-Teil — jeder
+Fehler dort (z.B. in `planTree()`) springt sofort zum Menü statt die Szene
+für immer im aktuellen Zustand einzufrieren. Grund: eine frühere Fassung
+setzte `introBuildPhase = "BUILD"`, BEVOR `introBuildTiles` feststand; flog
+dabei eine Ausnahme, blieb die Phase auf "BUILD" haengen, waehrend die Daten
+`null` blieben — jeder folgende Frame griff auf `null[...]` zu, warf sofort
+wieder, von `gameLoop()`s eigenem try/catch endlos abgefangen: ein Spieler
+sah nur einen dauerhaft schwarzen Bildschirm, ohne dass irgendwo ein
+sichtbarer Fehler auftauchte. Das Zeichnen selbst steckt aus demselben Grund
+in einem `try`/`finally`: ohne das haette ein Fehler mitten im Zeichnen
+(z.B. in `drawPlayer()`) die Wiederherstellung von `player.x`/`y` und
+`drawCamX`/`drawCamY` übersprungen und den echten Spieler dauerhaft auf die
+Szenen-Koordinaten hängen lassen, sobald das eigentliche Spiel beginnt.
+
+**Das Menü muss unabhängig vom Spiel-Loop erreichbar bleiben.** Vor dieser
+Änderung lief `show()` bedingungslos direkt bei `DOMContentLoaded` -- das
+Menü kam also immer, egal was sonst auf der Seite schiefging. Es jetzt an
+das Ende der BOOT-Szene zu haengen, gab diese Garantie auf: startet
+`requestAnimationFrame(gameLoop)` in `voxeria-boot.js` aus irgendeinem Grund
+nie, blieb rein gar nichts mehr uebrig, das `#vx-menu` je zeigen wuerde --
+eine dauerhaft schwarze Seite ohne jeden sichtbaren Fehler. Deshalb steht in
+`voxeria-menu-worlds.js` jetzt ein zweites, vom Spiel-Loop komplett
+unabhaengiges `setTimeout` (15s, liest `#vx-menu`s Klasse direkt aus dem DOM
+statt `window.vxMenuIsOpen()` aufzurufen -- diese Funktion koennte genau
+dann fehlen, wenn `voxeria-engine.js` selbst nicht fertig durchgelaufen
+ist): zeigt das Menü notfalls trotzdem, egal was mit dem Rest der Engine los
+ist. Zusammen mit `INTRO_BOOT_MAX_MS` (12s, siehe oben) ist damit jede
+denkbare Fehlerkette zwischen Seitenaufruf und sichtbarem Menü abgesichert --
+bewusst zusaetzlich zur eigentlichen Ursache unten, nicht als Ersatz dafuer.
+
+**Die tatsaechliche Ursache, als das zuerst live auf itch.io schwarz blieb,
+war simpler und lag gar nicht im Spielcode:** siehe "Build für itch.io" weiter
+unten, Cache-Control auf den Skript-Dateien. Der obige Loop-Unabhaengigkeits-
+Fallback haette diesen konkreten Fall gar nicht behoben (ein 31 Tage alter,
+gecachter Codestand ist ja nicht "kaputt", er laeuft nur nicht mehr durch bis
+zu dem Punkt, der `show()` aufruft) -- bleibt trotzdem drin, weil "das Menü
+kommt so oder so" unabhängig von dieser einen Ursache weiter gilt.
+
+**`#early-loading-hint` (`index.html`) ist jetzt nur noch reines Schwarz**,
+kein Text, kein Logo — sie ist immer noch nötig (rein inline HTML/CSS, malt
+sich schon, bevor das restliche, riesige Skript überhaupt geladen ist), aber
+ihr Inhalt sollte verschwinden. Sie bleibt einfach schwarz, bis die
+BOOT-Szene selbst (die auf demselben Schwarz startet) sie entfernt — dadurch
+gibt es beim Übergang keinen Sprung oder Blitz. Der 15-Sekunden-Hard-Timeout,
+der sie notfalls trotzdem entfernt, ist unverändert geblieben.
 
 ## Overworld-Weltgenerierung
 
@@ -722,6 +1087,151 @@ Höhe: kein Seiten-Scroll, jedes Panel bleibt sichtbar und intern scrollbar.
 Desktop (1440 × 900) unverändert — die Regeln greifen ausschließlich unter der
 500-/820-px-Schwelle.
 
+## Text als Datentyp im Mod-System
+
+Ein Mod kennt drei Speicher: Zahlen (`graphVars`), Listen (`graphLists`) und
+**Texte** (`graphTexts`), alle drei in `voxeria-modding.js`. Der Textspeicher ist
+der jüngste und kehrt eine frühere Entscheidung um. Vorher hieß es „nur Zahlen,
+eine Textvariable wäre bloß eine schlechtere Art, ‚Show a message‘ zu sagen“.
+Das galt genau so lange, wie Text nicht **gebaut** werden konnte: mit
+„join with“ setzt ein Mod jetzt eine Zeile zusammen, die beim Bauen niemand
+eingetippt hat, und kann zwei Texte vergleichen. Das ist eine Art von Daten, die
+der Zahlenspeicher nicht ausdrücken konnte.
+
+Zwei neue Karten, jeweils im Zuschnitt ihres Zahlen-Geschwisters:
+
+| Karte | entspricht |
+|---|---|
+| `changeText` „Set or change a text“ | `changeVar`, mit `set to` / `join with` / `join with a space` |
+| `ifTextIs` „If a text ...“ | `ifCompare`, mit `is` / `is not` / `contains` / `is empty` |
+
+Dazu ein **eigener Slot-Typ** `kind: 'textvalue'`, gespeichert als `{s, t, v}`
+parallel zum `{s, n, v}` der Zahlen. Bewusst kein vierter Quelltyp am
+Zahlen-Slot, aus zwei Gründen, und der zweite trägt die Entscheidung:
+
+* Jeder vorhandene Slot verspricht seinem Leser eine **Zahl** (eine Anzahl, ein
+  Radius, ein Stat). Eine Quelle, die Text zurückgeben könnte, hieße: jeder
+  dieser Leser braucht eine Antwort auf „und wenn da ein Wort steht?“, wegen der
+  zwei Stellen, die tatsächlich eins wollen.
+* Die gespeicherte Form **jedes je geteilten Mod-Codes** hätte ein Feld
+  dazubekommen. So ändert sich kein einziges Byte an einem bestehenden Code.
+
+Die Regel lautet deshalb: ein Zahlen-Slot bleibt Zahlen, ein Text-Slot bleibt
+Text. Sie treffen sich an genau einer Stelle, „Show text or a number“, die von
+jedem eins hat und immer hatte.
+
+**Rückwärtskompatibilität.** `showText.text` und `showDialog.title` waren feste
+Zeichenketten und sind jetzt Text-Slots. `graphCleanTextValue` nimmt eine rohe
+Zeichenkette weiterhin an und hebt sie auf `{s: 'a fixed text', t: …}` an, ein
+alter Code zeigt also wortgleich dasselbe Banner. Nachgemessen am geteilten
+Code aus `depth_gauntlet_mod_code.txt` (55 Karten, 9 Banner): alle Parameter
+aller Karten kommen nach einem Encode/Decode-Rundlauf byte-identisch zurück.
+
+**Absichtlich fest geblieben** sind die Knopfbeschriftungen von
+„Ask with buttons“ und das `button`-Feld von „When a dialog button is pressed“.
+Die werden über ihre **wörtliche Aufschrift** gematcht; wäre sie berechenbar,
+könnte ein Knopf etwas anderes zeigen als das, worauf das Ereignis wartet.
+
+Im Terminal ist das Sigil **`&NAME`** (`$NAME` ist für Zahlen vergeben, `#`
+beginnt einen Kommentar). Die Befehle heißen `Set-Text` und `Compare-Text` und
+sind, wie alle anderen, aus `NODE_CATALOG` generiert.
+
+Begrenzt ist ein Text auf `GRAPH_MAX_TEXT` = 48 Zeichen, dieselbe Länge, die das
+Eingabefeld schon erlaubte. Das ist kein Schönheitswert: ohne ihn könnte ein
+„join with“ auf einem Timer eine Zeichenkette unbegrenzt wachsen lassen, genau
+wie `graphClampNum` das für „add 999“ verhindert.
+
+### Das Eingabefeld im Dialog
+
+„Ask with buttons” hat einen sechsten Parameter, `into`. Leer gelassen heißt
+„kein Eingabefeld”, also genau der Dialog, den es vorher gab; steht ein Name
+drin, bekommt der Kasten ein Textfeld, und beim Knopfdruck liegt das Getippte
+als gespeicherter Text unter diesem Namen. Dieselbe Konvention, unter der ein
+leer gelassener Knopf nicht gezeigt wird. Damit schließt sich der Kreis: der
+Spieler tippt etwas, der Mod merkt es sich, setzt es zusammen und zeigt es an.
+
+Der Parameter hängt **ans Ende** der Liste, obwohl er inhaltlich unter die
+Frage gehörte: die Reihenfolge in `NODE_CATALOG` ist zugleich die Reihenfolge
+der Stellungsargumente im Terminal, ein Einschub in der Mitte hätte also jedes
+geteilte `Show-Dialog`-Skript um eine Stelle verrutschen lassen.
+
+Drei Dinge, die dabei nicht offensichtlich sind:
+
+* **Die Tastatur gehört dem Feld.** Die Engine steigt in ihrem eigenen
+  `keydown`/`keyup` aus, sobald ein `INPUT` den Fokus hat (`voxeria-engine.js`),
+  ein getipptes „a” lässt die Figur also nicht loslaufen. Das gilt auch bei
+  „let me keep moving”: ein Dialog mit Eingabefeld nimmt die Tastatur immer.
+  Die Einstellung wirkt weiter auf die Physik, nicht mehr auf die Tasten.
+* **Gedrückte Tasten werden beim Öffnen geleert.** Derselbe Ausstieg schluckt
+  auch das Loslassen, eine beim Öffnen gehaltene Taste bliebe also dauerhaft
+  „unten” und die Figur liefe nach dem Schließen von selbst weiter.
+* **Der Text wird vor dem Ereignis gesichert.** `commit()` läuft vor
+  `fireGraphEvent('onButtonPress')`, damit eine Regel die Antwort sofort
+  benutzen kann statt erst im nächsten Frame.
+
+Enter drückt den ersten Knopf (es gibt immer einen, `showDialog` ergänzt
+notfalls „OK”). Das Feld steht auf 16px, weil iOS Safari darunter beim Fokus
+die ganze Seite hineinzoomt.
+
+**Ungefährlich trotz freier Eingabe:** `showNotification` und der Dialog-Titel
+schreiben über `textContent`, die schwebende Schrift wird auf die Leinwand
+gemalt, und die Debug-Anzeige läuft durch `escapeHtml`. Markup in einem Text
+ist also überall inert, auch wenn der Mod von einem Fremden kommt.
+
+## Panels: die eigene Anzeige eines Mods
+
+Alles, was ein Mod zeigen konnte, war vorher **flüchtig** (Banner 2,5 Sekunden,
+schwebende Schrift) oder **fest gebaut** (die Arena-Punktetafel). Eine Zeile,
+die stehen bleibt und fortgeschrieben wird, „Welle 3", „Leben: 2", „noch 45s",
+war nicht sagbar. Genau das braucht aber jedes Minispiel.
+
+Zwei Karten, beide in `voxeria-modding.js`:
+
+| Karte | Terminal | wofür |
+|---|---|---|
+| `setPanel` „Show or hide a panel" | `Show-Panel` | wo der Kasten hängt, wie er heißt, `show` / `hide` / `clear` |
+| `panelLine` „Write a line on a panel" | `Set-Panel-Line` | was in Zeile *n* steht, mit Text **und** Zahl wie „Show text or a number" |
+
+**Bewusst zwei Karten**, obwohl der Katalog sonst zusammenlegt: die eine sagt
+*wo*, die andere *was*. Auf einer Karte wären es acht Felder, von denen je nach
+Auswahl die Hälfte wirkungslos ist, und das liest ein Anfänger nicht mehr auf
+einen Blick.
+
+**Bewusst keine freie Oberfläche.** Ein Panel ist ein Kasten in einer Ecke mit
+Überschrift und bis zu sechs Zeilen. Ein Mod beschreibt nur, was in Zeile 3
+steht, und schreibt nie Markup in die Seite. Gezeichnet wird über `textContent`,
+nicht `innerHTML`. Das ist die Bedingung dafür, dass ein geteilter Mod von einem
+Fremden harmlos bleibt, dieselbe Regel, unter der schon der Dialog steht.
+
+Vier Behälter, einer je Ecke, jeder eine Flex-Spalte: dass Panels sich
+**stapeln** statt sich zu überlagern, fällt damit dem Layout zu und muss
+nirgends gerechnet werden. `pointer-events: none` auf allem, ein Mod darf den
+Bildschirm beschriften, aber niemals einen Klick abfangen, der der Welt galt.
+
+Grenzen wie bei `graphZones` und aus demselben Grund: höchstens 4 Panels, 6
+Zeilen. Eine Regel, die jeden Frame läuft, darf den Bildschirm nicht unbegrenzt
+zupflastern.
+
+Details, die beim Bauen nötig wurden:
+
+* **Angelegt beim ersten Schreiben**, wie `graphGetList` eine Liste anlegt. Wer
+  nur eine Zeile zeigen will, braucht die erste Karte gar nicht.
+* **`hide` und `clear` legen nichts an.** Ein Panel zu verstecken, das es nicht
+  gibt, tut nichts, statt einen der vier Plätze zu verbrauchen.
+* **Eine leer geschriebene Zeile verschwindet**, statt als Lücke stehen zu
+  bleiben. So räumt eine Regel eine einzelne Zeile ab, ohne eigene Karte dafür.
+* **Oben rechts sitzt die Arena-Punktetafel.** Die Spalte dort weicht um deren
+  gemessene Höhe nach unten aus, solange sie sichtbar ist, und nimmt den Platz
+  zurück, sobald sie weg ist. Deshalb ruft `graphRenderBoard`/`graphHideBoard`
+  auch `graphRenderPanels()`.
+* **Beim Weltwechsel geleert**, sonst blieben die Kästen des vorigen Mod-Satzes
+  stehen, obwohl die Regel dahinter weg ist.
+
+Die Palette hat dafür ein eigenes Bündel **„On-screen display"** bekommen
+(`showText`, `showDialog`, `setPanel`, `panelLine`). Die beiden ersten lagen
+vorher unter „Spawning & effects", zwischen Kreaturen und Partikeln, wo sie
+niemand sucht.
+
 ## Farben in Block- und Kreatur-Designer
 
 Beide Designer malen mit **beliebigen RGB-Farben**, nicht mehr mit einer festen
@@ -781,6 +1291,127 @@ derselben, in der man ihn durch die Welt laufen sieht. Im Mods-Panel als
 Balken, Punkt und Name; im Spiel als Ring um den Block, den man gerade in der
 Hand hält.
 
+## Die Mod-Galerie im Hauptmenü
+
+`window.VxGallery` (`voxeria-gallery.js`, geladen nach `voxeria-modding.js`
+und `voxeria-menu-worlds.js`, vor `voxeria-boot.js`) ist eine öffentliche,
+durchstöberbare Liste veröffentlichter Mods. **Zwei Ansichten:** die
+durchsichtige Seitenleiste links neben `#vx-menu` zeigt nur die **fünf
+neuesten** als Appetithappen, dahinter öffnet "See all mods" das volle
+Galerie-Fenster mit Kategoriefiltern und einer Karte pro Mod. Baut komplett
+auf dem bestehenden Mod-Code-System auf, statt etwas Neues zu erfinden:
+
+- **Eine Karte** zeigt ein Weltbild, Titel/Autor und genau drei Knöpfe:
+  Melden (Flagge), Details (i) und Spielen (Dreieck). Alle Icons sind
+  **selbst gezeichnet**, nie System-Emoji: die sehen auf jedem Betriebssystem
+  anders aus und passten nicht neben 32×32-Blockgrafik. Gleiches Rezept wie
+  die bestehenden `drawIcon*` in voxeria-engine.js (flache Rechtecke, dieselben
+  zwei Farbtöne, danach `_vxCrispen`), aber in `voxeria-gallery.js` selbst
+  definiert, damit das Löschen des Script-Tags weiterhin alles mitnimmt.
+  `terrain` wird aus dem bestehenden `VX_ICONS` wiederverwendet — das Bild
+  gab es schon und passt für die Kategorie "World" exakt.
+- **Kategorien werden aus dem Code abgeleitet, nie vom Autor gewählt**
+  (`deriveTags()`): welche Stück-Arten enthalten sind (Block/Kreatur/Regel),
+  plus "World", wenn die Mod-Hälfte tatsächlich etwas gegenüber
+  `modDefaults()` ändert. Dadurch kann nichts falsch einsortiert werden und
+  das Veröffentlichen braucht kein zusätzliches Feld.
+- **Der Details-Knopf zeigt ebenfalls nur Abgeleitetes** (`describeEntry()`):
+  Anzahl und Namen der Stücke, welche Bereiche der Mod ändert, Seed,
+  Veröffentlichungsdatum — nichts davon ist von Hand eingetippt, also kann
+  eine Beschreibung auch nichts behaupten, was der Code nicht tut.
+- **Das Weltbild** ist derselbe 9×9-Block-Schnappschuss von Chunk 0, den die
+  "Welt laden"-Kacheln benutzen (`captureWorldThumb()` in
+  voxeria-menu-worlds.js ist dort privat, die Galerie hat die ~20 Zeilen
+  deshalb als `captureGalleryThumb()` bei sich — ein Export hätte hier mehr
+  gekostet als gespart). Aufgenommen beim Veröffentlichen, also die Welt des
+  Autors, gespeichert als PNG-Data-URL im Dokument (~3 KB, unkritisch fürs
+  1-MB-Limit von Firestore). Fehlt eines, zeigt die Karte einen leeren
+  Schraffur-Rahmen statt einer kaputten Grafik.
+- **Jedes Feld aus der Datenbank gilt als feindlich.** Die Collection ist
+  für jeden angemeldeten Client beschreibbar (die Firestore-Rules prüfen
+  `request.auth`, nicht den Inhalt — genau wie bei `voxeria_rooms`), also
+  kann ein Dokument beliebige Werte enthalten. Der `code` selbst ist
+  ungefährlich, er landet nur in den Decodern, die ihn per Prüfsumme und
+  Klemmung entschärfen. Drei Felder gehen aber ins Markup und werden deshalb
+  geprüft, nicht geglaubt: `thumb` muss auf eine echte Bild-Data-URL passen
+  (sonst zeigt die Karte den leeren Rahmen — ein präparierter String könnte
+  sonst aus dem `src`-Attribut ausbrechen), `id` läuft durch `escapeHtml`
+  (Firestore-IDs sind nicht garantiert anführungszeichenfrei), und
+  `pieceCount` wird auf eine Ganzzahl gezwungen. Titel und Autor kommen
+  ohnehin aus dem decodierten Code und gehen zusätzlich durch `escapeHtml`.
+  Mit einem absichtlich bösartigen Testdokument nachgeprüft: keiner der vier
+  Vektoren führt Code aus.
+- **Was bewusst offen bleibt:** Wortfilter und Abkühlzeit laufen im Client
+  und sind mit einem veränderten Client umgehbar, und die Sortierung nach
+  `createdAt` kann jemand mit einem Datum weit in der Zukunft dauerhaft
+  oben festnageln. Beides ist erst mit echten Firestore-Rules lösbar (dort
+  gehört es auch hin), nicht im Spielcode — dasselbe Vertrauensmodell, das
+  im Rest des Spiels ohnehin schon gilt.
+- **Melden** schreibt nach `voxeria_gallery_reports`, Doc-ID =
+  `<eintrag>_<uid>`: dieselbe Person kann denselben Eintrag beliebig oft
+  melden, es entsteht aber nur ein Dokument statt eines Stapels Duplikate.
+  Mehrere Gründe gleichzeitig sind erlaubt (Mehrfachauswahl), mindestens
+  einer ist Pflicht. Es gibt bewusst noch **keine** Admin-Ansicht dafür — die
+  Meldungen sammeln sich erstmal, ausgewertet wird später.
+- **Ein Eintrag = ein Loadout-Code** (`VXL1-<mod>~<stück>~<stück>…`,
+  `encodeLoadoutCode`/`decodeLoadoutCode` in voxeria-modding.js), auch bei
+  0 Stücken — damit `playGalleryEntry()` nur eine Code-Form behandeln muss.
+  Kein eigenes Titel/Autor-Feld: `mod.name`/`mod.author` stecken schon im
+  Code (dort beim Bauen im Mod Builder gesetzt).
+- **Das erste Feld akzeptiert auch einen alleinstehenden Block-/Kreatur-/
+  Regel-Code** (z.B. `VXG2-`, was der "Export"-Knopf im Node-Graph-Editor
+  direkt ausgibt — kein Mod drumherum, das ist normal und der häufigste
+  Fall bei reinen Regel-Mods). `submitPublish()` erkennt das über
+  `isAnyPieceCode()` und verpackt es dann selbst in einen `modDefaults()`
+  mit `mod.name` = dem Namen des Stücks, damit weiterhin immer nur die eine
+  VXL1-Form gespeichert wird. Ursprünglich übersehen — nur `isModCode()`/
+  `isLoadoutCode()` wurden geprüft, ein reiner Regel-Code lief ins Leere.
+- **Firestore-Collections** (`artifacts/{appId}/public/data/...`, gleiches
+  Namensschema wie `voxeria_rooms`): `voxeria_gallery` (ein Dokument pro
+  Veröffentlichung, Auto-ID, Felder `code`/`authorUid`/`pieceCount`/`tags`/
+  `thumb`/`createdAt`), `voxeria_gallery_cooldown` (Doc-ID = `userId`, eine
+  simple Abkühlzeit von 5 Minuten pro Person) und `voxeria_gallery_reports`.
+  Gelesen wird mit **einem** `getDocs` (bis zu 60, neueste zuerst), das beide
+  Ansichten speist — bewusst kein Live-`onSnapshot`: eine fremde
+  Veröffentlichung mitten im Stöbern würde sonst die Einflug-Animation neu
+  auslösen und wie ein Glitch wirken.
+- **Spielen überspringt den normalen "Neue Welt"-Dialog komplett** und ruft
+  `VxWorlds.applySave({...}, true)` direkt auf — genau der Pfad, den
+  `createWorld()` für einen normalen Menü-Klick auch geht. `applySave` war
+  bis dahin privat; die einzige Änderung an einer bestehenden Datei ist eine
+  Zeile in `voxeria-menu-worlds.js`, die sie im Rückgabeobjekt von
+  `VxWorlds` exportiert, statt ihre Logik ein zweites Mal nachzubauen (Gefahr:
+  auseinanderlaufen, wenn `applySave` sich später ändert und die Kopie nicht
+  mitgepflegt wird).
+- **Moderation ist bewusst minimal**: ein fest einprogrammierter Wortfilter
+  (`containsBlockedWord()`, komplett neuer Code — es gab vorher **keinen**
+  Filter irgendwo im Projekt) auf `mod.name`/`mod.author` beim
+  Veröffentlichen, kein Melde-System. Lehnt mit einer konkreten Meldung ab,
+  kürzt nie still. Nutzt zusätzlich die schon vorhandene `_bannedUids`-Liste
+  (dieselbe, die die Admin-Ban-Funktion live per `onSnapshot` hält) — ein
+  gesperrter Spieler kann nicht veröffentlichen, ohne dass dafür ein zweites
+  Sperrsystem gebaut wurde.
+- **Kein eigener Look, keine `--hud-*`-Token**: diese sind seit der
+  HUD-Überarbeitung bewusst blickdicht (`--hud-blur: 0px`, siehe deren
+  eigene Definition) — der Sidebar-Hintergrund ist stattdessen aus derselben
+  Familie wie `#vx-menu`s eigener durchsichtiger Verlauf, plus
+  `backdrop-filter: blur()` für den "Minecraft-Launcher"-Effekt.
+- **Sidebar/Modal sitzen als Geschwister außerhalb von `#vx-menu`**, nicht
+  als Flex-Kind darin: `#vx-menu` zentriert seinen eigenen Inhalt als Gruppe
+  (`flex-direction: column`), eine "links davon"-Seitenleiste würde diese
+  Zentrierung stören. Sichtbarkeit läuft rein über einen CSS-Geschwister-
+  Selektor (`#vx-menu.show ~ #vx-gallery-sidebar`), kein JS-Hook in
+  `VxWorlds.show()`/`hide()` nötig.
+- **Unter 980px Breite verschwindet die Seitenleiste** (eigene, an der
+  tatsächlichen Größe gemessene Regel — weder die 760px- noch die
+  820px-`orientation:portrait`-Regel im Menü sind dafür gedacht, siehe deren
+  eigene Kommentare). Bleibt ein Desktop-Bonus; das Menü selbst ist auf dem
+  Handy unverändert.
+
+Ein Tag (`<script src="voxeria-gallery.js">`) entfernen macht das Feature
+restlos weg — Sidebar/Modal in `index.html` bleiben dann einfach leer und
+unsichtbar, nichts sonst im Spiel ruft in diese Datei hinein.
+
 ## Lokal testen ohne Node
 
 `.claude/serve.ps1` ist ein kleiner statischer Server in PowerShell, für den
@@ -797,6 +1428,29 @@ Dann `http://localhost:4173` aufrufen.
 `Voxeria_itch_build.zip` enthält `index.html` + alle `.js`-Dateien + `Assets/` +
 `Music/`, alles auf oberster Ebene (itch.io erwartet `index.html` im
 ZIP-Wurzelverzeichnis).
+
+**Ein neuer Build kann für wiederkehrende Spieler trotzdem alt aussehen --
+Browser-Cache, nicht itch.** Nachgemessen am 2026-09-01 (echte
+Response-Header von `https://html-classic.itch.zone/html/<id>/...`): itchs
+CDN liefert `index.html` selbst UND jede der `voxeria-*.js`-Dateien mit
+`Cache-Control: max-age=2678400` (31 Tage). itch haengt bei jedem neuen
+Upload zwar ein frisches `?v=<timestamp>` an die AEUSSERE iframe-URL
+(`.../index.html?v=...`) -- das erzwingt einen echten Netzwerk-Request für
+`index.html` selbst, egal was der Browser schon gecacht hat. Aber die
+`<script src="...">`-Tags DARIN zeigten bisher auf die exakt gleiche,
+unversionierte URL wie beim letzten Build (z.B. `voxeria-engine.js`, keine
+Query) -- und genau die liefert der Browser dann einfach aus seinem
+31-Tage-Cache, ganz ohne Netzwerk-Request. Ergebnis: ein Spieler, der die
+Seite schon kannte, sah nach einem frischen Upload weiterhin exakt den alten
+JS-Stand, ohne jeden Fehler in Konsole oder Netzwerk-Tab, der das verraten
+hätte -- der neue Code lag ja tatsächlich auf dem Server, wurde nur nie
+abgerufen. Deshalb tragen alle `<script src="...">`-Tags in `index.html`
+jetzt `?v=2`: bump die Zahl bei **jedem** neuen itch/pitch-Build, sonst
+bringt dieser Mechanismus für genau diesen Build nichts (siehe den
+Kommentar direkt über den Script-Tags in `index.html`). `build-zip.js`s
+eigener Regex, der die Script-Liste aus `index.html` liest, überspringt die
+Query beim Dateinamen-Abgleich -- ein `?v=`-Query auf einem Tag bricht den
+Build selbst nicht.
 
 ## `index.html` + die zehn Skripte sind die einzige Quelle
 

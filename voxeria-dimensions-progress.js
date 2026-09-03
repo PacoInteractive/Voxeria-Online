@@ -30,6 +30,15 @@
 // The legacy branches below remain in source for now, but no portal, book entry
 // or teleport can reach them. This keeps the prototype reversible.
 const POCKET_DIMS = new Set(["ERG"]);
+
+// Bei der Engine anmelden, was sie ueber diese Dimensionen wissen muss. Der
+// Startwert ist derselbe, den pocketSeedOffset hat, bevor irgendein Lauf
+// begonnen hat: damit ist der Hash-Schluessel schon vor dem ersten Betreten
+// exakt derselbe wie frueher, als die Engine POCKET_DIMS selbst abfragte.
+function _publishPocketSalt() {
+  for (const d of POCKET_DIMS) DIM_SEED_SALT[d] = pocketSeedOffset;
+}
+for (const d of POCKET_DIMS) EPHEMERAL_DIMS.add(d);
 const POCKET_LEFT = 4;                                    // first playable column (bedrock/void wall to its left)
 const POCKET_INTERIOR_W = 320;                            // ten whole 32-block chunks; reads as the requested ~300-block run
 const POCKET_RIGHT = POCKET_LEFT + POCKET_INTERIOR_W - 1; // last playable column
@@ -44,6 +53,7 @@ const POCKET_COLLAPSE_LEN = 260; // ~4.3s staged catastrophe (buildup -> climax)
 let pocketActive = false;        // inside a live pocket run
 let pocketTimer = 0;             // counts down from POCKET_DURATION
 let pocketSeedOffset = 0;        // per-visit nonce -> a different layout every entry
+_publishPocketSalt();
 let pocketLandmarkX = 0;         // world-X anchor of this run's single guaranteed structure
 // Dimension forge — every pocket dimension now has exactly ONE forge, built
 // beside its landmark (see buildPocketLandmark). It crafts the armor for the
@@ -119,6 +129,81 @@ function generateArenaChunk(cx, chunk) {
     }
   }
 }
+
+// ── Bau-Vorlagen ─────────────────────────────────────────────────────────
+// Ohne das begann jede Arena mit der schmalen, elf Bloecke breiten Start-
+// plattform von oben, und alles Weitere -- ein durchgehender Boden, Waende,
+// eine Strecke -- war Handarbeit. Fuer einen Modus, dessen eigentlicher Sinn
+// das Bauen von REGELN ist, war das die falsche Stelle fuer zehn Minuten
+// Bodenverlegung.
+//
+// Jede Vorlage liefert ihre Bloecke als Liste [x, y, Blocktyp], im selben
+// Format wie worldEdits sie ohnehin schon speichert (siehe applySave() in
+// voxeria-menu-worlds.js). Kein zweites Speicherformat, kein "lade ein
+// statisches Chunk-Array" -- die Vorlage wird beim Erstellen einmal in genau
+// die Bearbeitungsliste geschrieben, die ein geladener Speicherstand sowieso
+// abspielt.
+//
+// Als FUNKTION statt als fest verdrahtetes Array: die Feldbreite steht erst
+// beim Erstellen fest (der Spieler waehlt sie auf demselben Bildschirm), eine
+// Vorlage muss sich also nach der tatsaechlich gewaehlten Breite richten
+// statt nur fuer eine einzige Groesse zu passen.
+const ARENA_TEMPLATES = {
+  empty: {
+    label: 'Empty Grid',
+    // Durchgehender Glasboden ueber die volle Breite, mit einem Steinblock
+    // alle zehn Felder als Lineal -- ein einfarbiger Boden liesse sich sonst
+    // nicht auf einen Blick abmessen.
+    build(width) {
+      const centerX = Math.floor(width / 2);
+      const half = Math.max(1, Math.floor(width / 2) - 1);
+      const edits = [];
+      for (let dx = -half; dx <= half; dx++) {
+        edits.push([centerX + dx, ARENA_PLATFORM_Y, (dx % 10 === 0) ? BLOCKS.STONE : BLOCKS.GLASS]);
+      }
+      return edits;
+    }
+  },
+  dome: {
+    label: 'PvP Dome',
+    // Ein geschlossener Raum: Boden, zwei Seitenwaende, eine Decke. Bewusst
+    // auf 48 Felder gedeckelt, unabhaengig von der gewaehlten Feldbreite --
+    // eine 128 Felder breite, voll ummauerte Kuppel waere grossenteils leerer
+    // Innenraum, kein PvP-Feld.
+    build(width) {
+      const centerX = Math.floor(width / 2);
+      const half = Math.floor(Math.min(width - 4, 48) / 2);
+      const roomH = 18;
+      const edits = [];
+      for (let dx = -half; dx <= half; dx++) {
+        edits.push([centerX + dx, ARENA_PLATFORM_Y, BLOCKS.STONE]); // Boden, voll belegt
+        for (let dy = -roomH; dy < 0; dy++) {
+          const isWall = dx === -half || dx === half;
+          const isCeil = dy === -roomH;
+          if (isWall || isCeil) edits.push([centerX + dx, ARENA_PLATFORM_Y + dy, BLOCKS.STONE]);
+        }
+      }
+      return edits;
+    }
+  },
+  race: {
+    label: 'Race Track',
+    // Ein niedriger Tunnel ueber die VOLLE Breite -- hier darf es lang sein,
+    // das ist der ganze Zweck einer Strecke. Boden und Decke, offen an
+    // beiden Enden.
+    build(width) {
+      const centerX = Math.floor(width / 2);
+      const half = Math.max(1, Math.floor(width / 2) - 1);
+      const tubeH = 4;
+      const edits = [];
+      for (let dx = -half; dx <= half; dx++) {
+        edits.push([centerX + dx, ARENA_PLATFORM_Y, BLOCKS.STONE]);
+        edits.push([centerX + dx, ARENA_PLATFORM_Y - tubeH, BLOCKS.STONE]);
+      }
+      return edits;
+    }
+  }
+};
 
 // =========================================================
 // OCEAN DIMENSION OXYGEN — Ocean is the one pocket dimension that does NOT
@@ -455,747 +540,10 @@ function buildGoldWatchtower(ax) {
   }
 }
 
-function getChunk(cx, targetDim = currentDim) {
-  let cmap = dimensions[targetDim];
-  if (cmap.has(cx)) return cmap.get(cx);
-
-  let oldDim = currentDim;
-  currentDim = targetDim;
-  const chunk = new Uint8Array(CHUNK_W * WORLD_H);
-
-  // ── POCKET DIMENSIONS (GOLD / OCEAN / LAVA / VOID) ──
-  // Bounded, salted, single-landmark generation. Terrain is filled directly
-  // into `chunk`; decorations + the one guaranteed landmark are placed via
-  // localSetBlock AFTER the chunk is registered in the map (so cross-boundary
-  // writes land in real chunks). See generatePocketChunk / decoratePocketChunk.
-  if (POCKET_DIMS.has(currentDim)) {
-    generatePocketChunk(cx, chunk);
-    cmap.set(cx, chunk);
-    decoratePocketChunk(cx);
-    currentDim = oldDim;
-    return chunk;
-  }
-
-  // ── ARENA-WELT ──
-  // Die leere Leinwand des Arena-Modus (siehe generateArenaChunk oben). Steht
-  // VOR der Overworld-Generierung, weil sie nichts davon will: keine Biome,
-  // keine Erze, keine Hoehlen, keine Doerfer, keine Welt-Ereignisse. Wuerde sie
-  // durchfallen, liefe der gesamte Rumpf dieser Funktion trotzdem durch und
-  // fuellte die Arena mit Terrain.
-  //
-  // Keine Dekorationsrunde wie bei den Pockets: die Startplattform steckt schon
-  // in generateArenaChunk. Sie muss GENERIERT sein und darf nicht ueber
-  // localSetBlock kommen -- sonst landete sie nicht in worldEdits (der
-  // Generator umgeht das absichtlich) und waere nach dem Runden-Reset weg.
-  if (currentDim === 'OVERWORLD' && typeof gameMode !== 'undefined' && gameMode === 'arena') {
-    generateArenaChunk(cx, chunk);
-    cmap.set(cx, chunk);
-    currentDim = oldDim;
-    return chunk;
-  }
-
-  // OVERWORLD
-  const surfaceY = new Array(CHUNK_W);
-  const colBiome = new Array(CHUNK_W);
-  // Der Chunk-Aufkleber. Wird nur noch fuer Dinge gebraucht, die eine Antwort
-  // fuer die ganze Gegend brauchen (Ruinen-Wurf, Bauwerks-Material), nicht mehr
-  // fuer den Boden selbst.
-  const biome = getBiome(cx);
-
-  // Der frühere Rand-Blend ist weg: er mischte die Hoehe ueber 6 Spalten linear
-  // und wuerfelte das Biom pro Spalte aus, weil getBiome() nur chunkweise
-  // antworten konnte. Beides erledigt jetzt das Klimafeld selbst
-  // (getSnowWeight/isSnowColumn in voxeria-engine.js). Die Hoehe ist dort ohnehin
-  // stetig, weil sie den Schneeanteil pro Block liest statt ein Ja/Nein pro
-  // Chunk; der Uebergang laeuft dadurch ueber rund vier Chunks statt ueber
-  // sechs Spalten, und er sitzt da, wo das Klima ihn hinlegt, statt auf einer
-  // Chunk-Grenze.
-  for (let i = 0; i < CHUNK_W; i++) {
-    const wx = cx * CHUNK_W + i;
-    surfaceY[i] = Math.floor(getBiomeHeight(wx));
-    colBiome[i] = isSnowColumn(wx) ? "SNOW" : "FOREST";
-  }
-
-  // The VILLAGE HOUSE that used to be rolled here (Forest, 15% of chunks) is
-  // gone by request, and with it the terrain flattening it needed: nine
-  // columns of surfaceY were forced to one height to give the house a level
-  // plot. That flattening was the only thing in this function that overrode
-  // the height field, so the ground here is now purely what getBiomeHeight
-  // produced.
-  //
-  // Deliberately kept: the RUINS further down (5% of Forest/Snow chunks) and
-  // the COAL MINE chamber variant in the cave carver.
-
-  // ══════════════════════════════════════════════════════════
-  // ROCK: THE DENSITY FIELD
-  // ══════════════════════════════════════════════════════════
-  // Everything above this point is a HEIGHTMAP: exactly one surface row per
-  // column. That is a silhouette you could draw without lifting the pen, which
-  // is why the world could only ever be hills, however dramatic the height
-  // function got. An overhang needs two surfaces in one column, so it cannot be
-  // expressed at all up there. This is where the terrain stops being a line and
-  // becomes rock.
-  //
-  // The two hand-written passes that used to sit here are gone. One undercut
-  // the foot of a cliff, the other let the top two rows stick out over a drop.
-  // Between them they could produce exactly one shape, and every further shape
-  // would have needed its own pass with its own rules. terrainSolidAt() in
-  // voxeria-engine.js answers a single question instead, "is there rock at this
-  // spot", and overhangs, arches, free-standing pillars and cave mouths are all
-  // the same answer to it.
-  //
-  // Still true, and still the reason nothing here calls getBlock(): this runs
-  // BEFORE cmap.set(). getBlock()/localSetBlock() reach across chunk borders
-  // and pull neighbouring chunks into existence, so calling one from here,
-  // while this chunk is not yet in the map, would recurse into getChunk() for
-  // the neighbour, which would do the same back. The cave carver further down
-  // is allowed to use them precisely because it runs after cmap.set().
-
-  // The ruins' plot is reserved from all of it. That structure is drawn from a
-  // fixed layout grid against ONE surface row (see the ruins block further
-  // down), so a hollow or a shelf inside its footprint would leave it
-  // straddling a hole or half-buried.
-  //
-  // Rolled HERE and read there, rather than rolled twice: both rolls are pure
-  // hashes of cx and would agree today, but two copies of the same decision is
-  // exactly the kind of thing that drifts apart the first time somebody tunes
-  // one of them.
-  // Ruinen liegen jetzt auf dem Feature-Gitter (featureWinner in
-  // voxeria-engine.js) statt auf einem freien 5%-Wurf. Der freie Wurf konnte
-  // zwei Ruinen in benachbarte Chunks legen, und zwei gleiche Bauwerke in
-  // Sichtweite nehmen beiden das Besondere. Die Torwahrscheinlichkeit steht auf
-  // 8 %, weil das Gitter sie auf gemessene 5,5 % ausduennt; die Haeufigkeit
-  // bleibt also praktisch wie vorher, nur der Mindestabstand ist neu.
-  const hasRuins = (biome === "FOREST" || biome === "SNOW") && cx !== 0
-                && featureWinner(cx, 5, 0.08, NOISE_CH.RUINS);
-  const ruinX = seededInt(3, Math.max(4, CHUNK_W - 22), 'r-x', cx);
-  const RUIN_W = 21;   // widest row of the layout grid below
-  const reservedCol = new Array(CHUNK_W).fill(false);
-  if (hasRuins) {
-    for (let i = 0; i < RUIN_W; i++) if (ruinX + i < CHUNK_W) reservedCol[ruinX + i] = true;
-  }
-
-  const CLIFF_SLOPE = 1.4;  // height change per column that reads as a cliff face
-  const TREE_LINE   = 32;   // above this row, ground is bare rock
-
-  // ── The wide working buffer ──────────────────────────────────────────────
-  // The rock is built across a window that overhangs the chunk by MARGIN
-  // columns on each side, and only the middle is kept. This is what finally
-  // fixes the chunk seam, which the old passes could not: they noted that the
-  // neighbour "cannot be read from here at all", and that was true of the
-  // neighbour's CHUNK, but not of its terrain. Height and density are pure
-  // functions of world position, so the neighbouring columns can simply be
-  // recomputed here without touching getChunk() and without any recursion.
-  //
-  // That matters for one step only, and it matters completely: deciding what
-  // is still attached to the ground. A piece of rock held up by something two
-  // columns into the next chunk looks unsupported when you can only see this
-  // chunk, and deleting it carves a notch straight down the chunk boundary.
-  // Under the old, deliberately tiny carves that was a rare nick. Under a
-  // density field, formations are the size of the margin, and it would have
-  // been a visible scar on every seam in the world.
-  const MARGIN = 24;
-  const WIDE = CHUNK_W + MARGIN * 2;
-  const baseX = cx * CHUNK_W - MARGIN;
-
-  const wSurf = new Int32Array(WIDE);
-  for (let i = 0; i < WIDE; i++) wSurf[i] = Math.floor(getBiomeHeight(baseX + i));
-
-  const wSlope = new Float32Array(WIDE);
-  for (let i = 0; i < WIDE; i++) {
-    const a = Math.max(0, i - 1), b = Math.min(WIDE - 1, i + 1);
-    wSlope[i] = b > a ? Math.abs(wSurf[b] - wSurf[a]) / (b - a) : 0;
-  }
-
-  // 1 = rock, 0 = air. Bedrock row is forced solid: it is the anchor the
-  // support check floods out from.
-  const wRock = new Uint8Array(WIDE * WORLD_H);
-  for (let i = 0; i < WIDE; i++) {
-    const wx = baseX + i;
-    const sy = wSurf[i];
-    const inChunk = i - MARGIN;
-    const reserved = inChunk >= 0 && inChunk < CHUNK_W && reservedCol[inChunk];
-    const gates = densityGates(wSlope[i], wx);
-    const gUp = reserved ? 0 : gates.up;
-    const gDn = reserved ? 0 : gates.down;
-    // Outside the band the answer is the plain heightmap, so it is filled
-    // directly rather than asked for: that is seven eighths of the world, and
-    // asking would mean a simplex evaluation for every one of those cells.
-    const bandTop = Math.max(0, sy - DENSITY_UP);
-    const bandBot = Math.min(WORLD_H - 2, sy + DENSITY_DOWN);
-    for (let y = bandTop; y <= bandBot; y++) {
-      if (terrainSolidAt(wx, y, sy, gUp, gDn)) wRock[y * WIDE + i] = 1;
-    }
-    for (let y = bandBot + 1; y < WORLD_H; y++) wRock[y * WIDE + i] = 1;
-  }
-
-  // ── Support: what is still attached to the ground ────────────────────────
-  // The field does not know about gravity, so it will leave rock hanging in
-  // mid-air. Most of that is crumbs, a block or three shaved off a ledge, and
-  // it looks like a bug because it is one. But a genuine arch that has lost its
-  // second leg, or a slab left standing off a cliff, is a landmark, and the old
-  // rule (delete everything not connected to bedrock) could not tell the two
-  // apart because it never asked how big the piece was.
-  //
-  // So each disconnected piece is measured, and it survives if it is big
-  // enough AND its region allows floating rock at all. Everything else goes.
-  //
-  // A piece that reaches the edge of the wide window is KEPT without asking.
-  // Its true extent is unknown from here, so it may well be connected to
-  // bedrock somewhere further along, and keeping it is the harmless mistake:
-  // an extra formation nobody notices, rather than a hole where the world
-  // stops. It also makes the decision consistent between neighbouring chunks,
-  // which see the same rock through different windows.
-  const MIN_ISLAND = 10;
-  const wSup = new Uint8Array(WIDE * WORLD_H);
-  const stack = [];
-  for (let i = 0; i < WIDE; i++) {
-    const k = (WORLD_H - 1) * WIDE + i;
-    if (wRock[k]) { wSup[k] = 1; stack.push(k); }
-  }
-  while (stack.length) {
-    const k = stack.pop();
-    const x = k % WIDE, y = (k - x) / WIDE;
-    const visit = n => { if (!wSup[n] && wRock[n]) { wSup[n] = 1; stack.push(n); } };
-    if (x > 0) visit(k - 1);
-    if (x < WIDE - 1) visit(k + 1);
-    if (y > 0) visit(k - WIDE);
-    if (y < WORLD_H - 1) visit(k + WIDE);
-  }
-
-  const seen = new Uint8Array(WIDE * WORLD_H);
-  const comp = [];
-  for (let k0 = 0; k0 < wRock.length; k0++) {
-    if (!wRock[k0] || wSup[k0] || seen[k0]) continue;
-    comp.length = 0;
-    comp.push(k0); seen[k0] = 1;
-    let head = 0, touchesEdge = false, sumX = 0;
-    while (head < comp.length) {
-      const k = comp[head++];
-      const x = k % WIDE, y = (k - x) / WIDE;
-      if (x === 0 || x === WIDE - 1) touchesEdge = true;
-      sumX += x;
-      const visit = n => { if (wRock[n] && !wSup[n] && !seen[n]) { seen[n] = 1; comp.push(n); } };
-      if (x > 0) visit(k - 1);
-      if (x < WIDE - 1) visit(k + 1);
-      if (y > 0) visit(k - WIDE);
-      if (y < WORLD_H - 1) visit(k + WIDE);
-    }
-    const keep = touchesEdge ||
-      (comp.length >= MIN_ISLAND && floatingAllowed(baseX + Math.round(sumX / comp.length)));
-    if (!keep) for (let n = 0; n < comp.length; n++) wRock[comp[n]] = 0;
-  }
-
-  // ── Out of the window and into the chunk ─────────────────────────────────
-  // Everything solid becomes STONE here; the surface pass below repaints the
-  // top rows as grass or dirt. Filling soil in first (as the heightmap version
-  // did) and correcting it afterwards produced the same result by a longer
-  // route, and only worked because the correction ran over every row anyway.
-  for (let y = 0; y < WORLD_H; y++) {
-    for (let i = 0; i < CHUNK_W; i++) {
-      chunk[y * CHUNK_W + i] = y === WORLD_H - 1 ? BLOCKS.BEDROCK
-                             : (wRock[y * WIDE + MARGIN + i] ? BLOCKS.STONE : BLOCKS.AIR);
-    }
-  }
-
-  const slope = new Array(CHUNK_W);
-  for (let i = 0; i < CHUNK_W; i++) slope[i] = wSlope[MARGIN + i];
-
-  // Steep ground and high ground carry no soil. Free realism: the shape is
-  // already there, this only stops it being carpeted in grass, and it is what
-  // makes a cliff read as rock rather than as a very abrupt lawn.
-  const bareRock = new Array(CHUNK_W).fill(false);
-  for (let i = 0; i < CHUNK_W; i++) {
-    if (reservedCol[i]) continue;
-    if (slope[i] >= CLIFF_SLOPE || surfaceY[i] < TREE_LINE) bareRock[i] = true;
-  }
-
-  // ── Surface material, and where the surface now actually is ──────────────
-  // Re-derived from the finished rock rather than from the heightmap, because
-  // the density field has moved it: a shelf gives a column a new and much
-  // higher top, a hollow can leave a ledge thinner than the soil band, and an
-  // arch puts the top of the column a dozen rows above the ground under it.
-  // Every later stage (ore depth, trees, ruins, caves, spawn) reads surfaceY,
-  // so this is the point where it has to become true again.
-  for (let i = 0; i < CHUNK_W; i++) {
-    let top = -1;
-    for (let y = 0; y < WORLD_H; y++) {
-      if (chunk[y * CHUNK_W + i] !== BLOCKS.AIR) { top = y; break; }
-    }
-    if (top < 0) { surfaceY[i] = WORLD_H - 1; continue; }
-    surfaceY[i] = top;
-    const rock = bareRock[i];
-    chunk[top * CHUNK_W + i] = rock ? BLOCKS.STONE : BLOCKS.GRASS;
-    for (let d = 1; d <= 3; d++) {
-      const y = top + d;
-      if (y >= WORLD_H - 1) break;
-      const idx = y * CHUNK_W + i;
-      // Air here means the ledge is thinner than the soil band would be; the
-      // band simply stops rather than being painted into the void below.
-      if (chunk[idx] === BLOCKS.AIR) break;
-      chunk[idx] = rock ? BLOCKS.STONE : BLOCKS.DIRT;
-    }
-    // Nothing below the first four rows keeps soil: dirt sitting under an
-    // overhang's roof, with no sky above it, is exactly the giveaway that a
-    // world was carved rather than grown.
-    for (let y = top + 4; y < WORLD_H - 1; y++) {
-      const idx = y * CHUNK_W + i;
-      if (chunk[idx] === BLOCKS.DIRT || chunk[idx] === BLOCKS.GRASS) chunk[idx] = BLOCKS.STONE;
-    }
-  }
-
-  cmap.set(cx, chunk);
-
-  // Ore rarity — one gate roll per chunk per tier. Most chunks contain NONE
-  // of a given ore at all; only on a "win" does the chunk get exactly one
-  // organic vein.
-  // chunkOreWon is also read further below by the cave-chamber-wall ore
-  // decoration, so caves can't sneak in extra ore beyond this same budget.
-  const ORE_TIERS = [
-    { key: 'COAL',    block: BLOCKS.COAL_ORE,    minDepth: 4,  chance: 0.25,  sizeMin: 3, sizeMax: 6 },
-    { key: 'IRON',    block: BLOCKS.IRON_ORE,    minDepth: 8,  chance: 0.15,  sizeMin: 3, sizeMax: 5 },
-    { key: 'GOLD',    block: BLOCKS.GOLD_ORE,    minDepth: 15, chance: 0.08,  sizeMin: 2, sizeMax: 4 },
-    { key: 'DIAMOND', block: BLOCKS.DIAMOND_ORE, minDepth: 25, chance: 0.05,  sizeMin: 1, sizeMax: 3 },
-    { key: 'RAINBOW', block: BLOCKS.RAINBOW_ORE, minDepth: 35, chance: 0.02,  sizeMin: 1, sizeMax: 2 },
-    // Player-authored ore pieces (see registerCustomBlockPieces, ~4900) —
-    // same tier shape, same vein-growth loop below, nothing else changes.
-    ...customOreTiers,
-  ];
-  const chunkOreWon = {};
-  for (const tier of ORE_TIERS) {
-    const won = seededRandom('ore-tier-win', cx, tier.block) < tier.chance;
-    chunkOreWon[tier.key] = won;
-    if (!won) continue;
-    const seedI = seededInt(0, CHUNK_W - 1, 'vein-x', cx, tier.block);
-    const minY = surfaceY[seedI] + tier.minDepth;
-    if (minY >= WORLD_H - 5) continue;
-    const seedY = seededInt(minY, WORLD_H - 4, 'vein-y', cx, tier.block);
-    const veinSize = seededInt(tier.sizeMin, tier.sizeMax, 'vein-size', cx, tier.block);
-    // Branch from a random existing member each step (coordinates clamped
-    // in-bounds) so the blob stays compact and connected, instead of a free
-    // random walk that can drift out of the chunk and fragment into specks.
-    const members = [[seedI, seedY]];
-    if (chunk[seedY * CHUNK_W + seedI] === BLOCKS.STONE) chunk[seedY * CHUNK_W + seedI] = tier.block;
-    for (let n = 1; n < veinSize; n++) {
-      const [px, py] = members[seededInt(0, members.length - 1, 'vein-branch', cx, tier.block, n)];
-      const nx = Math.max(0, Math.min(CHUNK_W - 1, px + seededInt(-1, 1, 'vein-walk-x', cx, tier.block, n)));
-      const ny = Math.max(1, Math.min(WORLD_H - 2, py + seededInt(-1, 1, 'vein-walk-y', cx, tier.block, n)));
-      members.push([nx, ny]);
-      if (chunk[ny * CHUNK_W + nx] === BLOCKS.STONE) chunk[ny * CHUNK_W + nx] = tier.block;
-    }
-  }
-
-  // Decoration
-  // Tracks the last column a tree's trunk landed on, so consecutive rolls
-  // within this chunk can't plant two trees close enough for their crowns to
-  // interlock into one hard-edged, mismatched-colour blob (see
-  // TREE_MIN_SPACING's comment in voxeria-engine.js). Chunk-local only — a
-  // tree right at a chunk boundary can still end up close to one in the
-  // neighbouring chunk, same as real forest edges are uneven, not a perfect grid.
-  let lastTreeX = -Infinity;
-
-  // Hier stand ein Versuch, Baumgruppen per Micro-Varianz pro Chunk zu steuern,
-  // erst ueber den Spaltenwurf, dann ueber den Mindestabstand. Beides ist
-  // gemessen wirkungslos und wurde wieder entfernt, weil keiner der beiden am
-  // Flaschenhals sitzt: von den bestandenen Wuerfen scheitern **91 % am Boden**
-  // (kein Gras, weil Fels oder Ueberhangdach) und nur **0,2 % am Abstand**.
-  // Wie dicht ein Waldstueck wird, entscheidet also allein, wie viel Gras das
-  // Gelaende dort uebrig laesst. Das ist kein Mangel: Baumgruppen folgen damit
-  // der Landschaft (Haine wo Erde liegt, Lichtungen auf Fels) statt einem
-  // zweiten, unabhaengigen Regler daneben. Enger stellen ginge ohnehin nicht,
-  // die halbe Kronenbreite ist nachgemessen 3, zwei Baeume im Abstand 6
-  // beruehren sich also schon.
-
-  for (let i = 0; i < CHUNK_W; i++) {
-    const worldX = cx * CHUNK_W + i;
-    const sy = surfaceY[i];
-
-    const r = seededRandom('decor', cx, i);
-    const cb = colBiome[i];
-
-    // Both biomes' trees come out of the shared planTree() generator (see
-    // voxeria-engine.js) rather than the fixed silhouette each used to hard-code
-    // here, so they vary in height, crown and branching — and so a tree that
-    // grows in later looks like the ones that were always there. The rand()
-    // passed in is seeded per column, which keeps world-gen trees identical on
-    // every regeneration of the same chunk.
-    if (cb === "SNOW") {
-      if (r < 0.06 && getBlock(worldX, sy) === BLOCKS.GRASS && worldX - lastTreeX >= TREE_MIN_SPACING) {
-        let n = 0;
-        const tiles = planTree(worldX, sy, 'SNOW', () => seededRandom('snow-tree', cx, i, n++));
-        if (tiles) { for (const t of tiles) localSetBlock(t.x, t.y, t.b); lastTreeX = worldX; }
-      }
-    } else { // FOREST
-      if (r < 0.08 && isGrassOrDirt(worldX, sy) && worldX - lastTreeX >= TREE_MIN_SPACING) {
-        let n = 0;
-        const tiles = planTree(worldX, sy, 'FOREST', () => seededRandom('forest-tree', cx, i, n++));
-        if (tiles) { for (const t of tiles) localSetBlock(t.x, t.y, t.b); lastTreeX = worldX; }
-      }
-      // Flowers no longer spawn here (used to be r < 0.2 && canSpawnFlowerAt(...)).
-      // BLOCKS.FLOWER, canSpawnFlowerAt(), and every other flower-adjacent
-      // function are left in place rather than deleted — same call as the
-      // 'snow' weather removal: an untouched enum id and untouched drawing
-      // code cost nothing, and it means a mod or an old save that already
-      // placed a flower still renders it correctly instead of crashing on an
-      // unrecognised block.
-    }
-  }
-
-
-  // ══════════════════════════════════════════════════════════
-  // CAVE SYSTEM — Worm Carving (OVERWORLD only)
-  // ══════════════════════════════════════════════════════════
-  const midSY = surfaceY[Math.floor(CHUNK_W / 2)];
-
-  // 1–2 cave worms per chunk
-  const numWorms = 1 + (seededRandom('cave-count', cx) > 0.65 ? 1 : 0);
-  for (let w = 0; w < numWorms; w++) {
-    const startLX = seededInt(0, CHUNK_W - 1, 'cave-wx', cx, w);
-    let cwx = cx * CHUNK_W + startLX;
-    let cwy = midSY + 12 + seededInt(0, 30, 'cave-wy', cx, w);
-    if (cwy >= WORLD_H - 8) continue;
-
-    let angle = seededRandom('cave-angle', cx, w) * Math.PI * 2;
-    const wormLen = 30 + seededInt(0, 40, 'cave-len', cx, w);
-    const baseRadius = 2.2 + seededRandom('cave-base-r', cx, w) * 1.8;
-
-    for (let step = 0; step < wormLen; step++) {
-      angle += (seededRandom('cave-turn', cx, w, step) - 0.5) * 0.7;
-      const r = baseRadius + Math.sin(step * 0.4) * 0.8;
-      const ry = r * 0.65;
-
-      for (let dx2 = -Math.ceil(r); dx2 <= Math.ceil(r); dx2++) {
-        for (let dy2 = -Math.ceil(ry); dy2 <= Math.ceil(ry); dy2++) {
-          if ((dx2 * dx2) / (r * r) + (dy2 * dy2) / (ry * ry) <= 1) {
-            const bx = Math.floor(cwx + dx2);
-            const by = Math.floor(cwy + dy2);
-            const localX = bx - cx * CHUNK_W;
-            const minDepth = (localX >= 0 && localX < CHUNK_W) ? surfaceY[localX] + 5 : midSY + 5;
-            // Only ever eats through plain Stone — ore veins, trees and
-            // structures (all placed earlier in generation) already sit in
-            // this depth range, and a worm carving through one unconditionally
-            // would silently delete it or gut a wall from inside a build.
-            if (by >= minDepth && by < WORLD_H - 3 && getBlock(bx, by) === BLOCKS.STONE) {
-              localSetBlock(bx, by, BLOCKS.AIR);
-            }
-          }
-        }
-      }
-      cwx += Math.cos(angle) * 1.6;
-      cwy += Math.sin(angle) * 0.45;
-      cwy = Math.max(midSY + 8, Math.min(WORLD_H - 10, cwy));
-    }
-
-    // ── Chamber at worm endpoint (50% chance) ──
-    if (seededRandom('cave-chamber', cx, w) > 0.5) {
-      const chR  = 5 + seededInt(0, 5, 'ch-r', cx, w);
-      const chRY = Math.floor(chR * 0.65);
-      const chX  = Math.floor(cwx);
-      const chY  = Math.floor(cwy);
-
-      for (let dx2 = -chR; dx2 <= chR; dx2++) {
-        for (let dy2 = -chRY; dy2 <= chRY; dy2++) {
-          if ((dx2*dx2)/(chR*chR) + (dy2*dy2)/(chRY*chRY) <= 1) {
-            const bx = chX + dx2, by = chY + dy2;
-            const localX = bx - cx * CHUNK_W;
-            const minD = (localX >= 0 && localX < CHUNK_W) ? surfaceY[localX] + 5 : midSY + 5;
-            if (by >= minD && by < WORLD_H - 3 && getBlock(bx, by) === BLOCKS.STONE) localSetBlock(bx, by, BLOCKS.AIR);
-          }
-        }
-      }
-
-      // Chamber variant — most read as natural caverns, but roughly a quarter
-      // are an old coal mine's dig. Picked once per chamber so its decoration
-      // and loot stay internally consistent.
-      const caveDepth = chY - midSY;
-      const chamberVariant = seededRandom('cave-variant', cx, w) < 0.25 ? 'coalmine' : 'natural';
-
-      if (chamberVariant === 'natural') {
-        // Stalactites (from ceiling)
-        for (let dx2 = -chR + 1; dx2 < chR; dx2++) {
-          if (seededRandom('stal-t', cx, w, dx2 + 50) < 0.45) {
-            const bx = chX + dx2;
-            const topY = chY - chRY + 1;
-            const len = 1 + seededInt(0, 4, 'stal-tl', cx, w, dx2);
-            for (let s = 0; s < len; s++) {
-              const by = topY + s;
-              if (getBlock(bx, by - 1) !== BLOCKS.AIR) localSetBlock(bx, by, BLOCKS.STONE);
-            }
-          }
-        }
-        // Stalagmites (from floor)
-        for (let dx2 = -chR + 1; dx2 < chR; dx2++) {
-          if (seededRandom('stal-b', cx, w, dx2 + 100) < 0.45) {
-            const bx = chX + dx2;
-            const botY = chY + chRY - 1;
-            const len = 1 + seededInt(0, 4, 'stal-bl', cx, w, dx2);
-            for (let s = 0; s < len; s++) {
-              const by = botY - s;
-              if (getBlock(bx, by + 1) !== BLOCKS.AIR) localSetBlock(bx, by, BLOCKS.STONE);
-            }
-          }
-        }
-
-        // Underground pool — used to be water shallow / lava deep. The water
-        // half is gone: matches the surface ponds/lakes removal above, and
-        // Ocean Depth is now the only dimension that ever generates WATER/
-        // DEEP_WATER (see generatePocketChunk's OCEAN branch and the sunken
-        // temple in buildPocketLandmark). This also removes a real gameplay
-        // bug, not just a look — updatePlayer's nowInWater check re-samples
-        // the block at the player's feet every frame and switches between
-        // full gravity and 38%-gravity buoyancy depending on the result;
-        // standing at the edge of one of these pools made that check flicker
-        // between the two most frames, which read as the camera erratically
-        // bobbing up and down. With no water left to trigger it outside
-        // Ocean Depth, that flicker can no longer happen anywhere else.
-        // Shallow caves (caveDepth <= 45) simply get no pool at all now
-        // rather than a non-liquid stand-in — lava pools in deep caves are
-        // untouched.
-        if (caveDepth > 45 && seededRandom('cave-pool', cx, w) < 0.5) {
-          const poolBlock = BLOCKS.LAVA;
-          const poolW = Math.floor(chR * 0.55);
-          for (let dx2 = -poolW; dx2 <= poolW; dx2++) {
-            const bx = chX + dx2;
-            const botY = chY + chRY - 1;
-            if (getBlock(bx, botY + 1) !== BLOCKS.AIR) localSetBlock(bx, botY, poolBlock);
-          }
-        }
-
-        // Torch in some chambers
-        if (seededRandom('cave-torch', cx, w) < 0.35) {
-          const bx = chX;
-          const botY = chY + chRY - 1;
-          if (getBlock(bx, botY + 1) !== BLOCKS.AIR && getBlock(bx, botY) === BLOCKS.AIR) {
-            localSetBlock(bx, botY, BLOCKS.TORCH);
-          }
-        }
-
-        // Ore veins on chamber walls (reward exploration) — gated by the same
-        // chunkOreWon rarity roll above, so caves can't bypass the ore budget.
-        if (caveDepth > 20) {
-          for (let dx2 = -chR + 1; dx2 < chR; dx2++) {
-            if (seededRandom('ch-ore', cx, w, dx2) < 0.12) {
-              const bx = chX + dx2;
-              const veinY = chY + seededInt(-chRY + 1, chRY - 1, 'ch-vy', cx, w, dx2);
-              const oreBlock = (caveDepth > 40 && chunkOreWon.DIAMOND) ? BLOCKS.DIAMOND_ORE
-                             : (caveDepth > 25 && chunkOreWon.GOLD) ? BLOCKS.GOLD_ORE
-                             : chunkOreWon.IRON ? BLOCKS.IRON_ORE
-                             : null;
-              if (oreBlock && getBlock(bx, veinY) === BLOCKS.STONE) localSetBlock(bx, veinY, oreBlock);
-            }
-          }
-        }
-      } else if (chamberVariant === 'coalmine') {
-        // Two timber support pillars holding up the ceiling, log posts capped
-        // with a plank beam either side — an old dig, not a natural cavity.
-        // Cleared with the same surface-depth safety margin as the chamber
-        // ellipse above, but independently of it: a pillar column can sit
-        // just outside where the ellipse itself happened to clear, and a
-        // getBlock()===AIR gate would then silently skip the whole post.
-        const postXs = [-Math.floor(chR * 0.5), Math.floor(chR * 0.5)];
-        for (const px of postXs) {
-          const bx = chX + px;
-          const localX = bx - cx * CHUNK_W;
-          const minD = (localX >= 0 && localX < CHUNK_W) ? surfaceY[localX] + 5 : midSY + 5;
-          for (let dy2 = -chRY + 1; dy2 <= chRY - 1; dy2++) {
-            const by = chY + dy2;
-            if (by >= minD && by < WORLD_H - 3) localSetBlock(bx, by, BLOCKS.LOG);
-          }
-          localSetBlock(bx - 1, chY - chRY + 1, BLOCKS.PLANKS);
-          localSetBlock(bx + 1, chY - chRY + 1, BLOCKS.PLANKS);
-        }
-        // Coal seam one row below the cleared floor — deliberately just
-        // outside the ellipse (dy2=chRY+1 always fails the ellipse test),
-        // so it's guaranteed-solid ground to embed ore into, instead of a
-        // wall-vein roll that mostly lands back inside the cleared interior.
-        for (let dx2 = -chR + 2; dx2 <= chR - 2; dx2++) {
-          if (dx2 === postXs[0] || dx2 === postXs[1]) continue;
-          if (seededRandom('cm-coal', cx, w, dx2) < 0.55) {
-            const bx = chX + dx2, by = chY + chRY + 1;
-            if (by < WORLD_H - 3 && getBlock(bx, by) !== BLOCKS.AIR) localSetBlock(bx, by, BLOCKS.COAL_ORE);
-          }
-        }
-        // A mine is a lit mine
-        localSetBlock(chX, chY - chRY + 2, BLOCKS.TORCH);
-        localSetBlock(chX - 2, chY + chRY - 2, BLOCKS.TORCH);
-        // A little Iron on top, gated by the same chunk budget as wild ore
-        if (chunkOreWon.IRON) localSetBlock(chX + 2, chY + chRY - 2, BLOCKS.IRON_ORE);
-      }
-    }
-  }
-
- // `hasRuins` and `ruinX` were decided up in the cliff section, which reserved
- // this footprint from being undercut. Re-rolling them here would be a second
- // copy of the same decision.
- if (hasRuins) {
-  // Dein angepasstes Raster aus dem Screenshot (alle Zeilen auf 20 Zeichen ausgerichtetet)
-  const layout = [
-    "DDDDDDDDDDDDDDDDD    ", // Reihe 0 (Ganz oben)
-    " ##............# ", // Reihe 1
-    " T#.....A.....T# ", // Reihe 2
-    "  #...AAAA..DDD#    ", // Reihe 3
-    "  #....A...DDDD#   ", // Reihe 4
-    "  ...A....DDDDD# ", // Reihe 5
-    "  .......DDDDDD#    ", // Reihe 6
-    " #......DDDDDDD#     ", // Reihe 7 (Direkt über dem Boden)
-    "DDDDDDDDDDDDDDDDD     "  // Reihe 8 (Der feste Boden auf Oberflächenhöhe)
-  ];
-
-  const ruinH = layout.length;
-
-  const rX = ruinX;
-  const worldRX = cx * CHUNK_W + rX;
-  const rY = surfaceY[rX];
-
-  // The whole grid is drawn against this ONE surface row, so it needs ground
-  // that is actually level. Before the terrain rework almost everywhere was,
-  // and this went unchecked; now that cliffs and terraces are real, an
-  // unchecked ruin lands half in the air on one side and buried on the other.
-  // Measured across the footprint that is really used (the grid is clipped to
-  // the chunk anyway).
-  let plotLo = rY, plotHi = rY;
-  for (let i = rX; i < Math.min(CHUNK_W, rX + RUIN_W); i++) {
-    if (surfaceY[i] < plotLo) plotLo = surfaceY[i];
-    if (surfaceY[i] > plotHi) plotHi = surfaceY[i];
-  }
-  const plotIsLevel = (plotHi - plotLo) <= 3;
-
-  if (rY > 10 && rY < 88 && plotIsLevel) {
-    const wallBlock = biome === "SNOW" ? BLOCKS.STONE : BLOCKS.PLANKS;
-    const roofBlock = BLOCKS.STONE;
-
-    // Iteriere durch das Raster von oben nach unten
-    for (let r = 0; r < ruinH; r++) {
-      const rowStr = layout[r];
-      const targetY = rY - (ruinH - 1 - r);
-
-      for (let dx = 0; dx < rowStr.length; dx++) {
-        const char = rowStr[dx];
-        const bx = worldRX + dx;
-
-        if (char === '#') {
-          localSetBlock(bx, targetY, wallBlock);
-        } else if (char === 'D') {
-          localSetBlock(bx, targetY, roofBlock);
-        } else if (char === 'T') {
-          localSetBlock(bx, targetY, BLOCKS.TORCH);
-        } else if (char === '.') {
-          // Ersetzt den hohlen Innenraum/Hintergrund durch die Planken-Rückwand
-          localSetBlock(bx, targetY, BLOCKS.BG_PLANKS);
-        } else if (char === 'A') {
-          // NEU: Setzt an dieser Stelle explizit echte Luft (z.B. für Fenster oder offene Bereiche)
-          localSetBlock(bx, targetY, BLOCKS.AIR);
-        }
-        // Leerzeichen ' ' werden übersprungen, damit die Außenwelt unberührt bleibt
-      }
-    }
-
-    // Kohle/Eisen Loot im Inneren auf dem Boden — gated by the same chunk
-    // rarity roll as wild ore, so ruins can't bypass the ore budget.
-    if (chunkOreWon.COAL) localSetBlock(worldRX + 4, rY - 1, BLOCKS.COAL_ORE);
-    if (chunkOreWon.IRON && seededRandom('r-iron', cx) < 0.5) {
-      localSetBlock(worldRX + 5, rY - 1, BLOCKS.IRON_ORE);
-    }
-  }
-}
-  // The WATCHTOWERS that used to stand here (Forest/Snow, 12% of chunks) are
-  // gone by request. Nothing else read them: their only outputs were blocks
-  // written through localSetBlock, and their iron loot went through the same
-  // chunkOreWon.IRON gate every other structure uses, so the ore budget is
-  // unaffected. Their seededRandom('tower'/'t-x'/'t-h') rolls were pure hash
-  // lookups rather than draws from a shared stream, so removing them leaves
-  // every other roll in this chunk landing exactly where it did before.
-  //
-  // The ruins above and the abandoned mine shaft below are untouched.
-
-  // ── UNDERGROUND DUNGEONS (all biomes, ~20% of chunks) ──
-  if (cx !== 0 && seededRandom('dungeon', cx) < 0.20) {
-    const dX = seededInt(3, CHUNK_W - 10, 'd-x', cx);
-    const worldDX = cx * CHUNK_W + dX;
-    const dDepth = 45 + seededInt(0, 15, 'd-depth', cx); // 45–60 blocks deep
-    const dW = 7; const dH = 5;
-    const dY = Math.min(surfaceY[dX] + dDepth, WORLD_H - dH - 2);
-    if (dY > 20) {
-      // Clear interior
-      for (let dx = 1; dx < dW-1; dx++) for (let dy = 1; dy < dH-1; dy++) localSetBlock(worldDX+dx, dY+dy, BLOCKS.AIR);
-      // Obsidian frame
-      for (let dx = 0; dx < dW; dx++) {
-        localSetBlock(worldDX+dx, dY, BLOCKS.OBSIDIAN);
-        localSetBlock(worldDX+dx, dY+dH-1, BLOCKS.OBSIDIAN);
-      }
-      for (let dy = 0; dy < dH; dy++) {
-        localSetBlock(worldDX, dY+dy, BLOCKS.OBSIDIAN);
-        localSetBlock(worldDX+dW-1, dY+dy, BLOCKS.OBSIDIAN);
-      }
-      // Torch corners
-      localSetBlock(worldDX+1, dY+1, BLOCKS.TORCH);
-      localSetBlock(worldDX+dW-2, dY+1, BLOCKS.TORCH);
-      // Treasure: Rainbow Ore + Diamond/Gold — gated by the same chunk rarity
-      // roll as wild ore. This structure spawns in ~20% of ALL chunks, so
-      // leaving its loot unconditional would make Rainbow Ore far more common
-      // than intended (it was the actual cause of that bug, not the wild gen).
-      if (chunkOreWon.RAINBOW) localSetBlock(worldDX+3, dY+dH-2, BLOCKS.RAINBOW_ORE);
-      if (seededRandom('d-diamond', cx) < 0.5) {
-        if (chunkOreWon.DIAMOND) localSetBlock(worldDX+4, dY+dH-2, BLOCKS.DIAMOND_ORE);
-      } else if (chunkOreWon.GOLD) localSetBlock(worldDX+4, dY+dH-2, BLOCKS.GOLD_ORE);
-    }
-  }
-
-  // ── ABANDONED MINE SHAFT (all biomes, ~12% of chunks) — a man-made,
-  // timber-framed vertical shaft dug down from the surface, ending in a
-  // small loot room. Unlike every other structure here it starts AT the
-  // surface, so its entrance is a visible pit — a landmark you can spot
-  // while walking by, not just luck while digging.
-  if (cx !== 0 && seededRandom('mineshaft', cx) < 0.12) {
-    const mX = seededInt(2, CHUNK_W - 4, 'ms-x', cx);
-    const worldMX = cx * CHUNK_W + mX;
-    const mSurfaceY = surfaceY[mX];
-    const mDepth = 18 + seededInt(0, 14, 'ms-depth', cx); // 18-32 blocks down
-    const mBottom = mSurfaceY + mDepth;
-    if (mSurfaceY > 8 && mBottom < WORLD_H - 8) {
-      // Carve the 2-wide shaft
-      for (let dy = 0; dy <= mDepth; dy++) {
-        localSetBlock(worldMX, mSurfaceY + dy, BLOCKS.AIR);
-        localSetBlock(worldMX + 1, mSurfaceY + dy, BLOCKS.AIR);
-      }
-      // Timber support frames every 4-5 tiles: a plank beam spanning the
-      // shaft with log posts biting into the walls either side
-      for (let dy = 2; dy < mDepth; dy += 4 + seededInt(0, 1, 'ms-gap', cx, dy)) {
-        localSetBlock(worldMX - 1, mSurfaceY + dy, BLOCKS.LOG);
-        localSetBlock(worldMX, mSurfaceY + dy, BLOCKS.PLANKS);
-        localSetBlock(worldMX + 1, mSurfaceY + dy, BLOCKS.PLANKS);
-        localSetBlock(worldMX + 2, mSurfaceY + dy, BLOCKS.LOG);
-        if (seededRandom('ms-torch', cx, dy) < 0.4) localSetBlock(worldMX - 1, mSurfaceY + dy - 1, BLOCKS.TORCH);
-      }
-      // Small room at the bottom
-      for (let dx = -2; dx <= 3; dx++) for (let dy = -3; dy <= 0; dy++) localSetBlock(worldMX + dx, mBottom + dy, BLOCKS.AIR);
-      for (let dx = -2; dx <= 3; dx++) localSetBlock(worldMX + dx, mBottom + 1, BLOCKS.PLANKS);
-      localSetBlock(worldMX - 1, mBottom - 1, BLOCKS.TORCH);
-      // Loot — gated the same way as every other structure's bonus ore
-      localSetBlock(worldMX + 1, mBottom, BLOCKS.COAL_ORE);
-      if (chunkOreWon.IRON) localSetBlock(worldMX + 2, mBottom, BLOCKS.IRON_ORE);
-    }
-  }
-
-  // ── WORLD DIRECTOR: rare "anomalies" (retention set-pieces) ──
-  // Everything above already builds a coherent, sensible world. This runs
-  // last and almost always does nothing — but ~2% of chunks get one
-  // deliberately special, sometimes deliberately ABSURD discovery: a hidden
-  // message spelled in blocks, a meme structure that ignores the rules of a
-  // normal build, or a jackpot that breaks the ore economy on purpose. These
-  // are the moments players screenshot and tell their friends about, which is
-  // exactly why they exist. All seeded, so a given world's anomalies are fixed
-  // in place — two players on the same seed find the same wonders.
-  if (cx !== 0 && seededRandom('anomaly', cx) < 0.02) {
-    const kind = seededRandom('anomaly-kind', cx);
-    if (kind < 0.45) placeHiddenMessage(cx, surfaceY);
-    else if (kind < 0.85) placeMemeStructure(cx, surfaceY, biome);
-    else placeMotherLode(cx, surfaceY);
-  }
-
-  currentDim = oldDim;
-  return chunk;
-}
+// getChunk() ist nach voxeria-worldgen.js gezogen, zusammen mit der
+// Hoehenkurve und dem Dichtefeld, die es liest. generatePocketChunk,
+// decoratePocketChunk und generateArenaChunk (weiter oben in dieser Datei)
+// werden von dort aufgerufen und sind hier geblieben.
 
 
 
@@ -1305,9 +653,11 @@ function beginPocketRun(preX, preY) {
   if (canJoin) {
     _sharedRun = open;
     pocketSeedOffset = open.offset;
+    _publishPocketSalt();
     showNotification('👥 Joined a run already in progress');
   } else {
     pocketSeedOffset = (Math.random() * 1e9) | 0; // fresh layout every entry
+    _publishPocketSalt();
     _sharedRun = null;
     if (isMultiplayerActive && mpVisible && db && userId) {
       _sharedRun = { seed: rawSeedString, dim: currentDim, offset: pocketSeedOffset, startTs: now,
@@ -2097,16 +1447,6 @@ function playForgeHammer(vol) {
   o1.start(t); o2.start(t); o1.stop(t + 0.2); o2.stop(t + 0.2);
 }
 
-// Cache of the exact 36x36 pixel-art icons the crafting cards use (see
-// drawBlockMini) so the in-world hologram shows the identical art, not a
-// re-implementation of it.
-const _forgeIconCache = {};
-function _forgeIcon(block) {
-  let c = _forgeIconCache[block];
-  if (!c) { c = document.createElement('canvas'); drawBlockMini(c, block); _forgeIconCache[block] = c; }
-  return c;
-}
-
 // A flickering, scanlined holographic projection floating above a forge,
 // showing exactly which materials it still needs and how many you're
 // carrying — "Man soll oberhalb der Schmiede in Hologramm-Form die
@@ -2427,3 +1767,697 @@ updateAndDrawIntro = function(ctx, dt) {
     tryResumeSession();
   }
 };
+
+// =========================================================
+// DAS PORTAL-BUCH -- vollstaendig, statt auf zwei Dateien verteilt
+// =========================================================
+// Bis eben lag das Buch quer ueber beide Dateien: Zustand und Navigation
+// (pbView, pbGoto, isDimRevealed, togglePortalBook) hier, das Zeichnen aller
+// drei Ebenen in voxeria-engine.js. Die Engine las dafuer PORTAL_DEFS,
+// isDimRevealed und pbGoto aus dieser Datei nach oben, und diese Datei rief
+// renderPortalBook() zurueck nach unten. Ein Bildschirm, zwei Dateien, ein
+// Ring.
+//
+// Jetzt ist alles hier. Was umgezogen ist:
+//
+//   _pbTile / _pbBack / _pbLabel     die drei Bausteine der Oberflaeche
+//   PB_DIM_SCENE / drawDimScene      die kleine Szene pro Dimension
+//   drawRecipePreview / drawAltar…   die Rezeptvorschauen
+//   renderPortalBook + die 3 Ebenen  Dimensionsliste, Dimension, Ruestung
+//   toggleArmorEquip                 nur vom Buch aus erreichbar
+//
+// Bewusst NICHT mitgekommen ist drawBlockMini(): das benutzen auch die
+// Mod-Galerie und der Block-Katalog, es ist also echtes Allgemeingut der
+// Engine und bleibt dort.
+//
+// Alles hier liest weiter frei aus der Engine (BLOCKS, blockColors,
+// craftedArmor, showNotification und so weiter). Das ist die erlaubte
+// Richtung: ein Feature darf das Fundament benutzen.
+// =========================================================
+
+// One tile shape for everything the player clicks in this book: image on the
+// left, name (plus an optional sub-line) on the right.
+function _pbTile(opts) {
+  const tile = document.createElement('div');
+  tile.className = 'pb-tile' + (opts.onClick ? ' clickable' : '') + (opts.locked ? ' locked' : '');
+  if (opts.lockGlyph) {
+    const l = document.createElement('div');
+    l.className = 'pb-tile-lock';
+    l.textContent = opts.lockGlyph;
+    tile.appendChild(l);
+  } else if (opts.img) {
+    opts.img.className = 'pb-tile-img';
+    tile.appendChild(opts.img);
+  }
+  const txt = document.createElement('div');
+  txt.className = 'pb-tile-text';
+  const nm = document.createElement('div');
+  nm.className = 'pb-tile-name';
+  nm.textContent = opts.name;
+  if (opts.nameColor) nm.style.color = opts.nameColor;
+  txt.appendChild(nm);
+  if (opts.sub) {
+    const s = document.createElement('div');
+    s.className = 'pb-tile-sub';
+    s.textContent = opts.sub;
+    txt.appendChild(s);
+  }
+  tile.appendChild(txt);
+  if (opts.onClick) {
+    const chev = document.createElement('div');
+    chev.className = 'pb-tile-chev';
+    chev.textContent = '›';
+    tile.appendChild(chev);
+    tile.onclick = opts.onClick;
+  }
+  return tile;
+}
+
+function _pbBack(label, onClick) {
+  const b = document.createElement('button');
+  b.className = 'pb-back';
+  b.textContent = '‹ ' + label;
+  b.onclick = onClick;
+  return b;
+}
+
+function _pbLabel(text) {
+  const el = document.createElement('div');
+  el.className = 'pb-label';
+  el.textContent = text;
+  return el;
+}
+
+// Recipe for each dimension's generated preview scene: the sky ramp it sits
+// under, the blocks its terrain is made of (surface → deeper), the rarer blocks
+// scattered through it, and the colour of its ambient glow. All drawn with the
+// game's real block palette, so the card previews what the realm actually
+// looks like rather than being decorative art made up separately.
+const PB_DIM_SCENE = {
+  GOLD:  { sky: ['#432a07', '#8a5f18', '#e0a233'],
+           ground: [BLOCKS.YELLOW_LIMESTONE, BLOCKS.GOLD_BRICK, BLOCKS.OBSIDIAN],
+           accents: [BLOCKS.EMBER_ORE, BLOCKS.RAINBOW_ORE, BLOCKS.GOLD_ORE],
+           glow: 'rgba(255,190,80,0.34)' },
+  LAVA:  { sky: ['#190603', '#4d1206', '#ad2c09'],
+           ground: [BLOCKS.VOLCANIC_ROCK, BLOCKS.MAGMA, BLOCKS.OBSIDIAN],
+           accents: [BLOCKS.LAVA, BLOCKS.FIRE_CRYSTAL, BLOCKS.EMBER_ORE],
+           glow: 'rgba(255,90,30,0.4)' },
+  OCEAN: { sky: ['#02121f', '#064063', '#0b73a0'],
+           ground: [BLOCKS.CORAL, BLOCKS.OCEAN_STONE, BLOCKS.OCEAN_STONE],
+           accents: [BLOCKS.SEA_LANTERN, BLOCKS.KELP, BLOCKS.CORAL],
+           glow: 'rgba(80,200,255,0.3)' },
+  VOID:  { sky: ['#07030e', '#1c0a35', '#37135e'],
+           ground: [BLOCKS.VOID_STONE, BLOCKS.VOID_GLASS, BLOCKS.VOID_STONE],
+           accents: [BLOCKS.VOID_ORE, BLOCKS.STAR_DUST, BLOCKS.ETHER_CRYSTAL],
+           glow: 'rgba(160,110,255,0.36)' },
+  ERG:   { sky: ['#7a4a12', '#c9862f', '#e8c468'],
+           ground: [BLOCKS.ERG_SAND, BLOCKS.ERG_SAND, BLOCKS.ERG_SANDSTONE],
+           accents: [BLOCKS.ERG_CACTUS],
+           glow: 'rgba(232,196,104,0.32)' }
+};
+
+// Small deterministic PRNG so a dimension's card looks identical every time
+// the book is opened, instead of reshuffling on every render.
+function _pbSceneRand(seed) {
+  let s = (seed >>> 0) || 1;
+  return function () {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function drawDimScene(canvas, dimId) {
+  const W = 400, H = 140;
+  canvas.width = W; canvas.height = H;
+  const c = canvas.getContext('2d');
+  const cfg = PB_DIM_SCENE[dimId];
+  if (!cfg) { c.fillStyle = '#111'; c.fillRect(0, 0, W, H); return; }
+
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, cfg.sky[0]); g.addColorStop(0.55, cfg.sky[1]); g.addColorStop(1, cfg.sky[2]);
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+
+  const rnd = _pbSceneRand(hashCode('scene-' + dimId));
+
+  // Ambient light blooms — these are what survive the blur most and give each
+  // realm its colour at a glance.
+  for (let i = 0; i < 5; i++) {
+    const gx = rnd() * W, gy = H * 0.1 + rnd() * H * 0.6, gr = 38 + rnd() * 78;
+    const rg = c.createRadialGradient(gx, gy, 0, gx, gy, gr);
+    rg.addColorStop(0, cfg.glow); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = rg;
+    c.beginPath(); c.arc(gx, gy, gr, 0, Math.PI * 2); c.fill();
+  }
+
+  const S = 16;
+  const colsN = Math.ceil(W / S), rowsN = Math.ceil(H / S);
+  function blockAt(px, py, btype) {
+    const col = blockColors[btype];
+    if (!col) return;
+    c.fillStyle = col[0]; c.fillRect(px, py, S, S);
+    c.fillStyle = col[2]; c.fillRect(px, py, S, 3);
+    c.fillStyle = col[1]; c.fillRect(px, py + S - 3, S, 3);
+    c.fillStyle = col[3]; c.fillRect(px + S - 3, py, 3, S);
+  }
+  const pick = arr => arr[Math.floor(rnd() * arr.length)];
+
+  if (dimId === 'VOID') {
+    // Floating islands rather than continuous ground — that IS the Blither.
+    let x = 0;
+    while (x < colsN) {
+      const w = 2 + Math.floor(rnd() * 4);
+      const top = 2 + Math.floor(rnd() * 4);
+      const depth = 1 + Math.floor(rnd() * 2);
+      for (let i = 0; i < w && x + i < colsN; i++) {
+        for (let d = 0; d < depth; d++) {
+          const base = d === 0 ? cfg.ground[0] : cfg.ground[1];
+          blockAt((x + i) * S, (top + d) * S, rnd() < 0.16 ? pick(cfg.accents) : base);
+        }
+      }
+      x += w + 1 + Math.floor(rnd() * 2);
+    }
+  } else {
+    let h = Math.floor(rowsN * 0.5);
+    for (let cx = 0; cx < colsN; cx++) {
+      h += Math.floor(rnd() * 3) - 1;
+      h = Math.max(Math.floor(rowsN * 0.3), Math.min(rowsN - 1, h));
+      for (let ry = h; ry < rowsN; ry++) {
+        let bt = ry === h ? cfg.ground[0] : (ry < h + 2 ? cfg.ground[1] : cfg.ground[2]);
+        if (ry > h && rnd() < 0.09) bt = pick(cfg.accents);
+        blockAt(cx * S, ry * S, bt);
+      }
+    }
+  }
+}
+
+// Renders any rectangular recipe grid (0 = empty cell) into a canvas. Shared by
+// the portal recipes (3x3 plus-shape) and the armor altars (5x3), so both read
+// as the same kind of diagram instead of two different visual languages.
+function _drawRecipeGrid(canvas, grid) {
+  const rc = canvas.getContext('2d');
+  const S = 16; // cell size
+  const PAD = 4;
+  const rows = grid.length, cols0 = grid[0].length;
+  canvas.width = S * cols0 + PAD * (cols0 + 1);
+  canvas.height = S * rows + PAD * (rows + 1);
+  rc.fillStyle = 'rgba(0,0,0,0.4)';
+  rc.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols0; col++) {
+      const btype = grid[row][col];
+      const bx = PAD + col * (S + PAD);
+      const by = PAD + row * (S + PAD);
+      if (btype === 0) {
+        rc.fillStyle = 'rgba(255,255,255,0.05)';
+        rc.fillRect(bx, by, S, S);
+        continue;
+      }
+      const cols = blockColors[btype];
+      if (cols) {
+        rc.fillStyle = cols[0]; rc.fillRect(bx, by, S, S);
+        rc.fillStyle = cols[2]; rc.fillRect(bx, by, S, 2);
+        rc.fillStyle = cols[3]; rc.fillRect(bx+S-2, by, 2, S);
+        rc.fillStyle = cols[1]; rc.fillRect(bx, by+S-2, S, 2);
+        rc.fillStyle = cols[1]; rc.fillRect(bx, by, 2, S);
+        if (btype === BLOCKS.RAINBOW_ORE) {
+          rc.fillStyle = '#55ffff'; rc.fillRect(bx+3,by+3,3,3); rc.fillRect(bx+9,by+7,3,3); rc.fillRect(bx+3,by+9,3,3);
+        } else if (ORE_SPECKLE_IDS.has(btype)) {
+          // Without this, ores whose base/shadow match their dimension's plain
+          // rock (e.g. Gold/Diamond/Coal share Stone's grey, or Ember Ore
+          // shares Magma Rock's tone) render as an almost-plain colored square
+          // here — the accent color is otherwise just a barely-visible 2px rim.
+          rc.fillStyle = cols[3]; rc.fillRect(bx+3,by+3,3,3); rc.fillRect(bx+9,by+7,3,3); rc.fillRect(bx+3,by+9,3,3);
+        }
+      }
+      rc.strokeStyle = 'rgba(255,255,255,0.15)'; rc.lineWidth = 0.5; rc.strokeRect(bx, by, S, S);
+    }
+  }
+}
+
+function drawRecipePreview(canvas, centerBlock, crossBlock) {
+  _drawRecipeGrid(canvas, [
+    [0, crossBlock, 0],
+    [crossBlock, centerBlock, crossBlock],
+    [0, crossBlock, 0]
+  ]);
+}
+
+// The armor altar. The grid is DERIVED from ARMOR_PATTERN rather than written
+// out again, so the diagram the player is asked to copy can never drift out of
+// sync with the shape checkArmorAltar actually looks for.
+function drawAltarPreview(canvas, baseBlock, coreBlock) {
+  const xs = ARMOR_PATTERN.map(p => p[0]).concat(0);
+  const ys = ARMOR_PATTERN.map(p => p[1]).concat(0);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const grid = [];
+  for (let y = minY; y <= maxY; y++) {
+    const row = [];
+    for (let x = minX; x <= maxX; x++) row.push(0);
+    grid.push(row);
+  }
+  for (const [ox, oy] of ARMOR_PATTERN) grid[oy - minY][ox - minX] = baseBlock;
+  grid[0 - minY][0 - minX] = coreBlock;
+  _drawRecipeGrid(canvas, grid);
+}
+
+function renderPortalBook() {
+  const body = document.getElementById('pb-body');
+  body.innerHTML = '';
+  if (pbView === 'armor' && pbViewDim) { _pbRenderArmor(body, pbViewDim); return; }
+  if (pbView === 'dim' && pbViewDim) { _pbRenderDim(body, pbViewDim); return; }
+  _pbRenderDims(body);
+}
+
+// Level 1 — one tile per dimension. Undiscovered ones stay blacked out; you
+// uncover them by entering the dimension before them in the chain.
+function _pbRenderDims(body) {
+  PORTAL_DEFS.forEach(def => {
+    const revealed = isDimRevealed(def.id);
+    const card = document.createElement('div');
+    card.className = 'pb-dim-card' + (revealed ? '' : ' locked');
+
+    const scene = document.createElement('canvas');
+    scene.className = 'pb-dim-scene';
+    drawDimScene(scene, def.id);
+    card.appendChild(scene);
+
+    const veil = document.createElement('div');
+    veil.className = 'pb-dim-veil';
+    card.appendChild(veil);
+
+    const label = document.createElement('div');
+    label.className = 'pb-dim-label';
+    const title = document.createElement('div');
+    title.className = 'pb-dim-title';
+    title.textContent = revealed ? def.name : '? ? ?';
+    if (revealed) title.style.color = def.color;
+    label.appendChild(title);
+
+    const noteText = !revealed
+      ? 'Discover the dimension before this one'
+      : (currentDim === def.id ? '◉ You are here' : null);
+    if (noteText) {
+      const note = document.createElement('div');
+      note.className = 'pb-dim-note';
+      note.textContent = noteText;
+      label.appendChild(note);
+    }
+    card.appendChild(label);
+
+    if (revealed) card.onclick = () => pbGoto('dim', def.id);
+    body.appendChild(card);
+  });
+}
+
+// Level 2 — one dimension: how to open its portal, then the armor it builds.
+function _pbRenderDim(body, dimId) {
+  const def = PORTAL_DEFS.find(d => d.id === dimId);
+  if (!def) { pbGoto('dims'); return; }
+  body.appendChild(_pbBack('All dimensions', () => pbGoto('dims')));
+
+  const banner = document.createElement('div');
+  banner.className = 'pb-dim-card compact';
+  const bScene = document.createElement('canvas');
+  bScene.className = 'pb-dim-scene';
+  drawDimScene(bScene, def.id);
+  const bVeil = document.createElement('div');
+  bVeil.className = 'pb-dim-veil';
+  const bLabel = document.createElement('div');
+  bLabel.className = 'pb-dim-label';
+  const bTitle = document.createElement('div');
+  bTitle.className = 'pb-dim-title';
+  bTitle.textContent = def.name;
+  bTitle.style.color = def.color;
+  bLabel.appendChild(bTitle);
+  banner.appendChild(bScene); banner.appendChild(bVeil); banner.appendChild(bLabel);
+  body.appendChild(banner);
+
+  const desc = document.createElement('div');
+  desc.className = 'pb-desc';
+  desc.textContent = def.desc;
+  body.appendChild(desc);
+
+  body.appendChild(_pbLabel('Portal Recipe'));
+  const panel = document.createElement('div');
+  panel.className = 'pb-panel';
+  const rc = document.createElement('canvas');
+  drawRecipePreview(rc, def.recipe.center, def.recipe.cross);
+  const ptxt = document.createElement('div');
+  ptxt.className = 'pb-panel-text';
+  ptxt.innerHTML = 'Center: <b>' + escapeHtml(def.centerLabel) + '</b><br>' +
+                   'Cross: <b>' + escapeHtml(def.crossLabel) + '</b>';
+  panel.appendChild(rc); panel.appendChild(ptxt);
+  body.appendChild(panel);
+
+  // The armor this realm makes (FORGE_OUTPUT: always the piece you need for the
+  // NEXT dimension, which is why it's found one realm early).
+  const recId = FORGE_OUTPUT[dimId];
+  const r = recId ? CRAFTING_RECIPES.find(x => x.id === recId) : null;
+  if (r) {
+    body.appendChild(_pbLabel('Armor built here'));
+    const img = document.createElement('canvas');
+    img.width = 60; img.height = 60;
+    drawArmorPreview(img, r.dim);
+    body.appendChild(_pbTile({
+      img, name: r.name,
+      sub: craftedArmor.has(r.dim) ? '✓ Already built' : 'Not built yet',
+      onClick: () => pbGoto('armor', dimId)
+    }));
+  }
+}
+
+// Level 3 — how to build one armor piece: the altar shape, nothing else.
+function _pbRenderArmor(body, dimId) {
+  const recId = FORGE_OUTPUT[dimId];
+  const r = recId ? CRAFTING_RECIPES.find(x => x.id === recId) : null;
+  const def = PORTAL_DEFS.find(d => d.id === dimId);
+  if (!r) { pbGoto('dim', dimId); return; }
+  body.appendChild(_pbBack(def ? def.name : 'Back', () => pbGoto('dim', dimId)));
+
+  const head = document.createElement('div');
+  head.className = 'pb-detail-head';
+  const ico = document.createElement('canvas');
+  ico.width = 60; ico.height = 60;
+  ico.className = 'pb-tile-img';
+  drawArmorPreview(ico, r.dim);
+  const nm = document.createElement('div');
+  nm.className = 'pb-detail-name';
+  nm.textContent = r.name;
+  head.appendChild(ico); head.appendChild(nm);
+  body.appendChild(head);
+
+  const eff = document.createElement('div');
+  eff.className = 'pb-desc';
+  eff.textContent = r.effect + ' (-' + Math.round(ARMOR_DEFENSE[r.dim] * 100) + '% DMG while equipped)';
+  body.appendChild(eff);
+
+  body.appendChild(_pbLabel('How to build it'));
+  const panel = document.createElement('div');
+  panel.className = 'pb-panel';
+  const shape = document.createElement('canvas');
+  drawAltarPreview(shape, r.base, r.core);
+  const txt = document.createElement('div');
+  txt.className = 'pb-panel-text';
+  const haveBase = countInInventory(r.base), haveCore = countInInventory(r.core);
+  const needBase = r.mats[r.base], needCore = r.mats[r.core];
+  txt.innerHTML =
+    'Place the blocks in exactly this shape while you are in the <b>' + escapeHtml(r.forge.dim) + '</b> Dimension. They turn into the armor on the spot.<br>' +
+    '<span class="' + (haveBase >= needBase ? 'cm-ok' : 'cm-short') + '">' +
+      escapeHtml(blockNames[r.base] || 'Block') + ' ' + Math.min(haveBase, needBase) + '/' + needBase + '</span> · ' +
+    '<span class="' + (haveCore >= needCore ? 'cm-ok' : 'cm-short') + '">' +
+      escapeHtml(blockNames[r.core] || 'Block') + ' ' + Math.min(haveCore, needCore) + '/' + needCore + ' (core)</span>';
+  panel.appendChild(shape); panel.appendChild(txt);
+  body.appendChild(panel);
+
+  // Wearing it is the only thing there's still a button for.
+  if (craftedArmor.has(r.dim)) {
+    const btn = document.createElement('button');
+    btn.className = 'craft-btn';
+    const equipped = equippedArmor.has(r.dim);
+    btn.classList.add(equipped ? 'equipped' : 'stowed');
+    btn.textContent = equipped ? 'Equipped (click to remove)' : 'Stowed (click to wear)';
+    btn.onclick = () => toggleArmorEquip(r.dim);
+    body.appendChild(btn);
+  }
+}
+
+// Toggles a crafted armor piece between worn and stowed. No-op if you don't
+// actually own it yet (equipping is only ever a display/protection choice
+// over what's already been crafted, never a way to skip crafting).
+function toggleArmorEquip(dim) {
+  if (!craftedArmor.has(dim)) return;
+  if (equippedArmor.has(dim)) {
+    equippedArmor.delete(dim);
+    showNotification('👕 Unequipped ' + dim + ' armor.');
+  } else {
+    equippedArmor.add(dim);
+    showNotification('🛡️ Equipped ' + dim + ' armor.');
+  }
+  syncProgressToCloud();
+  drawHotbar();
+  updateDefenseBadge();
+  applyArmorStatBonuses();
+  // Armor state shows up on every level of the book (the "already built"
+  // sub-line on a dimension tile, the equip button on the armor view), so
+  // refresh whichever view happens to be open.
+  if (document.getElementById('portal-book-modal').classList.contains('open')) renderPortalBook();
+}
+
+// =========================================================
+// GOLD SLIMES -- die Kreatur der Gold-Dimension, jetzt bei ihrer Dimension
+// =========================================================
+// Diese ~120 Zeilen standen in voxeria-engine.js und lasen von dort aus vier
+// Namen nach oben in diese Datei: POCKET_LEFT, POCKET_RIGHT, POCKET_ENTRY_X
+// und goldSurfaceY. Eine Kreatur, die nur in einer Pocket-Dimension existiert,
+// deren Waende kennt und deren Boden abtastet, gehoert nicht ins Fundament.
+//
+// Der Weg zurueck laeuft ueber zwei Punkte, beide an exakt der alten Stelle
+// im Frame: 'update' fuer die Simulation und 'drawCreatures' am Ende von
+// drawAnimals() fuer das Zeichnen.
+// =========================================================
+
+// Gold Dimension hazard: 3-5 bouncing "Gold Slime" balls per pocket run —
+// no damage on touch, just a flash-freeze (see player.goldFrozenTimer).
+let goldSlimes = [];
+
+// =========================================================
+// GOLD SLIMES — bouncing yellow balls with eyes, unique to the Gold
+// Dimension pocket run. No damage on touch, just a 5s flash-freeze (see
+// player.goldFrozenTimer / GOLD_FREEZE_DURATION). Spawned once per run in
+// beginPocketRun, cleared in endPocketRun.
+// =========================================================
+function spawnGoldSlimes() {
+  goldSlimes = [];
+  const count = seededInt(3, 5, 'gs-count');
+  for (let i = 0; i < count; i++) {
+    let wx, tries = 0;
+    do { wx = seededInt(POCKET_LEFT + 20, POCKET_RIGHT - 20, 'gs-x', i, tries++); }
+    while (Math.abs(wx - POCKET_ENTRY_X) < 14 && tries < 8); // steer clear of the landing spot
+    const sy = goldSurfaceY(wx);
+    goldSlimes.push({
+      x: wx * TILE, y: (sy - 3) * TILE,
+      vx: (seededRandom('gs-dir', i) < 0.5 ? -1 : 1) * (0.6 + seededRandom('gs-spd', i) * 0.5),
+      vy: 0, w: 30, h: 30, onGround: false,
+      hopCooldown: 30 + seededInt(0, 60, 'gs-hop', i),
+      scaleX: 1, scaleY: 1, // squash/stretch, punched by triggerLandingSquash/triggerTurnSquash and eased by updateCreatureSquash — same shared juice helpers the animals use
+      blink: Math.floor(seededRandom('gs-blink', i) * 160) + 40
+    });
+  }
+}
+
+function updateGoldSlimes(dt) {
+  if (!pocketActive || currentDim !== "GOLD" || pocketCollapsing) return;
+  for (const s of goldSlimes) {
+    s.blink -= dt;
+    if (s.blink <= 0) s.blink = 140 + Math.random() * 80;
+    updateCreatureSquash(s, dt);
+
+    s.vy += GRAVITY * 0.75 * dt;
+    if (s.vy > 8) s.vy = 8;
+    const nextX = s.x + s.vx * dt;
+    const footY = Math.floor((s.y + s.h - 2) / TILE);
+    const sideX = Math.floor((nextX + (s.vx > 0 ? s.w : 0)) / TILE);
+    if (isSolid(getBlock(sideX, footY)) || isSolid(getBlock(sideX, footY - 1))) { s.vx *= -1; triggerTurnSquash(s); }
+    else s.x = nextX;
+    // Belt-and-braces wall so a terrain gap near the pocket's edge can't let
+    // one wander into the bedrock border.
+    if (s.x < POCKET_LEFT * TILE) { s.x = POCKET_LEFT * TILE; s.vx = Math.abs(s.vx); }
+    if (s.x + s.w > (POCKET_RIGHT + 1) * TILE) { s.x = (POCKET_RIGHT + 1) * TILE - s.w; s.vx = -Math.abs(s.vx); }
+
+    s.y += s.vy * dt;
+    const wasOnGround = s.onGround;
+    s.onGround = false;
+    const left = Math.floor((s.x + 3) / TILE), right = Math.floor((s.x + s.w - 3) / TILE), bottom = Math.floor((s.y + s.h) / TILE);
+    for (let tx = left; tx <= right; tx++) {
+      if (isSolid(getBlock(tx, bottom)) && s.vy >= 0) { s.y = bottom * TILE - s.h; s.vy = 0; s.onGround = true; break; }
+    }
+    if (!wasOnGround && s.onGround) {
+      triggerLandingSquash(s);
+      spawnDustBurst(s.x + s.w / 2, s.y + s.h);
+      screenShake = Math.max(screenShake, 3);
+    }
+    s.hopCooldown -= dt;
+    if (s.onGround && s.hopCooldown <= 0) {
+      s.vy = -9;
+      s.scaleX = 1.35; s.scaleY = 0.6; // anticipation squat right before the leap, eases back out via updateCreatureSquash
+      s.hopCooldown = 50 + Math.random() * 70;
+    }
+
+    // Touch = flash-frozen in gold, not damage.
+    if (player.goldFrozenTimer <= 0 && player.frozenTimer <= 0 && !deathPending &&
+        player.x + player.w > s.x && player.x < s.x + s.w &&
+        player.y + player.h > s.y && player.y < s.y + s.h) {
+      player.goldFrozenTimer = GOLD_FREEZE_DURATION;
+      player.vx = 0; player.vy = 0;
+      addJuiceText(player.x + player.w / 2, player.y, '✨ Frozen in Gold!', '#ffd700');
+      spawnJuiceBurst(player.x + player.w / 2, player.y + player.h / 2, '#ffd700', 18, 7);
+      screenShake = Math.max(screenShake, 6);
+      playSound('hurt');
+    }
+  }
+}
+
+function drawGoldSlimes() {
+  if (!pocketActive || currentDim !== "GOLD") return;
+  for (const s of goldSlimes) {
+    const sx = s.x - drawCamX, sy = s.y - drawCamY;
+    // A subtle always-on jelly wobble on top of the event-driven squash, so
+    // it reads as squishy rubber even between hops.
+    const wob = Math.sin(frameCount * 0.1 + s.x * 0.05) * 0.05;
+    ctx.save();
+    ctx.translate(sx + s.w / 2, sy + s.h / 2);
+    ctx.scale(s.scaleX * (1 + wob), s.scaleY * (1 - wob));
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.ellipse(0, s.h / 2 - 2, s.w * 0.45, 4, 0, 0, Math.PI * 2); ctx.fill();
+    const grad = ctx.createRadialGradient(-s.w * 0.15, -s.h * 0.2, s.w * 0.05, 0, 0, s.w * 0.55);
+    grad.addColorStop(0, '#fff4b0');
+    grad.addColorStop(0.45, '#ffd700');
+    grad.addColorStop(1, '#c99400');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.ellipse(0, 0, s.w / 2, s.h / 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.ellipse(-s.w * 0.18, -s.h * 0.22, s.w * 0.22, s.h * 0.14, -0.4, 0, Math.PI * 2); ctx.fill();
+    const blinking = s.blink < 8;
+    const eyeR = s.w * 0.15, eyeDX = s.w * 0.19, eyeY = -s.h * 0.04;
+    if (blinking) {
+      ctx.strokeStyle = '#4a3300'; ctx.lineWidth = s.w * 0.06;
+      ctx.beginPath(); ctx.moveTo(-eyeDX - eyeR, eyeY); ctx.lineTo(-eyeDX + eyeR, eyeY);
+      ctx.moveTo(eyeDX - eyeR, eyeY); ctx.lineTo(eyeDX + eyeR, eyeY); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(-eyeDX, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(eyeDX, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#1a1a1a';
+      const pupilR = eyeR * 0.55;
+      ctx.beginPath(); ctx.arc(-eyeDX + eyeR * 0.2, eyeY + eyeR * 0.2, pupilR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(eyeDX + eyeR * 0.2, eyeY + eyeR * 0.2, pupilR, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// order 10, damit die Slimes wie bisher NACH der Graph-Runtime aus
+// voxeria-modding.js laufen. Ohne die Zahl entschiede die Anmeldereihenfolge,
+// und diese Datei laedt vor modding, der Ablauf waere also still vertauscht.
+//
+// Gegenueber frueher laufen sie zwei Anweisungen frueher im Frame, naemlich vor
+// updateSelectedBlockPopup() und updateDayNightCycle(). Beide sind reine
+// Zaehler, die kein Slime liest, das Verhalten ist also unveraendert.
+VxHooks.on('update', updateGoldSlimes, 10);
+VxHooks.on('drawCreatures', drawGoldSlimes);
+
+// =========================================================
+// ANMELDUNG BEI DER ENGINE
+// =========================================================
+// Bis hierher stand in voxeria-engine.js woertlich updatePocketDimension(),
+// drawDimForge(), checkPortal() und so weiter: die Engine kannte jedes
+// Feature dieser Datei beim Namen. Damit lief der Pfeil nach oben, in eine
+// Datei, die erst nach ihr geladen wird, und der Abhaengigkeitsgraph war ein
+// Ring statt eines Stapels (nachzaehlbar mit `node tools/check.js deps`).
+//
+// Jetzt meldet sich diese Datei selbst an. Die Engine macht nur noch benannte
+// Punkte auf und weiss nicht, wer daran haengt. Aufrufreihenfolge und
+// Aufrufzeitpunkt sind unveraendert, es ist dieselbe Stelle im Frame.
+//
+// Die Reihenfolge der on()-Aufrufe IST die Aufrufreihenfolge. Deshalb steht
+// drawErgStormWarning vor drawPocketCollapseOverlay: das Collapse-Kino lag
+// schon vorher darueber und muss oben bleiben.
+// Weltneustart: ein laufender Pocket-Run ist damit verloren, und alles, was
+// von ihm noch am Bildschirm haengt, muss weg, damit nichts in die frische
+// Welt leckt. Diese neun Zeilen standen bis eben in resetGameAndWorld() in
+// voxeria-engine.js.
+VxHooks.on('worldReset', function () {
+  pocketActive = false; pocketCollapsing = false; pocketMeteor = null;
+  pocketEntryInventory = null; pocketTimer = 0; pocketCollapseTimer = 0;
+  hidePocketTimer();
+  hideOceanOxygenBar();
+  playerOxygen = OXYGEN_MAX; playerDrowning = false;
+});
+// Zeitlauf-Regel der Gold-Dimension: rohes Gold ohne die Goldene Aegis
+// abzubauen destabilisiert die ganze Tasche sofort, ohne zweite Chance. Einen
+// Goldziegel aus dem Tempel zu schlagen zieht stattdessen Zeit vom
+// Einsturz-Timer ab, ein bewusstes "die Ruine lebt" Risiko, das die anderen
+// drei Pocket-Dimensionen nicht haben.
+VxHooks.on('blockMined', function (wx, wy, block) {
+  if (currentDim !== "GOLD" || !pocketActive || pocketCollapsing) return;
+  if (block === BLOCKS.GOLD_ORE && !equippedArmor.has('GOLD')) {
+    startPocketCollapse();
+  } else if (block === BLOCKS.GOLD_BRICK) {
+    pocketTimer = Math.max(0, pocketTimer - 900); // -15s
+    updatePocketTimerHud();
+    addJuiceText(wx*TILE+TILE/2, wy*TILE, '⏳ -15s!', '#ffcc33');
+  }
+});
+
+// Multiplayer ist verbunden: eigene Firebase-Stroeme aufmachen.
+VxHooks.on('multiplayerReady', subscribePocketRuns);
+
+// Der Spieler steht in einem Portalblock. Wohin es geht, weiss nur diese Datei.
+VxHooks.on('enterPortal', doTeleport);
+
+// Tod in einer Pocket-Dimension. Es fallen keine Blocke, weil die ganze Welt
+// gleich zerstoert wird: der Lauf endet einfach, die Beute dieses Laufs ist
+// verloren und der Spieler wird an die Oberflaeche zurueckgeworfen.
+//
+// Der Rueckgabewert ist die ganze Absprache. true heisst "ich habe das Sterben
+// uebernommen, misch dich nicht ein". Beim laufenden Einsturz-Kino ist das
+// ebenfalls true, aber ohne deathPending zu setzen, denn dort gehoert das Ende
+// schon jemand anderem und die Engine soll auch nichts nachholen.
+VxHooks.on('playerDeath', function (beansprucht) {
+  if (beansprucht || !pocketActive) return;
+  if (pocketCollapsing) return true;
+  deathPending = true;
+  VxHooks.run('gameEvent', 'onDeath', {});
+  spawnPlayerExplosion();
+  showNotification('💀 You died! Hurled back to the surface.');
+  setTimeout(() => { endPocketRun(true); deathPending = false; }, 1400);
+  return true;
+});
+
+// Fortschritt aus der Cloud holen. Die Verzoegerung ueber DOMContentLoaded
+// stand bis eben ganz oben in voxeria-engine.js, weil loadProgressFromCloud()
+// Zustand anfasst, der in DIESER Datei mit `let` deklariert wird und beim
+// Parsen der Engine noch in seiner temporalen Todeszone lag. Hier unten, hinter
+// allen Deklarationen, gibt es dieses Problem nicht mehr, aber der Aufruf muss
+// weiterhin warten, bis das Dokument steht.
+(function _bootStandaloneProgress() {
+  function run() { try { loadProgressFromCloud(); } catch (e) { console.error("loadProgressFromCloud error:", e); } }
+  if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', run);
+  else run();
+})();
+
+// Eigene Dimensionen erzeugen. Die Reihenfolge ist die alte: erst die
+// Pocket-Dimensionen, dann die Arena, denn die Arena ist keine eigene
+// Dimension, sondern eine leere Overworld im Arena-Modus, und wuerde sie
+// zuerst greifen, bekaeme eine Pocket-Dimension im Arena-Modus die falsche.
+//
+// Beide fuellen chunk direkt. decoratePocketChunk laeuft ueber localSetBlock
+// und muss deshalb warten, bis der Chunk registriert ist, deshalb reicht es
+// als decorate() zurueck statt selbst zu laufen. Die Arena braucht das nicht:
+// ihre Startplattform steckt schon in generateArenaChunk und MUSS generiert
+// sein, sonst landete sie nicht in worldEdits und waere nach dem Runden-Reset
+// weg.
+VxHooks.on('generateChunk', function (beansprucht, cx, chunk) {
+  if (beansprucht) return;
+  if (POCKET_DIMS.has(currentDim)) {
+    generatePocketChunk(cx, chunk);
+    return { decorate: decoratePocketChunk };
+  }
+  if (currentDim === 'OVERWORLD' && gameMode === 'arena') {
+    generateArenaChunk(cx, chunk);
+    return {};
+  }
+});
+
+VxHooks.on('updateLate', updatePocketDimension);
+VxHooks.on('updateLate', updateDimForge);
+VxHooks.on('drawWorld', drawDimForge);
+VxHooks.on('drawOverlay', drawErgStormWarning);
+VxHooks.on('drawOverlay', drawPocketCollapseOverlay);
+// Beide pruefen intern selbst, ob die Platzierung ueberhaupt etwas vollendet
+// hat, und beide sind auf ihre Dimension beschraenkt. Sie sehen deshalb jeden
+// gesetzten Block, genau wie vorher.
+VxHooks.on('blockPlaced', checkPortal);
+VxHooks.on('blockPlaced', checkArmorAltar);

@@ -29,9 +29,9 @@ const NON_ITEM_BLOCK_IDS = new Set([BLOCKS.AIR, BLOCKS.BEDROCK, BLOCKS.WATER, BL
 // =========================================================
 // CREATE-YOUR-OWN-MOD — visual block reskins + creature spawn toggles
 // =========================================================
-let blockReskin = {};
+blockReskin = {};
 try { blockReskin = JSON.parse(localStorage.getItem('voxeria_block_reskin') || '{}') || {}; } catch (e) { blockReskin = {}; }
-let creatureToggles = { butterfly: true };
+creatureToggles = { butterfly: true };
 try {
   const savedToggles = JSON.parse(localStorage.getItem('voxeria_creature_toggles') || 'null');
   // Only merge keys that still exist — an old save from before other
@@ -480,6 +480,16 @@ const BLOCK_PIECE_FIELDS = [
 // top of one of our silhouettes.
 const CREATURE_MOVES = ['patrol', 'jump', 'fly'];
 const CREATURE_BIOMES = ['any', 'FOREST', 'SNOW'];
+// How a creature fights, matched by name against CUSTOM_CREATURE_ATTACKS in
+// voxeria-engine.js. Kept separate from CREATURE_MOVES because locomotion and
+// aggression are independent: a flyer that charges and a walker that charges
+// are the same attack over different movement, and one combined list would
+// have needed an entry per combination.
+//
+// 'none' is not a wasted slot — it is the creature with health that never
+// fights back: a target dummy, a breakable egg, the crystal a defence mod
+// wants protected. APPEND ONLY, same wire-format rule as the lists above.
+const CREATURE_ATTACKS = ['none', 'touch', 'charge', 'leap', 'shoot'];
 
 // !! Same wire-format rule as MOD_FIELDS: append at the end only. !!
 const CREATURE_PIECE_FIELDS = [
@@ -954,14 +964,64 @@ const GRAPH_VAR_OPS = ['is exactly', 'is not', 'is more than', 'is less than', '
 // Every entry is a plain number with an obvious unit — hearts, not half-hearts;
 // a percentage, not a raw frame counter — because these get shown to players
 // through "Show a number" and compared against numbers they typed themselves.
+// The six entries after 'random 1-100' are the ones that let a mod see PAST
+// its own player. Everything above them describes the person holding the
+// keyboard; a minigame is by definition about somebody else being there too,
+// and without these the whole catalog could express "score points" but never
+// "score points for catching them".
+//
+// Deliberately added HERE rather than as new condition nodes: every value slot
+// in the catalog already accepts any entry in this list, so six table rows give
+// "If a number ..." , "Repeat while", "Set or change a number", "Show text or a
+// number" and every other slot the same reach at once. A node would have
+// reached one place.
+//
+// APPEND ONLY, never reorder or remove: a saved graph stores the source as its
+// STRING ('nearest player x'), not an index, so appending is safe for every
+// code ever shared — but a renamed entry would silently become an unknown
+// source and clean back to a fixed amount.
 const GRAPH_STATS = ['health', 'max health', 'depth', 'position x', 'time of day',
-                     'held count', 'blocks carried', 'creatures nearby', 'jumps left', 'random 1-100'];
+                     'held count', 'blocks carried', 'creatures nearby', 'jumps left', 'random 1-100',
+                     'players here', 'nearest player distance', 'nearest player x',
+                     'nearest player y', 'nearest player team', 'my team',
+                     // Die fünf letzten beziehen sich auf den Spieler, um den es
+                     // im gerade laufenden Spieler-Ereignis geht (beigetreten,
+                     // gegangen, Zone betreten, berührt). Ausserhalb eines
+                     // solchen Ereignisses lesen sie 0, genauso still
+                     // wirkungslos wie "Stop it from happening" ausserhalb
+                     // einer Vorher-Kette.
+                     //
+                     // Der Tag ist eine Zahl, keine Kennung: der Katalog kennt
+                     // ausschliesslich Zahlen, und eine Firebase-UID ist eine
+                     // Zeichenkette. graphPlayerTag streut sie deterministisch
+                     // auf 1..9999, sodass derselbe Spieler auf JEDEM Client
+                     // dieselbe Zahl bekommt, ohne dass irgendwer sie verteilen
+                     // muss. Damit lassen sich Spieler vergleichen und als
+                     // Listeneintrag merken, ohne dass je Text durch den
+                     // Katalog wandert.
+                     'event player tag', 'event player team', 'event player x',
+                     'event player y', 'event player distance'];
 const GRAPH_MATH_OPS = ['set to', 'add', 'subtract', 'multiply by', 'divide by', 'smallest of', 'largest of'];
+// What "Set or change a text" can do, and what "If a text is" can ask. Two
+// short lists rather than one shared with the number ops above: "multiply by"
+// means nothing to a text, and "is more than" would have to invent an
+// alphabetical order nobody asked for.
+//
+// 'join with' is the whole reason a text store is worth having: it is the one
+// operation that BUILDS a line the mod was not authored with. 'join with a
+// space' is there because the alternative is every mod writing a lone " " into
+// a second text first, which is a chore the dropdown can simply absorb.
+const GRAPH_TEXT_OPS = ['set to', 'join with', 'join with a space'];
+const GRAPH_TEXT_CMP_OPS = ['is', 'is not', 'contains', 'is empty'];
 // Dropdown lists for the blocks that replaced a row of near-identical ones.
 // Their values are switched on directly, the same way GRAPH_DIMS already was,
 // so each one doubles as the label the player reads.
 const GRAPH_BLOCK_VERBS  = ['touches', 'mines', 'places'];
 const GRAPH_PLAYER_VERBS = ['jumps', 'gets hurt', 'dies'];
+// The three moments a creature has, in the order a rule usually cares about
+// them. 'attacks' fires when a creature lands a hit on the player, not when it
+// merely swings, so a chain hanging off it can trust that damage happened.
+const GRAPH_CREATURE_VERBS = ['dies', 'is hurt', 'attacks'];
 const GRAPH_DAY_PHASES   = ['night falls', 'day breaks'];
 // "is the block involved" reads ctx.block — the same field the block-flavoured
 // events (onBlock) and now the inventory loop (forEachItem) already populate,
@@ -1015,8 +1075,71 @@ function graphSetAspectList(what) {
 const GRAPH_ARMOR_DIMS = typeof ARMOR_DIMS !== 'undefined'
   ? Array.from(ARMOR_DIMS)
   : ['GOLD', 'LAVA', 'OCEAN', 'VOID'];
-const GRAPH_MAX_NODES = 60;
-const GRAPH_MAX_WIRES = 90;
+// How many numbers one list may hold. Bounded for the same reason a saved
+// number is clamped to [-9999, 9999]: a mod is shared code from a stranger, and
+// "add to the end" inside a loop must have a ceiling it cannot walk past. 20 is
+// enough for the things lists are actually for here (a scoreboard, a spawn
+// table, a set of waypoints, a remembered inventory) while staying small enough
+// that a graph holding several of them cannot grow without limit.
+const GRAPH_MAX_LIST = 20;
+// Weiteste Reichweite, die eine "berührt mich"-Karte verlangen darf. Steht
+// HIER und nicht unten bei der Präsenz-Logik, weil NODE_CATALOG die Zahl als
+// Obergrenze seines Parameters braucht und weiter oben im Modul steht: eine
+// später deklarierte Konstante wäre beim Auswerten des Katalogs noch nicht
+// verfügbar und bräche das Laden der ganzen Datei.
+const GRAPH_TOUCH_MAX_RANGE = 8;
+// What "Change a list" can do. Closed like every other enum in this catalog, and
+// switched on directly by GRAPH_ACTIONS.changeList, so each entry doubles as the
+// label the player reads in the dropdown.
+const GRAPH_LIST_OPS = ['add to the end', 'set the item at', 'remove the item at',
+                        'remove the last', 'clear it'];
+// Was "Start or stop a countdown" kann, und was die Punktetafel zeigen kann.
+// Beide werden direkt darauf verglichen, jeder Eintrag ist also zugleich die
+// Beschriftung im Auswahlkasten.
+const GRAPH_TIMER_OPS = ['start', 'stop'];
+const GRAPH_BOARD_OPS = ['per player', 'per team', 'hide it'];
+// ── Panels: die eigene Anzeige eines Mods ────────────────────────────────
+// Alles, was ein Mod bisher zeigen konnte, war fluechtig (Banner 2,5 Sekunden,
+// schwebende Schrift) oder fest gebaut (die Arena-Punktetafel). Eine Zeile, die
+// STEHEN bleibt und sich fortschreibt -- "Welle 3", "Leben: 2", "noch 45s" --
+// war nicht sagbar, und genau das braucht jedes Minispiel.
+//
+// Bewusst KEINE freie Oberflaeche. Ein Panel ist ein Kasten in einer Ecke mit
+// einer Ueberschrift und bis zu sechs Zeilen, und ein Mod beschreibt nur, WAS
+// in Zeile 3 steht. Er schreibt nie Markup in die Seite, genau wie beim Dialog:
+// das ist die Bedingung dafuer, dass ein geteilter Mod von einem Fremden
+// harmlos bleibt. Gezeichnet wird deshalb ueber textContent, nicht innerHTML.
+const GRAPH_PANEL_CORNERS = ['top left', 'top right', 'bottom left', 'bottom right'];
+const GRAPH_PANEL_OPS = ['show', 'hide', 'clear'];
+// Begrenzt wie graphZones und aus demselben Grund: eine Regel, die jeden Frame
+// laeuft, darf den Bildschirm nicht unbegrenzt zupflastern koennen.
+const GRAPH_MAX_PANELS = 4;
+const GRAPH_MAX_PANEL_LINES = 6;
+const GRAPH_DIALOG_HOLD = ['hold me still', 'let me keep moving'];
+// Angehoben von 60 auf 150, nachdem gemessen wurde, was die alte Grenze
+// überhaupt geschützt hat. Das Ergebnis war: nicht die Ausführung.
+//
+//   Ausführung   ein Graph mit 400 Karten läuft genauso schnell wie einer mit
+//                60 (rund 6 ms im ungünstigsten Fall), weil GRAPH_MAX_STEPS
+//                die Arbeit deckelt und nicht die Kartenzahl. Der Scan über
+//                alle Karten aller Mods kostet bei 1200 Karten 0,0017 ms je
+//                Frame, also ein Hundertstel Prozent des Frame-Budgets.
+//   Teilen       war ein echter Einwand: 150 Karten wären 26,5 KB Code
+//                gewesen. Seit VXG2- komprimiert, sind es rund 4,4 KB und
+//                damit weniger als die Hälfte dessen, was 60 Karten vorher
+//                unkomprimiert kosteten.
+//   Darstellung  war der eigentliche Engpass: 234 ms, um 150 Karten
+//                aufzubauen. Seit das erzwungene Reflow in ngRender aufgelöst
+//                und die Icons gebacken sind, sind es rund 47 ms, ebenfalls
+//                weniger als die 100 ms, die 60 Karten vorher gekostet haben.
+//
+// Beide Kosten liegen bei 150 Karten also unter dem, was 60 Karten vor diesen
+// Änderungen verursacht haben. GRAPH_MAX_STEPS bleibt bei 2000 und unverändert:
+// es ist nachweislich das, was tatsächlich schützt.
+const GRAPH_MAX_NODES = 150;
+// Dasselbe Verhältnis wie vorher (Karten mal 1,5). Linien kosten keine eigene
+// Laufzeit, sie begrenzen nur, wie verzweigt ein Graph sein darf.
+const GRAPH_MAX_WIRES = 225;
 // A single "Repeat" node cannot ask for more than this many passes. The
 // runtime clamps to it (graphResolveInt below) and the editor's own number
 // field is built against the same constant, so the two can never disagree
@@ -1039,10 +1162,114 @@ const GRAPH_MAX_LOOP_ITERS = 200;
 const VALUE_FIXED = 'a fixed amount';
 const VALUE_VAR   = 'a saved number';
 const VALUE_NONE  = 'nothing';
+// The two list readings. Added as SOURCES rather than as their own condition
+// and action nodes for the reason spelled out on GRAPH_STATS above: every value
+// slot in the catalog already accepts any source, so two entries here give
+// "If a number ...", "Repeat while", "Set or change a number", "Show text or a
+// number" and every other slot the ability to read a list at once. Two nodes
+// would each have reached one place.
+//
+// They reuse the slot's existing { s, n, v } shape instead of widening it:
+// `v` carries the list name (the same field a saved number already uses for
+// its name) and, for VALUE_LIST, `n` carries the position. That is what keeps
+// every graph code ever shared readable by this build, since the stored shape
+// did not change at all.
+//
+// The position is therefore a literal, not itself a slot: reading "the item at
+// whatever POS currently says" is what the "For each item in a list" loop is
+// for, and nesting a slot inside a slot would have changed the stored shape for
+// every mod in existence to serve the rarer half of that pair.
+const VALUE_LIST     = 'an item in a list';
+const VALUE_LIST_LEN = 'how many in a list';
+// The position AT a position: reads a list at whatever a nested value slot
+// currently says, instead of the number the mod was authored with. This is
+// the one thing VALUE_LIST could not express - "$LISTE[$I]" rather than only
+// "$LISTE[3]" - and it is deliberately its own source rather than a fourth
+// field VALUE_LIST always carries, so every old graph keeps meaning exactly
+// what it always meant.
+//
+// Stored as { s, n, v, idx }: `v` is still the list name, `idx` is a full
+// nested value slot cleaned through graphCleanValue itself with
+// LIST_INDEX_SOURCES (see below), which excludes this very source. That is
+// what makes "the index is itself dynamic-by-a-dynamic-index" structurally
+// impossible rather than merely discouraged - the nested clean can never
+// produce this source, so graphResolveValue's own recursion into it is
+// bounded at exactly one level no matter what a hand-edited code claims.
+const VALUE_LIST_DYNAMIC = 'an item in a list, at a position I calculate';
+// Sekunden, die auf einem benannten Countdown noch stehen. Benutzt `v` als
+// Namen, genauso wie die Listenlänge es tut, und wird deshalb vor den
+// Messwert-Lesern behandelt: die bekommen keine Argumente und könnten den
+// Namen gar nicht sehen.
+const VALUE_COUNTDOWN = 'seconds left on a countdown';
 // The live readings are exactly GRAPH_STATS, resolved through the same
 // GRAPH_STAT_READERS table "Read a game value" already used, so a slot and a
 // read can never disagree about what "health" means.
-const VALUE_SOURCE_KEYS = [VALUE_FIXED, VALUE_VAR, ...GRAPH_STATS];
+// APPEND-ONLY applies to this list for the same reason it applies to
+// GRAPH_STATS: a slot stores its source as a STRING, so adding entries is safe
+// but renaming one would silently turn every mod using it into a fixed amount.
+const VALUE_SOURCE_KEYS = [VALUE_FIXED, VALUE_VAR, VALUE_LIST, VALUE_LIST_DYNAMIC, VALUE_LIST_LEN,
+                           VALUE_COUNTDOWN, ...GRAPH_STATS];
+// Everything VALUE_LIST_DYNAMIC's own `idx` may be, which is everything
+// EXCEPT itself. Filtered rather than hand-listed so a future source is
+// automatically available inside a dynamic index too, the same "add it once,
+// every slot gets it" property the rest of this catalog already has.
+const LIST_INDEX_SOURCES = VALUE_SOURCE_KEYS.filter(k => k !== VALUE_LIST_DYNAMIC);
+const LIST_INDEX_SPEC = { min: 1, max: GRAPH_MAX_LIST, dec: 0, def: 1, sources: LIST_INDEX_SOURCES };
+
+// ── Text slots ────────────────────────────────────────────────────────────
+// The text counterpart of the value slot above, deliberately built as its own
+// parallel type rather than a fourth source on the number slot. Two reasons,
+// and the second is the load-bearing one:
+//
+//   * every existing slot promises a NUMBER to whatever reads it (a count, a
+//     radius, a stat). A source that could hand back text would mean every one
+//     of those readers needs an answer for "what if this is a word", for the
+//     sake of the two places that actually want one.
+//   * the stored shape of every value slot in every mod code ever shared would
+//     have had to grow a field. Keeping text in its own {s, t, v} shape means
+//     not one byte of an existing code changes meaning.
+//
+// So the rule is: a number slot is still numbers only, and a text slot is
+// text only. They meet in exactly one place — "Show text or a number", which
+// has one of each and always did.
+const TEXT_FIXED = 'a fixed text';
+const TEXT_VAR   = 'a saved text';
+const TEXT_SOURCE_KEYS = [TEXT_FIXED, TEXT_VAR];
+// The longest a saved text may be, and the same 48 the banner field already
+// allowed when it was a fixed string. Sharing the number keeps "what I can
+// type into the box" and "what a mod can build up" the same size, so a joined
+// text can never be silently longer than one a player could have written.
+const GRAPH_MAX_TEXT = 48;
+
+// Mirrors graphCleanValue. Accepts a bare string as well as the {s, t, v}
+// shape: that is what carries every mod code written before text slots
+// existed, where showText.text and showDialog.title were plain strings. Such a
+// value lands on TEXT_FIXED holding exactly the words it always held, so an
+// old code shows the same banner it always did.
+function graphCleanTextValue(spec, raw) {
+  const allowed = spec.sources || TEXT_SOURCE_KEYS;
+  const max = spec.max || GRAPH_MAX_TEXT;
+  if (typeof raw === 'string' || typeof raw === 'number') {
+    return { s: TEXT_FIXED, t: _modCleanText(raw, max), v: 'TEXT' };
+  }
+  const o = (raw && typeof raw === 'object') ? raw : {};
+  const s = allowed.includes(o.s) ? o.s : (spec.defSrc || TEXT_FIXED);
+  const t = _modCleanText(o.t == null ? (spec.def || '') : o.t, max);
+  // Same normalisation varname uses, so #score, #Score and #SCORE are one
+  // text the way $SCORE is one number.
+  const v = String(o.v == null ? '' : o.v).toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16) || 'TEXT';
+  return { s, t, v };
+}
+
+// Mirrors graphResolveValue, returning '' where that one returns 0. There is
+// no "nothing" source here and so no null case: a text slot that is empty is
+// an empty text, which every reader can already show.
+function graphResolveText(val) {
+  if (typeof val === 'string') return _modCleanText(val, GRAPH_MAX_TEXT);
+  if (!val || typeof val !== 'object') return '';
+  if (val.s === TEXT_VAR) return graphGetText(val.v);
+  return typeof val.t === 'string' ? val.t : '';
+}
 
 function graphCleanValue(spec, raw) {
   const allowed = spec.sources || VALUE_SOURCE_KEYS;
@@ -1054,7 +1281,9 @@ function graphCleanValue(spec, raw) {
     ? Math.max(spec.min, Math.min(spec.max, Number(n0.toFixed(dec))))
     : spec.def;
   const v = String(o.v == null ? '' : o.v).toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16) || 'SCORE';
-  return { s, n, v };
+  const out = { s, n, v };
+  if (s === VALUE_LIST_DYNAMIC) out.idx = graphCleanValue(LIST_INDEX_SPEC, o.idx);
+  return out;
 }
 
 // Returns null only for the "nothing" source, so a caller can tell "no number
@@ -1064,6 +1293,13 @@ function graphResolveValue(val) {
   if (val.s === VALUE_NONE) return null;
   if (val.s === VALUE_FIXED) return val.n;
   if (val.s === VALUE_VAR) return graphGetVar(val.v);
+  // Both read through the helpers next to graphGetVar, so an unset list reads
+  // as "empty" (0 items, every position 0) exactly the way an unset number
+  // reads as 0 rather than blowing up on the first run.
+  if (val.s === VALUE_LIST) return graphGetListItem(val.v, val.n);
+  if (val.s === VALUE_LIST_DYNAMIC) return graphGetListItem(val.v, graphResolveValue(val.idx));
+  if (val.s === VALUE_LIST_LEN) return graphGetList(val.v).length;
+  if (val.s === VALUE_COUNTDOWN) return graphCountdownLeft(val.v);
   const fn = GRAPH_STAT_READERS[val.s];
   if (!fn) return val.n;
   try {
@@ -1109,9 +1345,101 @@ const NODE_CATALOG = {
   // you like instead of copy-pasting it, hand it one number in, and read one
   // number back out via "Return a value" — see callSignal for how the two
   // ends actually meet.
+  // Three receiving slots rather than one. A helper that could only be handed a
+  // single number was a function of one argument, which is what forced the
+  // "park the other values in globals first, then call" shape every non-trivial
+  // mod ended up writing. Each name is filled in only if the matching slot of
+  // the call actually passed something (see fireGraphEvent), so a call from
+  // before this existed still means exactly what it did: ARG is written, ARG2
+  // and ARG3 are left holding whatever they already held.
   onSignal:     { kind: 'event', label: 'When called by name',
                   params: [{ k: 'signal', kind: 'varname', def: 'HELPER' },
-                           { k: 'argVar', label: 'receiving', kind: 'varname', def: 'ARG' }] },
+                           { k: 'argVar',  label: 'receiving', kind: 'varname', def: 'ARG' },
+                           { k: 'argVar2', label: 'and',       kind: 'varname', def: 'ARG2' },
+                           { k: 'argVar3', label: 'and',       kind: 'varname', def: 'ARG3' }] },
+
+  // The listening half of "Announce something happened". Deliberately NOT a
+  // second spelling of "When called by name": the two differ in WHEN they run,
+  // which is the whole reason this pair exists.
+  //
+  //   Call by name  runs its chains immediately, nested inside the caller, and
+  //                 hands a value back. It is a question with an answer, and it
+  //                 is bounded by GRAPH_MAX_SIGNAL_DEPTH because each nested
+  //                 call sits on the stack of the one before it.
+  //   Announce      queues, and the listeners run on the next tick with the
+  //                 announcer already finished. Nothing is handed back, nothing
+  //                 nests, and a chain reaction (a wave announces, a listener
+  //                 announces the next wave) is a flat queue rather than a
+  //                 stack that runs out of depth after eight steps.
+  //
+  // That second shape is what lets a large mod be built as independent parts
+  // that never call each other directly, which is the thing neither the events
+  // the game fires nor "Call by name" could express.
+  onAnnounced:  { kind: 'event', label: 'When something is announced',
+                  params: [{ k: 'event', label: 'announcement', kind: 'varname', def: 'WAVE' },
+                           { k: 'valueVar', label: 'value into', kind: 'varname', def: 'INFO' }] },
+
+  // ── Mehrspieler: die vier Karten, die andere Spieler MELDEN ─────────────
+  // Bisher waren andere Spieler nur ablesbar ("nearest player distance"), also
+  // musste eine Regel selbst nachsehen und den Unterschied zum letzten Mal
+  // erraten. Diese vier melden sich von sich aus, und das ist der Unterschied
+  // zwischen "ich kann fragen, wie weit jemand weg ist" und "sag mir, wenn
+  // jemand kommt".
+  //
+  // Alle vier tragen denselben Kontext: welcher Spieler es war (als Zahl, siehe
+  // graphPlayerTag), wo er ist, in welcher Mannschaft und wie weit weg. Gelesen
+  // wird das über die fünf "event player"-Werte, die jeder Wert-Slot anbietet.
+  //
+  // Sie feuern LOKAL auf jedem Client, so wie jede andere Regel auch. Jeder
+  // sieht dieselben Präsenzdaten, also kommt jeder zum selben Schluss, ohne
+  // dass irgendetwas ausgehandelt werden müsste.
+  onPlayerJoin:  { kind: 'event', label: 'When another player arrives', params: [] },
+  onPlayerLeave: { kind: 'event', label: 'When another player leaves', params: [] },
+  // Die Zone wird von "Mark a zone here" gesetzt, nicht hier: eine Karte, auf
+  // der man Weltkoordinaten eintippen müsste, wäre im Spiel unbrauchbar.
+  onPlayerEnterZone: { kind: 'event', label: 'When a player enters a zone',
+                       params: [{ k: 'zone', label: 'zone', kind: 'varname', def: 'BASE' }] },
+  // Gegenstueck zu onPlayerEnterZone, ueber dieselbe Ein-/Austritts-Erkennung
+  // in graphSweepZones. Beide feuern jetzt auch fuer den lokalen Spieler
+  // selbst, nicht nur fuer andere -- vorher liess sich ein Zonen-Mod nie
+  // allein testen, und "Offline - solo test run" ist der haeufigste
+  // Arena-Testfall ueberhaupt.
+  onPlayerLeaveZone: { kind: 'event', label: 'When a player leaves a zone',
+                       params: [{ k: 'zone', label: 'zone', kind: 'varname', def: 'BASE' }] },
+  // Die Frage-Version der beiden Ereignisse oben: nicht "gerade betreten",
+  // sondern "steht gerade drin". Damit lassen sich Dinge bauen, die
+  // weiterlaufen, SOLANGE jemand in der Zone steht, statt nur einmal beim
+  // Betreten zu feuern -- ein Huegel, der jede Sekunde Punkte gibt, oder eine
+  // Zone ausserhalb der man Schaden nimmt. Fragt immer nach MIR, nicht nach
+  // irgendeinem Spieler: die anderen Zonen-Karten sagen von sich aus Bescheid,
+  // wenn jemand kommt oder geht, aber eine Bedingung braucht ein festes "wer".
+  ifInZone:      { kind: 'cond', label: 'If I am standing in a zone',
+                   params: [{ k: 'zone', label: 'zone', kind: 'varname', def: 'BASE' }] },
+  // Das Grundelement für Fangen, Infektion und alles, was mit Anfassen zu tun
+  // hat. Nähe statt Tastendruck, weil das Spiel keine Taste für "andere Spieler
+  // berühren" hat und ein neuer Eingriff in die Engine dafür zu teuer wäre.
+  // Feuert höchstens alle 1,5 Sekunden je Spieler, sonst löste Nebeneinanderstehen
+  // sie jeden Frame aus.
+  onPlayerTouch: { kind: 'event', label: 'When a player touches me',
+                   params: [{ k: 'range', label: 'within', kind: 'num',
+                              min: 1, max: GRAPH_TOUCH_MAX_RANGE, dec: 0, def: 2 }] },
+
+  // Feuert genau einmal, wenn der benannte Countdown null erreicht. Die Sekunden
+  // davor liest man über die Wert-Quelle "seconds left on a countdown", sodass
+  // eine Regel auch WÄHREND des Laufens etwas tun kann und nicht nur am Ende.
+  onCountdownEnd: { kind: 'event', label: 'When a countdown ends',
+                    params: [{ k: 'timer', label: 'countdown', kind: 'varname', def: 'ROUND' }] },
+
+  // Die Antwort auf einen Dialog. Getroffen wird ueber die AUFSCHRIFT des
+  // Knopfes, nicht ueber eine Nummer: so steht in der Regel dasselbe Wort, das
+  // der Spieler angeklickt hat, und ein umsortierter Dialog bricht nichts.
+  //
+  // Feuert nur LOKAL, also auf dem Bildschirm, auf dem geklickt wurde. Der
+  // Klick eines anderen Spielers erreicht diesen Client nicht: es gibt keinen
+  // Kanal dafuer. Wer das braucht, laesst die Regel nach dem Druck etwas tun,
+  // das ohnehin geteilt wird, etwa "Score points" oder eine Ankuendigung.
+  onButtonPress: { kind: 'event', label: 'When a dialog button is pressed',
+                   params: [{ k: 'button', label: 'button', kind: 'text', def: 'OK', max: 20 }] },
 
   // ── The three that fire BEFORE the game acts ──
   // Everything above reports something that already happened. These three run
@@ -1122,6 +1450,18 @@ const NODE_CATALOG = {
   //
   // They exist without touching voxeria-engine.js: installGraphHooks() below
   // wraps the engine's own takeDamage/breakSingleBlock/addToInventory.
+  // The creature half of onBlock/onPlayer: one event, one verb dropdown, three
+  // moments. Deliberately NOT split into three nodes, for the same reason
+  // "When the player ... a block" is one node — they differ by a verb.
+  //
+  // It matches on the verb only, not on WHICH creature: a wave-survival rule
+  // ("when a creature dies, score a point") wants every creature, and the
+  // catalog's creature picker has no "any" value to offer. The creature that
+  // triggered it still travels in the context, so an action hanging off this
+  // acts on the right one.
+  onCreature:   { kind: 'event', label: 'When a creature ...',
+                  params: [{ k: 'how', label: 'a creature', kind: 'enum', list: GRAPH_CREATURE_VERBS, def: 'dies' }] },
+
   onBeforeHurt: { kind: 'event', label: 'Before the player is hurt', params: [] },
   onBeforeMine: { kind: 'event', label: 'Before a block breaks',
                   params: [{ k: 'block', kind: 'block', def: 1 }] },
@@ -1160,6 +1500,19 @@ const NODE_CATALOG = {
   forEachItem: { kind: 'loop', label: 'For each item I\'m carrying',
                  params: [{ k: 'itemVar', label: 'item into', kind: 'varname', def: 'ITEM' },
                           { k: 'countVar', label: 'count into', kind: 'varname', def: 'COUNT' }] },
+  // The fourth loop, and the one that makes lists worth having: a value slot can
+  // read a list at a position it was authored with, but only this can walk a
+  // list whose length the mod does not know. Every "find the biggest", "add them
+  // up", "is this one already in there" shape needs that, and none of them are
+  // expressible with a fixed position.
+  //
+  // Bounded by GRAPH_MAX_LIST for free, since that is the most a list can hold.
+  // Each pass writes the value and its 1-based position into the two saved
+  // numbers named here, mirroring what forEachItem does with block and count.
+  forEachInList: { kind: 'loop', label: 'For each item in a list',
+                   params: [{ k: 'list', label: 'list', kind: 'varname', def: 'ITEMS' },
+                            { k: 'itemVar', label: 'value into', kind: 'varname', def: 'ITEM' },
+                            { k: 'indexVar', label: 'position into', kind: 'varname', def: 'POS' }] },
 
   // ── Conditions: two outputs, `yes` and `no` ──
   ifChance:       { kind: 'cond', label: 'Random chance',
@@ -1175,6 +1528,20 @@ const NODE_CATALOG = {
                                defSrc: VALUE_VAR },
                              { k: 'op', label: '', kind: 'enum', list: GRAPH_VAR_OPS, def: 'is at least' },
                              { k: 'b', label: '', kind: 'value', min: -9999, max: 9999, dec: 1, def: 1 }] },
+  // The text counterpart of "If a number ...", with a slot on both sides for
+  // the same reason that one has: comparing a saved text against a fixed one
+  // and comparing two saved texts against each other are the same question,
+  // and splitting them would be the duplication this catalog was collapsed to
+  // remove.
+  //
+  // 'is empty' looks at the left side alone and ignores the right, which is
+  // what lets a mod ask "has this been set yet" without inventing a separate
+  // block for it — the same way "Change a list" ignores its position for the
+  // operations that have no use for one.
+  ifTextIs:       { kind: 'cond', label: 'If a text ...',
+                    params: [{ k: 'a', label: 'if', kind: 'textvalue', def: '', defSrc: TEXT_VAR },
+                             { k: 'op', label: '', kind: 'enum', list: GRAPH_TEXT_CMP_OPS, def: 'is' },
+                             { k: 'b', label: '', kind: 'textvalue', def: '' }] },
   ifBlock:        { kind: 'cond', label: 'If the player ... a block',
                     params: [{ k: 'how', label: 'the player', kind: 'enum', list: GRAPH_BLOCK_RELS, def: 'is holding' },
                              { k: 'block', label: 'the block', kind: 'block', def: 1 },
@@ -1219,7 +1586,12 @@ const NODE_CATALOG = {
   // was impossible before, because "Show a number" could only ever do a banner.
   showText:      { kind: 'action', label: 'Show text or a number',
                    params: [{ k: 'where', label: 'show', kind: 'enum', list: GRAPH_TEXT_WHERE, def: 'as a banner' },
-                            { k: 'text', label: 'text', kind: 'text', max: 48, def: 'Hello!' },
+                            // A text SLOT rather than a typed-in string, which is
+                            // what finally lets a banner show a line the mod built
+                            // itself. An old code carrying a bare string here still
+                            // decodes to exactly that string — see
+                            // graphCleanTextValue.
+                            { k: 'text', label: 'text', kind: 'textvalue', max: 48, def: 'Hello!' },
                             { k: 'number', label: 'and', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0,
                               defSrc: VALUE_NONE, sources: [VALUE_NONE, ...VALUE_SOURCE_KEYS] },
                             { k: 'color', label: 'colour', kind: 'enum', list: GRAPH_COLOR_KEYS, def: 'gold' }] },
@@ -1265,6 +1637,21 @@ const NODE_CATALOG = {
                             { k: 'rarity', label: 'how common', kind: 'value', min: 1, max: 8, dec: 0, def: 4 },
                             { k: 'biome', label: 'lives in', kind: 'enum', list: CREATURE_BIOMES, def: 'any' },
                             { k: 'traits', label: 'traits', kind: 'enum', list: ['none', 'glows', 'trail', 'both'], def: 'none' }] },
+  // The switch that turns a painting into an enemy. Separate from "Set up my
+  // creature" above rather than six more parameters on it, because these four
+  // answer a different question: that one is what the creature IS, this is
+  // what it does to you and what you can do to it. A mod that only wants a
+  // faster butterfly should not have to scroll past a damage slider.
+  //
+  // health 0 puts it back to ambient, which is what every creature starts as.
+  // That direction matters as much as the other: a mod must be able to
+  // DISARM a creature it made dangerous, or the setting is a one-way door.
+  setCreatureCombat: { kind: 'action', label: 'Set up my creature\'s fight',
+                   params: [{ k: 'creature', label: 'creature', kind: 'creature', def: 0 },
+                            { k: 'health', label: 'health', kind: 'value', min: 0, max: 40, dec: 0, def: 6 },
+                            { k: 'damage', label: 'hits for', kind: 'value', min: 1, max: 12, dec: 0, def: 2 },
+                            { k: 'attack', label: 'attacks by', kind: 'enum', list: CREATURE_ATTACKS, def: 'charge' },
+                            { k: 'aggro', label: 'notices within', kind: 'value', min: 0, max: 24, dec: 0, def: 8 }] },
   // `power` is the spread the particle engine always supported and this block
   // used to throw away by hard-coding it, and `at` lets a burst happen on the
   // block that triggered the chain instead of always on the player. Same engine
@@ -1291,6 +1678,34 @@ const NODE_CATALOG = {
                    params: [{ k: 'name', label: 'number', kind: 'varname', def: 'SCORE' },
                             { k: 'op', label: '', kind: 'enum', list: GRAPH_MATH_OPS, def: 'set to' },
                             { k: 'to', label: '', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0 }] },
+  // The text counterpart of the block above, same three-part shape: a name, an
+  // operation, and a slot that may be a fixed text or another saved text.
+  //
+  // What this adds that nothing else could: a mod can now hold a WORD it did
+  // not know when it was built and put it back together with others. Every
+  // text in the system before this was typed into a box at build time and
+  // could only ever be shown exactly as typed.
+  changeText:    { kind: 'action', label: 'Set or change a text',
+                   params: [{ k: 'name', label: 'text', kind: 'varname', def: 'LINE' },
+                            { k: 'op', label: '', kind: 'enum', list: GRAPH_TEXT_OPS, def: 'set to' },
+                            { k: 'to', label: '', kind: 'textvalue', def: 'Hello' }] },
+  // The write half of the two list sources on every value slot. One node for all
+  // five operations, the same way changeVar is one node for all seven maths
+  // operations: they are one thing (this list changes) split by which change,
+  // and a node per operation is exactly the duplication this catalog was
+  // collapsed to remove.
+  //
+  // A list is what a mod could not express at all before, whatever it wired:
+  // "remember the five best scores", "hold the spawn table", "queue up the
+  // waypoints". Saved numbers could count things, never keep a collection of
+  // them. `position` is ignored by the operations that have no use for it
+  // (adding to the end, clearing), which is why it sits last.
+  changeList:    { kind: 'action', label: 'Change a list',
+                   params: [{ k: 'list', label: 'list', kind: 'varname', def: 'ITEMS' },
+                            { k: 'how', label: '', kind: 'enum', list: GRAPH_LIST_OPS, def: 'add to the end' },
+                            { k: 'value', label: 'value', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0 },
+                            { k: 'position', label: 'at position', kind: 'value',
+                              min: 1, max: GRAPH_MAX_LIST, dec: 0, def: 1 }] },
   // Timing. Everything here fired in a single tick, so a chain could not say
   // "then, a moment later, ...". graphRunChain parks the rest of the chain in
   // graphPending and updateGraphRuntime resumes it, which keeps the step budget
@@ -1341,9 +1756,17 @@ const NODE_CATALOG = {
   // used to), and `result` is written only if the called chain actually used
   // "Return a value" — a HELPER that never returns anything simply leaves
   // `result` untouched rather than zeroing it out.
+  //
+  // All three passing slots default to "nothing", so a call code shared before
+  // the second and third existed decodes to a call that passes exactly what it
+  // always did.
   callSignal:    { kind: 'action', label: 'Call by name',
                    params: [{ k: 'signal', kind: 'varname', def: 'HELPER' },
                             { k: 'arg', label: 'passing', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0,
+                              defSrc: VALUE_NONE, sources: [VALUE_NONE, ...VALUE_SOURCE_KEYS] },
+                            { k: 'arg2', label: 'and', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0,
+                              defSrc: VALUE_NONE, sources: [VALUE_NONE, ...VALUE_SOURCE_KEYS] },
+                            { k: 'arg3', label: 'and', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0,
                               defSrc: VALUE_NONE, sources: [VALUE_NONE, ...VALUE_SOURCE_KEYS] },
                             { k: 'result', label: 'result into', kind: 'varname', def: 'RESULT' }] },
   // The other half of `argVar` on "When called by name": inside a called
@@ -1352,6 +1775,104 @@ const NODE_CATALOG = {
   // a call — dropped into an ordinary chain by mistake — it writes into a ctx
   // nothing ever reads back, the same quietly-inert shape preventIt and
   // setEventAmount already have outside a "Before …" chain.
+  // The firing half of "When something is announced". See that node for why
+  // this is not "Call by name" with different words. `value` may be "nothing",
+  // which is the common case: most announcements are the fact that they
+  // happened, not a number.
+  // Legt die Zone um die Stelle, an der die Kette gerade wirkt: bei einem
+  // Block-Ereignis um diesen Block, sonst um den Spieler selbst. Genau das
+  // Verhalten, das "Fill a box with" schon hat, und der Grund, warum hier
+  // niemand Weltkoordinaten eintippen muss. Man stellt sich hin, wo die Zone
+  // sein soll, und lässt die Regel laufen.
+  markZone:      { kind: 'action', label: 'Mark a zone here',
+                   params: [{ k: 'zone', label: 'zone', kind: 'varname', def: 'BASE' },
+                            { k: 'w', label: 'width', kind: 'value', min: 1, max: 64, dec: 0, def: 8 },
+                            { k: 'h', label: 'height', kind: 'value', min: 1, max: 64, dec: 0, def: 8 }] },
+  // Fuer Respawns und Checkpoints: ein fester Punkt liesse jeden Respawn an
+  // derselben Stelle enden (leicht campbar) und eine Rennstrecke bruachte
+  // sonst eine eigene Zone pro Startplatz. Sucht wie "Move the player" den
+  // naechsten freien Platz, statt jemanden in eine Wand zu setzen.
+  teleportToZone: { kind: 'action', label: 'Move to a random point in a zone',
+                    params: [{ k: 'zone', label: 'zone', kind: 'varname', def: 'BASE' }] },
+  // Eine Karte für Starten und Abbrechen statt zweier, aus demselben Grund, aus
+  // dem "Set or change a number" alle sieben Rechenarten trägt: es ist eine
+  // Sache mit einem Schalter, nicht zwei Sachen.
+  setCountdown:  { kind: 'action', label: 'Start or stop a countdown',
+                   params: [{ k: 'how', label: '', kind: 'enum', list: GRAPH_TIMER_OPS, def: 'start' },
+                            { k: 'timer', label: 'countdown', kind: 'varname', def: 'ROUND' },
+                            { k: 'seconds', label: 'for', kind: 'value',
+                              min: 1, max: 600, dec: 0, def: 30 }] },
+  // Zeigt die Rangliste, die die Arena ohnehin schon zwischen allen Spielern
+  // abgleicht. Deshalb steht hier KEIN eigener Abgleich: die Punkte kommen aus
+  // "Score points", und diese Karte ist reine Anzeige. Ausserhalb eines Matches
+  // ist sie still wirkungslos, genau wie "Score points" und "End the round now".
+  // Stellt eine Frage und wartet auf die Antwort. Ein leer gelassener Knopf
+  // wird nicht gezeigt, ein Dialog kann also einen bis drei haben.
+  //
+  // `freeze` ist eine Auswahl und keine feste Regel: eine Frage mitten im
+  // Kampf soll den Spieler festhalten, ein Hinweis am Rand aber nicht.
+  showDialog:    { kind: 'action', label: 'Ask with buttons',
+                   // Nur die FRAGE ist ein Textschlitz, die Knopfbeschriftungen
+                   // bleiben fest. "When a dialog button is pressed" trifft einen
+                   // Knopf über seine wörtliche Aufschrift; wäre die berechenbar,
+                   // könnte ein Knopf etwas anderes zeigen als das, worauf das
+                   // Ereignis wartet, und der Dialog liefe ins Leere.
+                   params: [{ k: 'title', label: 'question', kind: 'textvalue', def: 'Which one?', max: 60 },
+                            { k: 'b1', label: 'button 1', kind: 'text', def: 'OK', max: 20 },
+                            { k: 'b2', label: 'button 2', kind: 'text', def: '', max: 20 },
+                            { k: 'b3', label: 'button 3', kind: 'text', def: '', max: 20 },
+                            { k: 'freeze', label: '', kind: 'enum', list: GRAPH_DIALOG_HOLD, def: 'hold me still' },
+                            // Leer gelassen heisst "kein Eingabefeld", genau wie ein
+                            // leer gelassener Knopf nicht gezeigt wird. Steht ein Name
+                            // drin, erscheint ein Feld, und was der Spieler tippt, liegt
+                            // beim Knopfdruck als gespeicherter TEXT unter diesem Namen.
+                            //
+                            // Ans ENDE gehaengt, obwohl es direkt unter die Frage
+                            // gehoerte: die Reihenfolge hier ist zugleich die Reihenfolge
+                            // der Stellungsargumente im Terminal, und ein Einschub in der
+                            // Mitte haette jedes bereits geteilte `Show-Dialog`-Skript
+                            // um eine Stelle verrutschen lassen.
+                            { k: 'into', label: 'answer into', kind: 'varname', def: '',
+                              placeholder: 'leave empty for no typing field' }] },
+  // Die eigene Anzeige eines Mods. Zwei Karten statt einer, obwohl der Katalog
+  // sonst zusammenlegt: die beiden beantworten verschiedene Fragen. Diese sagt,
+  // WO der Kasten haengt und wie er heisst, die naechste, WAS drinsteht. Auf
+  // einer Karte waeren es acht Felder, von denen je nach Auswahl die Haelfte
+  // wirkungslos ist, und das ist genau der Zuschnitt, den ein Anfaenger nicht
+  // mehr auf einen Blick liest.
+  //
+  // "clear" leert die Zeilen und laesst den Kasten stehen, "hide" nimmt ihn weg
+  // und behaelt die Zeilen. Beides wird gebraucht: das eine zwischen zwei
+  // Runden, das andere fuer eine Anzeige, die nur zeitweise auftaucht.
+  setPanel:      { kind: 'action', label: 'Show or hide a panel',
+                   params: [{ k: 'panel', label: 'panel', kind: 'varname', def: 'INFO' },
+                            { k: 'how', label: '', kind: 'enum', list: GRAPH_PANEL_OPS, def: 'show' },
+                            { k: 'where', label: 'in the', kind: 'enum', list: GRAPH_PANEL_CORNERS,
+                              def: 'top left' },
+                            { k: 'title', label: 'titled', kind: 'textvalue', def: 'Info', max: 24 }] },
+  // Legt das Panel beim ersten Schreiben selbst an, so wie graphGetList eine
+  // Liste anlegt. Wer nur eine Zeile zeigen will, braucht die Karte darueber
+  // also gar nicht.
+  //
+  // Text UND Zahl, dieselbe Paarung wie bei "Show text or a number", und aus
+  // demselben Grund: "Leben:" und der Wert daneben ist der Normalfall einer
+  // stehenden Anzeige, und ihn ueber zwei Karten zusammensetzen zu muessen
+  // waere die Umstaendlichkeit, die diese Karte gerade abschafft.
+  panelLine:     { kind: 'action', label: 'Write a line on a panel',
+                   params: [{ k: 'panel', label: 'panel', kind: 'varname', def: 'INFO' },
+                            { k: 'line', label: 'line', kind: 'num',
+                              min: 1, max: GRAPH_MAX_PANEL_LINES, dec: 0, def: 1 },
+                            { k: 'text', label: 'text', kind: 'textvalue', def: 'Score:' },
+                            { k: 'number', label: 'and', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0,
+                              defSrc: VALUE_NONE, sources: [VALUE_NONE, ...VALUE_SOURCE_KEYS] },
+                            { k: 'color', label: 'colour', kind: 'enum', list: GRAPH_COLOR_KEYS, def: 'white' }] },
+  showBoard:     { kind: 'action', label: 'Show the scoreboard',
+                   params: [{ k: 'how', label: '', kind: 'enum', list: GRAPH_BOARD_OPS, def: 'per player' },
+                            { k: 'title', label: 'titled', kind: 'text', def: 'Scores', max: 24 }] },
+  announce:      { kind: 'action', label: 'Announce something happened',
+                   params: [{ k: 'event', label: 'announcement', kind: 'varname', def: 'WAVE' },
+                            { k: 'value', label: 'with', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0,
+                              defSrc: VALUE_NONE, sources: [VALUE_NONE, ...VALUE_SOURCE_KEYS] }] },
   returnValue:   { kind: 'action', label: 'Return a value',
                    params: [{ k: 'value', label: 'return', kind: 'value', min: -9999, max: 9999, dec: 1, def: 0 }] },
 
@@ -1375,10 +1896,30 @@ const NODE_CATALOG = {
   ifScoreAtLeast: { kind: 'cond', label: 'If my score is at least',
                     params: [{ k: 'points', label: 'points', kind: 'value', min: 1, max: 999, dec: 0, def: 10 }] },
   ifLeading:    { kind: 'cond', label: 'If I am in the lead', params: [] },
+  // Dieselben zwei Fragen wie oben, nur ueber die Mannschaftssumme statt den
+  // eigenen Punktestand -- fuer 2-gegen-2 und Team-vs-Team statt nur
+  // Einzelrennen. Kein neuer Punktezaehler: die Summe kommt direkt aus den
+  // Einzelpunkten, die "Score points" ohnehin schon synchron haelt (siehe
+  // VxArena.teamScore).
+  ifTeamScoreAtLeast: { kind: 'cond', label: "If my team's score is at least",
+                        params: [{ k: 'points', label: 'points', kind: 'value', min: 1, max: 999, dec: 0, def: 10 }] },
+  ifTeamLeading: { kind: 'cond', label: 'If my team is in the lead', params: [] },
 
   addScore:     { kind: 'action', label: 'Score points',
                   params: [{ k: 'points', label: 'points', kind: 'value', min: -99, max: 99, dec: 0, def: 1 }] },
-  endRound:     { kind: 'action', label: 'End the round now', params: [] }
+  endRound:     { kind: 'action', label: 'End the round now', params: [] },
+  // The write half of the 'my team' / 'nearest player team' readings. There is
+  // deliberately no matching "if same team" condition: with both sides
+  // readable as live values, "If a number ..." already says it
+  // (my team is exactly nearest player team), and a node that only restates
+  // what a slot can express is the exact duplication this catalog was
+  // collapsed to avoid.
+  //
+  // 0 is "no team" and is what everyone starts on, so a mod that never calls
+  // this leaves every comparison sitting at 0 = 0 rather than at some
+  // arbitrary default that would read as a real side.
+  setTeam:      { kind: 'action', label: 'Join a team',
+                  params: [{ k: 'team', label: 'team', kind: 'value', min: 0, max: 8, dec: 0, def: 1 }] }
 };
 
 // Every node type that existed before the catalog was collapsed, and which
@@ -1471,12 +2012,16 @@ const ACTION_GROUPS = [
   // First on purpose: a loop is the one thing nothing else in this catalog
   // can substitute for, so it should be the first thing a player scanning the
   // rail sees, not something they stumble onto near the bottom.
-  { label: 'Loops', types: ['repeatTimes', 'repeatWhile', 'forEachItem'] },
+  { label: 'Loops', types: ['repeatTimes', 'repeatWhile', 'forEachItem', 'forEachInList'] },
   { label: 'Player', types: ['changeHealth', 'setStat', 'movePlayer'] },
   { label: 'Inventory', types: ['changeItems', 'changeInvolvedItem'] },
-  { label: 'World editing', types: ['fillArea', 'setWorld'] },
-  { label: 'Spawning & effects', types: ['spawnCreature', 'setCreatureBehavior', 'showText', 'emitParticles', 'shake', 'playSound'] },
-  { label: 'Numbers, timing & reuse', types: ['changeVar', 'wait', 'callSignal', 'returnValue'] },
+  { label: 'World editing', types: ['fillArea', 'setWorld', 'markZone', 'teleportToZone'] },
+  { label: 'Spawning & effects', types: ['spawnCreature', 'setCreatureBehavior', 'setCreatureCombat', 'emitParticles', 'shake', 'playSound'] },
+  // Eigenes Buendel, weil das die Frage "wie sage ich dem Spieler etwas?" ist
+  // und nicht "was passiert in der Welt?". Vorher lagen die beiden Anzeige-
+  // Karten zwischen Kreaturen und Partikeln, wo sie niemand sucht.
+  { label: 'On-screen display', types: ['showText', 'showDialog', 'setPanel', 'panelLine'] },
+  { label: 'Numbers, text, lists, timing & reuse', types: ['changeVar', 'changeText', 'changeList', 'wait', 'callSignal', 'returnValue', 'announce'] },
   // Its own cluster rather than folded into the groups above: these are the
   // ones that change how the game itself behaves, and a player scanning the
   // rail should be able to see that line.
@@ -1485,7 +2030,7 @@ const ACTION_GROUPS = [
   // only mean anything inside an Arena match, and a player scanning the rail
   // should see that boundary rather than find "Score points" filed under
   // Inventory and wonder why it does nothing in their Exploration world.
-  { label: 'Arena matches', types: ['addScore', 'endRound'] }
+  { label: 'Arena matches', types: ['addScore', 'endRound', 'setTeam', 'setCountdown', 'showBoard'] }
 ];
 (function checkActionGroupsComplete() {
   const grouped = new Set(ACTION_GROUPS.flatMap(g => g.types));
@@ -1523,6 +2068,9 @@ function graphCleanParam(spec, raw, params) {
   }
   if (spec.kind === 'value') {
     return graphCleanValue(graphSpecRange(spec, params), raw);
+  }
+  if (spec.kind === 'textvalue') {
+    return graphCleanTextValue(spec, raw);
   }
   if (spec.kind === 'block') {
     const b = parseInt(raw, 10);
@@ -1576,9 +2124,16 @@ function graphDefaultParams(type) {
   // Built in spec order and fed back in, so a dependent spec sees the value its
   // controlling sibling just got rather than an empty object.
   for (const spec of NODE_CATALOG[type].params) {
-    out[spec.k] = spec.kind === 'value'
+    // Both slot kinds are built from `undefined` rather than from spec.def, so
+    // the slot lands on the source the spec asks for (defSrc) with spec.def as
+    // its contents. Handing the raw default in would take the "this is a plain
+    // value from an old code" path in both cleaners and pin the source to
+    // fixed, which is wrong for a spec that means to start on a saved one.
+    out[spec.k] = (spec.kind === 'value')
       ? graphCleanValue(graphSpecRange(spec, out), undefined)
-      : graphCleanParam(spec, spec.def, out);
+      : (spec.kind === 'textvalue')
+        ? graphCleanTextValue(spec, undefined)
+        : graphCleanParam(spec, spec.def, out);
   }
   return out;
 }
@@ -1590,13 +2145,139 @@ function graphCleanNodeParams(type, params) {
   return out;
 }
 
-// ── Graph code: VXG1-<base64url JSON> ────────────────────────────────────
+// ── LZSS, the compressor behind VXG2- ────────────────────────────────────
+// A graph payload is JSON and therefore extremely repetitive: the same
+// parameter keys and the same source names ("a fixed amount" and friends) are
+// spelled out again in every single value slot. Compressing it shrinks a
+// shared code by about 84%.
+//
+// WHY A HAND-ROLLED LZSS AND NOT CompressionStream: that API is asynchronous,
+// and encodeGraphCode/decodeGraphCode are called synchronously from a dozen
+// places (saving a mod, showing a share code, registering pieces at world
+// load, the terminal's own `mod code`). Making them async would ripple through
+// all of it. This is the compression that fits the call sites we have.
+//
+// WHY NO DICTIONARY: a dictionary keyed off the catalog would have to change
+// whenever the catalog does, and every code shared before that change would
+// decode into something else. Back-references travel inside the stream, so a
+// VXG2 code carries everything needed to read it and can never rot.
+//
+// The 16 bits of a reference token are split 11 for distance and 5 for
+// length, which measured better on real payloads than the usual 12/4: the
+// repeated runs here are long (a whole value slot is ~36 characters), so
+// reach past 35 characters buys more than a wider window does.
+const LZ_DIST_BITS = 11;
+const LZ_LEN_BITS  = 16 - LZ_DIST_BITS;
+const LZ_WINDOW    = 1 << LZ_DIST_BITS;          // 2048
+const LZ_MIN_MATCH = 4;                          // below this a token costs more than it saves
+const LZ_MAX_MATCH = (1 << LZ_LEN_BITS) - 1 + LZ_MIN_MATCH;   // 35
+// Hard ceiling on what a decode may produce. A corrupt or hand-edited code
+// could otherwise describe a few hundred bytes that expand without bound;
+// this is the same "a pasted code can never hurt you" rule the rest of the
+// mod pipeline follows.
+const LZ_MAX_OUTPUT = 4 * 1024 * 1024;
+
+function _lzCompress(bytes) {
+  const out = [];
+  let flagPos = -1, flagBit = 0;
+  // Hash chain over 3-byte keys. Without it the match search is quadratic and
+  // a large graph takes noticeably long to encode.
+  const head = new Map();
+  const remember = (pos) => {
+    if (pos + 2 >= bytes.length) return;
+    const key = bytes[pos] << 16 | bytes[pos + 1] << 8 | bytes[pos + 2];
+    let ch = head.get(key);
+    if (!ch) { ch = []; head.set(key, ch); }
+    ch.push(pos);
+    if (ch.length > 32) ch.shift();   // bounded, so encoding stays linear
+  };
+  let i = 0;
+  while (i < bytes.length) {
+    if (flagBit === 0) { flagPos = out.length; out.push(0); }
+    let bestLen = 0, bestDist = 0;
+    if (i + 2 < bytes.length) {
+      const key = bytes[i] << 16 | bytes[i + 1] << 8 | bytes[i + 2];
+      const chain = head.get(key);
+      // Newest first: a nearer match encodes the same but keeps the window useful.
+      if (chain) for (let c = chain.length - 1; c >= 0; c--) {
+        const cand = chain[c], dist = i - cand;
+        if (dist <= 0 || dist > LZ_WINDOW) continue;
+        let len = 0;
+        while (len < LZ_MAX_MATCH && i + len < bytes.length && bytes[cand + len] === bytes[i + len]) len++;
+        if (len > bestLen) { bestLen = len; bestDist = dist; if (len === LZ_MAX_MATCH) break; }
+      }
+    }
+    if (bestLen >= LZ_MIN_MATCH) {
+      out[flagPos] |= (1 << flagBit);
+      const code = ((bestDist - 1) << LZ_LEN_BITS) | (bestLen - LZ_MIN_MATCH);
+      out.push((code >> 8) & 0xff, code & 0xff);
+      for (let k = 0; k < bestLen; k++) remember(i + k);
+      i += bestLen;
+    } else {
+      out.push(bytes[i]);
+      remember(i);
+      i++;
+    }
+    flagBit = (flagBit + 1) & 7;
+  }
+  return out;
+}
+
+function _lzDecompress(bytes) {
+  const res = [];
+  let p = 0;
+  while (p < bytes.length) {
+    const flags = bytes[p++];
+    for (let b = 0; b < 8 && p < bytes.length; b++) {
+      if (res.length > LZ_MAX_OUTPUT) throw new Error('compressed graph expands too far');
+      if (flags & (1 << b)) {
+        if (p + 1 >= bytes.length) return res;
+        const code = (bytes[p] << 8) | bytes[p + 1]; p += 2;
+        const dist = (code >> LZ_LEN_BITS) + 1;
+        const len = (code & ((1 << LZ_LEN_BITS) - 1)) + LZ_MIN_MATCH;
+        const start = res.length - dist;
+        // A distance pointing before the start is a corrupt code, not a
+        // readable one: refused rather than silently filled with rubbish.
+        if (start < 0) throw new Error('compressed graph refers outside itself');
+        for (let k = 0; k < len; k++) res.push(res[start + k]);
+      } else {
+        res.push(bytes[p++]);
+      }
+    }
+  }
+  return res;
+}
+
+// Byte array to and from the binary string btoa/atob work in. Chunked because
+// String.fromCharCode.apply on a 30k array overflows the call stack.
+function _lzBytesToBinary(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    s += String.fromCharCode.apply(null, bytes.slice(i, i + 8192));
+  }
+  return s;
+}
+function _lzBinaryToBytes(str) {
+  const out = new Array(str.length);
+  for (let i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0xff;
+  return out;
+}
+
+// ── Graph code: VXG2-<base64url LZSS JSON>, VXG1- still read ─────────────
 // JSON rather than the bit-packing the other formats use: a graph has no
 // fixed field list to pack against — the node count, their types and their
 // wiring all vary per mod — so a positional bit layout would have nothing
 // stable to describe.
+//
+// VXG1- is the same JSON without the compression step. It is still decoded,
+// and always will be: every rule code shared before this existed is a VXG1.
+// Nothing writes one any more, which is why the constant below is only ever
+// read.
 const GRAPH_PREFIX = 'VXG1-';
-function isGraphCode(s) { return typeof s === 'string' && s.startsWith(GRAPH_PREFIX); }
+const GRAPH_PREFIX_C = 'VXG2-';
+function isGraphCode(s) {
+  return typeof s === 'string' && (s.startsWith(GRAPH_PREFIX_C) || s.startsWith(GRAPH_PREFIX));
+}
 
 function encodeGraphCode(graph) {
   const payload = {
@@ -1608,14 +2289,27 @@ function encodeGraphCode(graph) {
     w: graph.wires.slice(0, GRAPH_MAX_WIRES).map(wr => [wr.from, wr.fromPort, wr.to])
   };
   const json = JSON.stringify(payload);
-  return GRAPH_PREFIX + _pieceB64url(unescape(encodeURIComponent(json)));
+  const raw = unescape(encodeURIComponent(json));
+  try {
+    return GRAPH_PREFIX_C + _pieceB64url(_lzBytesToBinary(_lzCompress(_lzBinaryToBytes(raw))));
+  } catch (e) {
+    // A code that cannot be compressed is still worth having: fall back to the
+    // uncompressed form rather than handing back nothing.
+    console.warn('Voxeria: graph code could not be compressed, writing it plain.', e);
+    return GRAPH_PREFIX + _pieceB64url(raw);
+  }
 }
 
 function decodeGraphCode(s) {
   if (!isGraphCode(s)) return null;
   let data;
   try {
-    data = JSON.parse(decodeURIComponent(escape(_pieceB64urlDecode(String(s).slice(GRAPH_PREFIX.length).trim()))));
+    const str = String(s).trim();
+    const compressed = str.startsWith(GRAPH_PREFIX_C);
+    const body = str.slice((compressed ? GRAPH_PREFIX_C : GRAPH_PREFIX).length).trim();
+    let raw = _pieceB64urlDecode(body);
+    if (compressed) raw = _lzBytesToBinary(_lzDecompress(_lzBinaryToBytes(raw)));
+    data = JSON.parse(decodeURIComponent(escape(raw)));
   } catch (e) {
     console.warn('Voxeria: graph code is not readable.', e);
     return null;
@@ -1772,7 +2466,20 @@ window.VxPieces = (function () {
   function save(kind, code, name) {
     const all = readIndex();
     const localId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    all.push({ localId, kind, code, name, createdAt: Date.now(), enabled: true });
+    // Ein MOD startet ausgeschaltet, ein gemalter Block oder eine Kreatur nicht.
+    //
+    // Der Unterschied ist Absicht: ein Block ist ein Gegenstand, den man haben
+    // will, sobald man ihn gemalt hat. Ein Mod ist eine REGEL, die in die Welt
+    // eingreift, und die eingeschaltete Bibliothek gilt fuer jede Welt. Ein in
+    // Welt A gebauter Mod lief deshalb bisher sofort auch in jeder spaeter
+    // erstellten Welt B mit, ohne dass ihn dort jemand angefordert haette.
+    //
+    // Angeschaltet wird er mit einem Klick in der Liste "My mods" im Mod-Editor.
+    // Bestehende Eintraege bleiben unberuehrt: die Leser pruefen auf
+    // `enabled !== false`, ein alter Eintrag ohne das Feld gilt also weiterhin
+    // als eingeschaltet.
+    const enabled = kind !== 'GRAPH';
+    all.push({ localId, kind, code, name, createdAt: Date.now(), enabled });
     return writeIndex(all) ? localId : null;
   }
   function del(localId) { return writeIndex(readIndex().filter(p => p.localId !== localId)); }
@@ -1959,6 +2666,32 @@ function registerCustomBlockPieces(pieceCodes) {
   customOreTiers = [];
   customBlockSource = {};
   window.customBlockSource = customBlockSource;
+
+  // Wipe the whole reserved range before re-filling it. The loop below WRITES
+  // into six tables the engine owns (blockNames, blockColors, BLOCK_HARDNESS,
+  // BLOCK_SOUND, ORE_SPECKLE_IDS, _blockTextures) but used to clear none of
+  // them, so every id it did not reach this time kept whatever the PREVIOUS
+  // registration had left there.
+  //
+  // That is only invisible while the library grows. The moment it shrinks --
+  // deleting a piece, unticking one in the Mod Editor's list, or loading a
+  // loadout with fewer blocks than the last one -- the ids above the new count
+  // become phantoms: still named, still coloured, still passing the
+  // `blockNames[b]` test every block picker and graphCleanParam() use to decide
+  // whether an id is real. A mod could be built against one, and the block
+  // pickers offered it, long after the piece behind it was gone.
+  //
+  // Safe to clear wholesale because this range belongs to custom pieces alone
+  // (see the note above), and everything still in use is written back below.
+  for (let id = CUSTOM_BLOCK_ID_BASE; id <= CUSTOM_BLOCK_ID_MAX; id++) {
+    delete blockNames[id];
+    delete blockColors[id];
+    delete BLOCK_HARDNESS[id];
+    delete BLOCK_SOUND[id];
+    delete _blockTextures[id];
+    ORE_SPECKLE_IDS.delete(id);
+  }
+
   let nextId = CUSTOM_BLOCK_ID_BASE;
   // `null` is a RESERVED PLACE: it consumes an id without registering a block.
   // See the long note above this function. An invalid code, by contrast, is
@@ -1995,7 +2728,7 @@ window.registerCustomBlockPieces = registerCustomBlockPieces;
 // Live ambient creature definitions, read by spawnCustomCreatureNearPlayer()
 // and drawCustomCreatures(). Each carries its own pre-rendered sprite canvas
 // so nothing is decoded per frame.
-let customCreatureTypes = [];
+customCreatureTypes = [];
 
 function registerCustomCreaturePieces(pieceCodes) {
   customCreatureTypes = [];
@@ -2017,7 +2750,18 @@ function registerCustomCreaturePieces(pieceCodes) {
       speed: decoded.creature.speed,
       rarity: decoded.creature.rarity,
       biome: decoded.creature.biome,
-      traits: decoded.creature.traits || {}
+      traits: decoded.creature.traits || {},
+      // Combat is OFF by default and is not part of the piece code at all.
+      // health 0 means "cannot be hurt, never attacks", which is exactly what
+      // every creature did before combat existed — so every creature code ever
+      // shared keeps behaving identically, and a creature only becomes
+      // dangerous when a mod runs "Set up my creature's fight" on it.
+      //
+      // Deliberately a mod rule rather than six more fields in the piece:
+      // the same reasoning that moved Hardness out of the Block Designer (see
+      // setBlockMining). The drawing is the player's; how hard it hits is a
+      // rule of the world the drawing was dropped into.
+      health: 0, damage: 1, attack: 'none', aggro: 0
     });
   }
   // Creatures already roaming came from the previous set of definitions; drop
@@ -2031,7 +2775,7 @@ window.registerCustomCreaturePieces = registerCustomCreaturePieces;
 
 // Kept as a separate global rather than folded into GRAVITY directly, so the
 // constant stays a constant and "no mod active" is always exactly 1.
-let ruleGravityScale = 1;
+ruleGravityScale = 1;
 
 // Rebuilds every mod-driven stat from scratch: armor baseline, then the
 // legacy mod-code perk set (unchanged behaviour), then whatever the running
@@ -2104,7 +2848,7 @@ let graphGravityMult = 1;
 // re-derive-from-baseline treatment in applyActiveRules as speed/gravity.
 let graphReachBonus = 0;
 let graphMaxJumps = 1;
-let graphYieldMult = 1;
+graphYieldMult = 1;
 let graphBigPickaxe = false;
 let graphHazardImmune = false;
 let graphJumpMult = 1;
@@ -2124,11 +2868,26 @@ let graphTouching = new Set();
 const GRAPH_MAX_STEPS = 2000;
 // Named number storage for "Set a number" / "Change a number by" / "If a
 // number is" / "Show a number". Session state only — reset with everything
-// else in registerCustomGraphPieces, not carried into a saved world. Numbers
-// only, not text: a variable that could hold text would just be a second,
-// worse way to spell "Show a message", and would open the door to using it
-// as one — the closed-catalog rule this whole system runs on.
+// else in registerCustomGraphPieces, not carried into a saved world.
 let graphVars = {};
+// Name to array of numbers. Kept beside graphVars rather than inside it so a
+// mod naming a list and a number the same thing gets two separate stores
+// instead of one of them silently reading as 0.
+let graphLists = {};
+// Named TEXT storage, the third store beside the two above. Separate for the
+// same reason graphLists is separate: a mod naming a number and a text the
+// same thing gets two stores rather than one of them reading as the wrong
+// type.
+//
+// This deliberately reverses an earlier decision. The store used to be numbers
+// only, on the grounds that a text variable would be a second, worse way to
+// spell "Show a message". That held only while text could not be BUILT: with
+// "join with" a mod can now assemble a line it was never authored with, and
+// compare one text against another, which is a kind of data the number store
+// genuinely could not express. What it is still not is an escape from the
+// closed catalog — a text is a value the catalog's own blocks read and write,
+// never something handed to the game to interpret.
+let graphTexts = {};
 // "Call by name" (see GRAPH_ACTIONS.callSignal) re-enters fireGraphEvent, so
 // a signal that calls itself — directly, or through a longer A-calls-B-calls-A
 // loop — would recurse the JS call stack instead of looping inside the
@@ -2143,6 +2902,540 @@ const GRAPH_MAX_SIGNAL_DEPTH = 8;
 // does not start rather than the game slowing to a crawl.
 let graphPending = [];
 const GRAPH_MAX_PENDING = 64;
+// Announcements waiting for their listeners, drained once per frame by
+// updateGraphRuntime. Capped for the same reason graphPending is: a rule that
+// announces every frame must not be able to grow this without limit, and past
+// the cap an announcement is dropped rather than the frame getting slower.
+//
+// `let`, not `const`: the drain swaps the whole array out for a fresh one so
+// that anything announced BY a listener lands in the next frame's batch rather
+// than being delivered inside this one. That swap is what makes a chain
+// reaction flat and unable to recurse into itself, which is the property this
+// whole pair exists to provide.
+let graphAnnounceQueue = [];
+const GRAPH_MAX_ANNOUNCE = 32;
+
+// ── Dialoge: die eine Stelle, an der ein Mod eine ENTSCHEIDUNG verlangt ──
+// Bisher lief jeder Mod von selbst ab: der Spieler betritt eine Zone, bekommt
+// Punkte, fertig. Ein Dialog dreht das um und laesst den Spieler waehlen.
+//
+// Bewusst eine FESTE Form und keine freie Oberflaeche: eine Ueberschrift und
+// bis zu drei Knoepfe. Das ist der einzige Zuschnitt, der zum geschlossenen
+// Katalog passt, denn ein Mod darf beschreiben, WAS zur Wahl steht, aber nie
+// selbst Markup in die Seite schreiben. Damit bleibt ein geteilter Mod auch
+// dann harmlos, wenn er von einem Fremden kommt.
+let graphDialog = null;        // { title, buttons: [...], freeze } oder null
+let graphDialogEl = null;
+
+function graphDialogElement() {
+  if (graphDialogEl && graphDialogEl.isConnected) return graphDialogEl;
+  graphDialogEl = document.createElement('div');
+  graphDialogEl.id = 'vx-mod-dialog';
+  graphDialogEl.style.cssText =
+    'position:fixed;inset:0;z-index:70;display:none;' +
+    'align-items:center;justify-content:center;' +
+    'background:rgba(6,5,10,0.55);';
+  document.body.appendChild(graphDialogEl);
+  return graphDialogEl;
+}
+
+function graphCloseDialog() {
+  graphDialog = null;
+  if (graphDialogEl) graphDialogEl.style.display = 'none';
+}
+
+// `into` ist der Name eines gespeicherten Textes oder leer. Leer heisst: nur
+// Knoepfe, also genau der Dialog, den es vorher schon gab. Steht ein Name da,
+// bekommt der Kasten ein Eingabefeld, und beim Knopfdruck landet das Getippte
+// unter diesem Namen im Textspeicher.
+//
+// ZWEI DINGE, die man dabei wissen muss:
+//
+//   Die Tastatur gehoert dann dem Feld. Die Engine steigt in ihrem eigenen
+//   keydown/keyup sofort aus, sobald ein INPUT den Fokus hat, ein getipptes
+//   "w" laesst die Figur also nicht loslaufen. Das gilt aber auch fuer
+//   "let me keep moving": ein Dialog mit Eingabefeld nimmt die Tastatur immer,
+//   egal was der Auswahlkasten sagt. Die Einstellung wirkt weiter auf die
+//   Physik, nicht mehr auf die Tasten.
+//
+//   Eine beim Oeffnen GEDRUECKTE Taste bekaeme nie ihr keyup, weil derselbe
+//   Ausstieg auch das Loslassen schluckt. Sie bliebe danach dauerhaft "unten"
+//   und die Figur liefe von selbst weiter. Deshalb werden die Tasten hier
+//   einmal geleert, so als haette der Spieler alles losgelassen -- was optisch
+//   ohnehin passiert, sobald ein Kasten den Bildschirm nimmt.
+function graphOpenDialog(title, buttons, freeze, into) {
+  const el = graphDialogElement();
+  graphDialog = { title, buttons, freeze, into: into || '' };
+  if (graphDialog.into && typeof keys !== 'undefined') {
+    for (const k of Object.keys(keys)) keys[k] = false;
+  }
+  const box = document.createElement('div');
+  box.style.cssText =
+    'min-width:230px;max-width:340px;padding:16px 18px;' +
+    'border:2px solid rgba(168,85,247,0.6);border-radius:5px;' +
+    'background:rgba(14,12,20,0.97);color:#efe9ff;' +
+    'font-family:var(--font-mono,monospace);font-size:12px;' +
+    'box-shadow:0 8px 28px rgba(0,0,0,0.5);';
+  const h = document.createElement('div');
+  h.textContent = title;
+  h.style.cssText = 'color:#c4a2ff;font-size:12.5px;line-height:1.5;margin-bottom:14px;';
+  box.appendChild(h);
+
+  // 16px, nicht 12: darunter zoomt iOS Safari beim Fokus die ganze Seite hinein
+  // (dieselbe Regel, unter der jedes andere Eingabefeld im Spiel steht).
+  let input = null;
+  if (graphDialog.into) {
+    input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = GRAPH_MAX_TEXT;
+    input.setAttribute('aria-label', title);
+    input.style.cssText =
+      'display:block;width:100%;box-sizing:border-box;margin-bottom:4px;padding:8px 10px;' +
+      'border:1px solid rgba(168,85,247,0.45);border-radius:3px;' +
+      'background:rgba(6,5,10,0.85);color:#efe9ff;' +
+      'font-family:inherit;font-size:16px;outline:none;';
+    input.addEventListener('focus', () => { input.style.borderColor = 'rgba(168,85,247,0.9)'; });
+    input.addEventListener('blur',  () => { input.style.borderColor = 'rgba(168,85,247,0.45)'; });
+    box.appendChild(input);
+  }
+
+  // Was gerade im Feld steht, gesichert BEVOR der Knopf-Kette etwas laeuft.
+  // Ohne diese Reihenfolge muesste eine Regel den Text im naechsten Frame
+  // abholen, und "frag etwas, benutze die Antwort sofort" waere nicht sagbar.
+  const commit = () => {
+    if (graphDialog && graphDialog.into && input) graphSetText(graphDialog.into, input.value);
+  };
+
+  buttons.forEach(label => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.style.cssText =
+      'display:block;width:100%;margin-top:7px;padding:8px 10px;' +
+      'border:1px solid rgba(168,85,247,0.45);border-radius:3px;' +
+      'background:rgba(168,85,247,0.14);color:#efe9ff;' +
+      'font-family:inherit;font-size:12px;cursor:pointer;text-align:left;';
+    b.addEventListener('mouseenter', () => { b.style.background = 'rgba(168,85,247,0.28)'; });
+    b.addEventListener('mouseleave', () => { b.style.background = 'rgba(168,85,247,0.14)'; });
+    // Erst schliessen, dann feuern: eine Regel, die auf den Druck hin sofort
+    // den naechsten Dialog oeffnet, wuerde sonst von ihrem eigenen Aufraeumen
+    // wieder zugemacht.
+    b.addEventListener('click', () => {
+      commit();
+      graphCloseDialog();
+      fireGraphEvent('onButtonPress', graphSelfCtx(label));
+    });
+    box.appendChild(b);
+  });
+
+  el.innerHTML = '';
+  el.appendChild(box);
+  el.style.display = 'flex';
+
+  if (input) {
+    // Enter druckt den ERSTEN Knopf. Wer gerade getippt hat, greift nicht zur
+    // Maus, um zu bestaetigen, und ein Feld, in dem Enter nichts tut, fuehlt
+    // sich kaputt an. Der erste Knopf ist dabei die richtige Wahl, weil
+    // showDialog notfalls "OK" ergaenzt: es gibt also immer einen.
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const first = box.querySelector('button');
+      if (first) first.click();
+    });
+    // Nach dem Einhaengen, sonst nimmt ein noch nicht im Dokument haengendes
+    // Feld den Fokus gar nicht an.
+    input.focus();
+  }
+}
+
+// Der Kontext fuer einen Knopfdruck. Der "ausloesende Spieler" ist hier ICH,
+// denn ein Dialog steht auf meinem Bildschirm und nur ich kann ihn druecken.
+// Damit lesen sich die "event player"-Werte auch hier sinnvoll, statt leer zu
+// bleiben: der Tag ist meiner, die Entfernung ist 0.
+function graphSelfCtx(button) {
+  const t = graphPlayerTile();
+  return {
+    button: button,
+    playerUid: (typeof userId !== 'undefined' && userId) ? userId : 'me',
+    playerTag: graphPlayerTag((typeof userId !== 'undefined' && userId) ? userId : 'me'),
+    playerX: t.x,
+    playerY: t.y,
+    playerDist: 0,
+    playerTeam: (window.VxArena && VxArena.getTeam) ? (VxArena.getTeam() | 0) : 0
+  };
+}
+
+// ── Punktetafel, die ein Mod einblenden kann ─────────────────────────────
+// Ein EIGENES Element und nicht das der Arena (#arena-scores): die Arena
+// zeichnet ihres jeden Frame neu, ein Mod-Eintrag darin wäre also sofort
+// wieder überschrieben. Getrennt kann beides nebeneinander bestehen.
+let graphBoardEl = null;
+function graphBoardElement() {
+  if (graphBoardEl && graphBoardEl.isConnected) return graphBoardEl;
+  graphBoardEl = document.createElement('div');
+  graphBoardEl.id = 'vx-mod-board';
+  graphBoardEl.style.cssText =
+    'position:fixed;top:96px;right:14px;z-index:60;min-width:150px;max-width:230px;' +
+    'padding:8px 10px;border:2px solid rgba(168,85,247,0.55);border-radius:4px;' +
+    'background:rgba(12,10,18,0.86);color:#efe9ff;' +
+    'font-family:var(--font-mono,monospace);font-size:11px;line-height:1.6;' +
+    'pointer-events:none;display:none;';
+  document.body.appendChild(graphBoardEl);
+  return graphBoardEl;
+}
+function graphHideBoard() {
+  if (graphBoardEl) graphBoardEl.style.display = 'none';
+  // Die Spalte oben rechts weicht der Punktetafel aus, solange sie sichtbar
+  // ist. Verschwindet die Tafel, darf der Platz sofort zurueckfallen.
+  graphRenderPanels();
+}
+function graphRenderBoard(how, title, board) {
+  const el = graphBoardElement();
+  let rows;
+  if (how === 'per team') {
+    // Mannschaftssummen entstehen rein lokal aus denselben Einträgen. Es gibt
+    // deshalb keinen zweiten Weg, auf dem sie auseinanderlaufen könnten.
+    const totals = new Map();
+    for (const s of board) totals.set(s.team, (totals.get(s.team) || 0) + s.score);
+    rows = [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([team, score]) => [team === 0 ? 'No team' : 'Team ' + team, score]);
+  } else {
+    rows = board.slice(0, 8).map(s => [
+      s.name ? String(s.name).slice(0, 12) : String(s.uid || '').slice(0, 4).toUpperCase(),
+      s.score
+    ]);
+  }
+  const head = '<div style="color:#c4a2ff;letter-spacing:0.08em;margin-bottom:4px">' +
+               escapeHtml(String(title || 'Scores')) + '</div>';
+  const body = rows.length
+    ? rows.map(([name, score]) =>
+        '<div style="display:flex;justify-content:space-between;gap:10px">' +
+          '<span>' + escapeHtml(name) + '</span>' +
+          '<span style="font-variant-numeric:tabular-nums">' + (score | 0) + '</span>' +
+        '</div>').join('')
+    : '<div style="opacity:0.6">no scores yet</div>';
+  el.innerHTML = head + body;
+  el.style.display = '';
+  // Nach dem Einblenden, damit die Hoehe der Tafel schon messbar ist.
+  graphRenderPanels();
+}
+
+// ── Panels ───────────────────────────────────────────────────────────────
+// Vier Behaelter, einer je Ecke, jeder eine Spalte. Dass Panels sich stapeln
+// statt zu ueberlagern, faellt damit dem Layout zu und muss nirgends gerechnet
+// werden. `pointer-events:none` auf allem: ein Mod darf den Bildschirm
+// beschriften, aber niemals einen Klick abfangen, den der Spieler auf die Welt
+// gemeint hat.
+//
+// Die Abstaende oben und unten halten die bestehende Bedienung frei (Kopfleiste
+// und Hotbar), dieselben 96px, mit denen Punktetafel und Debug-Anzeige schon
+// arbeiten.
+let graphPanelLayerEl = null;
+const GRAPH_PANEL_CORNER_CSS = {
+  'top left':     'left:14px;top:96px;align-items:flex-start;',
+  'top right':    'right:14px;top:96px;align-items:flex-end;',
+  'bottom left':  'left:14px;bottom:96px;align-items:flex-start;flex-direction:column-reverse;',
+  'bottom right': 'right:14px;bottom:96px;align-items:flex-end;flex-direction:column-reverse;'
+};
+function graphPanelCorner(where) {
+  // Dieselbe Pruefung wie bei graphBoardElement: haengt das Element noch im
+  // Dokument? Ein einziger Behaelter reicht als Stichprobe, sie werden nur
+  // zusammen angelegt.
+  if (!graphPanelLayerEl || !graphPanelLayerEl['top left'].isConnected) {
+    graphPanelLayerEl = {};
+    for (const corner of GRAPH_PANEL_CORNERS) {
+      const box = document.createElement('div');
+      box.id = 'vx-mod-panels-' + corner.replace(' ', '-');
+      box.style.cssText =
+        'position:fixed;z-index:58;display:flex;flex-direction:column;gap:6px;' +
+        'pointer-events:none;' + GRAPH_PANEL_CORNER_CSS[corner];
+      document.body.appendChild(box);
+      graphPanelLayerEl[corner] = box;
+    }
+  }
+  return graphPanelLayerEl[GRAPH_PANEL_CORNERS.includes(where) ? where : 'top left'];
+}
+
+// Baut alle Panels neu auf. Bei hoechstens vier Panels zu je sechs Zeilen ist
+// das ein knappes Dutzend Elemente; ein gezieltes Nachfuehren einzelner Zeilen
+// waere mehr Zustand fuer weniger Verlaesslichkeit.
+function graphRenderPanels() {
+  const corners = {};
+  for (const c of GRAPH_PANEL_CORNERS) { corners[c] = graphPanelCorner(c); corners[c].innerHTML = ''; }
+
+  // Die Arena-Punktetafel sitzt fest oben rechts. Ein Panel in derselben Ecke
+  // wuerde sie ueberdecken, deshalb weicht die Spalte um ihre gemessene Hoehe
+  // nach unten aus, solange sie sichtbar ist.
+  const boardVisible = graphBoardEl && graphBoardEl.isConnected && graphBoardEl.style.display !== 'none';
+  corners['top right'].style.top = boardVisible ? (96 + graphBoardEl.offsetHeight + 8) + 'px' : '96px';
+
+  for (const name of Object.keys(graphPanels)) {
+    const p = graphPanels[name];
+    if (!p || !p.shown) continue;
+    const box = document.createElement('div');
+    box.style.cssText =
+      'min-width:132px;max-width:230px;padding:7px 9px;' +
+      'border:2px solid rgba(168,85,247,0.5);border-radius:4px;' +
+      'background:rgba(12,10,18,0.86);color:#efe9ff;' +
+      'font-family:var(--font-mono,monospace);font-size:11px;line-height:1.6;';
+    if (p.title) {
+      const h = document.createElement('div');
+      h.textContent = p.title;
+      h.style.cssText = 'color:#c4a2ff;letter-spacing:0.08em;margin-bottom:3px;';
+      box.appendChild(h);
+    }
+    for (let i = 1; i <= GRAPH_MAX_PANEL_LINES; i++) {
+      const row = p.lines[i];
+      if (!row) continue;
+      const d = document.createElement('div');
+      // textContent, nicht innerHTML: der Inhalt kommt aus einem geteilten Mod
+      // oder sogar aus dem, was ein Spieler in einen Dialog getippt hat.
+      d.textContent = row.text;
+      d.style.color = GRAPH_COLORS[row.color] || '#efe9ff';
+      box.appendChild(d);
+    }
+    corners[GRAPH_PANEL_CORNERS.includes(p.where) ? p.where : 'top left'].appendChild(box);
+  }
+}
+
+// Auf den ersten Zugriff angelegt, genau wie graphGetList eine Liste anlegt:
+// wer nur eine Zeile schreiben will, soll das Panel nicht vorher anmelden
+// muessen. Ueber der Grenze wird nichts mehr angelegt und der Aufrufer bekommt
+// null, was bei ihm still nichts tut.
+function graphGetPanel(name) {
+  let p = graphPanels[name];
+  if (!p) {
+    if (Object.keys(graphPanels).length >= GRAPH_MAX_PANELS) return null;
+    p = { where: 'top left', title: '', shown: true, lines: {} };
+    graphPanels[name] = p;
+  }
+  return p;
+}
+
+// ── Countdowns ───────────────────────────────────────────────────────────
+// Name -> Zeitpunkt (ms der Wanduhr), an dem er abläuft.
+//
+// ABSICHTLICH OHNE NETZWERK, und das ist eine Abkehr von dem, was ich zuerst
+// entworfen hatte. Der erste Plan war, dass der Host einen Endzeitpunkt in ein
+// gemeinsames Dokument schreibt und alle anderen ihn lesen. Beim Lesen des
+// Arena-Codes zeigte sich, dass das mehr Aufwand für weniger Ergebnis wäre:
+//
+//   * remainingS() rechnet dort längst aus EINEM Zeitstempel gegen die eigene
+//     Wanduhr, statt Ticks zu übertragen. Dasselbe Muster reicht auch hier.
+//   * Ein Countdown, den alle Clients im selben Moment starten, läuft ohnehin
+//     synchron, weil jeder dieselbe verstreichende Zeit misst. Auseinander
+//     laufen können sie nur um die Verzögerung des auslösenden Ereignisses,
+//     und die ist bei "Wenn die Runde beginnt" ein Wimpernschlag.
+//   * Ohne Netzwerkanteil funktioniert es in JEDER Welt, auch allein und
+//     ausserhalb der Arena, statt nur in einem laufenden Match.
+//
+// Der Preis ist ehrlich benannt: startet ein Countdown durch ein Ereignis, das
+// nicht alle gleichzeitig sehen, sehen auch die Uhren verschieden aus. Wer
+// echten Gleichlauf braucht, startet ihn aus "When the match starts", das der
+// Host treibt.
+let graphCountdowns = {};
+const GRAPH_MAX_COUNTDOWNS = 8;
+
+function graphCountdownLeft(name) {
+  const end = graphCountdowns[name];
+  if (!end) return 0;
+  return Math.max(0, (end - Date.now()) / 1000);
+}
+
+// Einmal je Frame. Ein abgelaufener Countdown wird ENTFERNT, bevor sein
+// Ereignis feuert, damit eine Regel, die im selben Zug denselben Namen neu
+// startet, nicht sofort wieder als abgelaufen gilt.
+function graphTickCountdowns() {
+  const now = Date.now();
+  for (const name in graphCountdowns) {
+    if (graphCountdowns[name] > now) continue;
+    delete graphCountdowns[name];
+    fireGraphEvent('onCountdownEnd', { timer: name });
+  }
+}
+
+// ── Mehrspieler-Präsenz: wer ist da, wer ist gegangen ────────────────────
+// WARUM NICHT AN FIRESTORE: der naheliegende Weg wäre, sich an die
+// docChanges() in startMultiplayerSync zu hängen und added/removed zu nehmen.
+// Das wäre in vier Fällen falsch, und alle vier stehen im bestehenden Code:
+//
+//   * ein Spieler auf einem FREMDEN Seed meldet ebenfalls "added", der
+//     Seed-Filter greift erst danach
+//   * wer den Seed WECHSELT, meldet "modified", nicht added oder removed,
+//     obwohl er für uns beitritt oder geht
+//   * wer abstürzt oder das Fenster schliesst, meldet GAR NICHTS: sein
+//     Dokument bleibt liegen und wird nur still
+//   * ein gebannter Spieler wird gesondert herausgefiltert
+//
+// otherPlayers hat all das bereits richtig gelöst. Deshalb wird hier nicht
+// Firestore beobachtet, sondern otherPlayers, und Beitritt wie Weggang werden
+// aus der Differenz zweier Frames abgeleitet. Ein Abgestürzter fällt damit
+// über dieselbe Frist heraus, die countPlayersHere ohnehin benutzt.
+const GRAPH_PRESENCE_STALE_MS = 8000;
+let graphSeenPlayers = new Map();     // uid -> { tag, x, y }
+// Wen der Sichtbereich schon berührt hat, mit dem Zeitpunkt: ohne das feuerte
+// "berührt mich" jeden Frame neu, solange zwei Spieler nebeneinander stehen.
+let graphTouchCooldown = new Map();   // uid -> ms
+const GRAPH_TOUCH_COOLDOWN_MS = 1500;
+// Vom Mod gesetzte Zonen. Begrenzt, weil der Durchlauf Spieler mal Zonen je
+// Frame kostet; bei acht und acht sind das 64 Vergleiche, also nichts.
+const GRAPH_MAX_ZONES = 8;
+let graphZones = {};                  // name -> { x0, y0, x1, y1 }
+let graphZoneState = {};              // name -> Set der uids, die drin waren
+// name -> { where, title, shown, lines: { <nr>: { text, color } } }
+// Die Zeilen sind ein Objekt und keine Reihung: eine Regel darf Zeile 4
+// beschreiben, ohne dass es Zeile 1 bis 3 schon gibt, und eine Luecke soll
+// dann eine leere Zeile sein statt eines Lochs im Array.
+let graphPanels = {};
+// Der Kontext der gerade laufenden Kette, damit die fünf "event player"-Werte
+// ihn lesen können. GRAPH_STAT_READERS bekommt keine Argumente, also muss der
+// Kontext hier stehen. Wird in graphWalk je Schritt gesetzt und ist deshalb
+// auch nach einem "Wait" wieder korrekt, weil die geparkte Kette ihren ctx
+// mitführt.
+let graphCtxNow = null;
+
+// Deterministische Streuung einer UID auf 1..9999 (FNV-1a). Gleiche UID ergibt
+// auf jedem Client dieselbe Zahl, ohne Absprache und ohne Server.
+function graphPlayerTag(uid) {
+  let h = 2166136261;
+  const s = String(uid);
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (Math.abs(h) % 9999) + 1;
+}
+
+// Baut den Kontext, den ein Spieler-Ereignis mitbekommt. Die Entfernung wird
+// hier einmal gerechnet, damit sie im Ereignis stabil ist, statt sich zwischen
+// zwei Karten derselben Kette zu ändern.
+function graphPlayerCtx(uid, p) {
+  const px = player.x + player.w / 2, py = player.y + player.h / 2;
+  const dx = (p.x || 0) - px, dy = (p.y || 0) - py;
+  return {
+    playerUid: uid,
+    playerTag: graphPlayerTag(uid),
+    playerX: Math.floor((p.x || 0) / TILE),
+    playerY: Math.floor((p.y || 0) / TILE),
+    playerDist: Math.sqrt(dx * dx + dy * dy) / TILE,
+    playerTeam: (window.VxArena && VxArena.teamOf) ? (VxArena.teamOf(uid) | 0) : 0
+  };
+}
+
+// Einmal je Frame aus updateGraphRuntime. Hält sich bewusst kurz, wenn gar
+// keine Mods laufen: dann gibt es niemanden, der zuhören könnte.
+function graphSyncPresence() {
+  if (typeof otherPlayers === 'undefined' || !otherPlayers) return;
+  const now = Date.now();
+  const live = new Map();
+  for (const uid in otherPlayers) {
+    const p = otherPlayers[uid];
+    if (!p) continue;
+    // Dieselbe Frische-Grenze, die countPlayersHere benutzt: ein Dokument, das
+    // seit acht Sekunden still ist, gehört zu jemandem, der weg ist.
+    if (now - (p.ts || 0) > GRAPH_PRESENCE_STALE_MS) continue;
+    live.set(uid, p);
+  }
+
+  for (const [uid, p] of live) {
+    if (!graphSeenPlayers.has(uid)) fireGraphEvent('onPlayerJoin', graphPlayerCtx(uid, p));
+  }
+  for (const [uid, prev] of graphSeenPlayers) {
+    // Abmelden, Seed-Wechsel, Bann und Absturz enden alle hier, weil sie alle
+    // dazu führen, dass der Spieler nicht mehr in `live` steht.
+    if (!live.has(uid)) {
+      fireGraphEvent('onPlayerLeave', graphPlayerCtx(uid, prev));
+      graphTouchCooldown.delete(uid);
+    }
+  }
+
+  graphSweepZones(live);
+  graphSweepTouch(live, now);
+  graphSeenPlayers = live;
+}
+
+// Schluessel, unter dem ich mich selbst in graphZoneState fuehre. Kein echtes
+// uid, damit es niemals mit einem echten Spieler kollidiert.
+const GRAPH_LOCAL_ZONE_KEY = ' local';
+function graphLocalZoneCtx() {
+  const t = graphPlayerTile();
+  return {
+    playerUid: GRAPH_LOCAL_ZONE_KEY, playerTag: 0,
+    playerX: t.x, playerY: t.y, playerDist: 0,
+    playerTeam: (window.VxArena && VxArena.getTeam) ? (VxArena.getTeam() | 0) : 0
+  };
+}
+
+function graphSweepZones(live) {
+  for (const name in graphZones) {
+    const z = graphZones[name];
+    const was = graphZoneState[name] || (graphZoneState[name] = new Set());
+    const nowIn = new Set();
+    for (const [uid, p] of live) {
+      const tx = Math.floor((p.x || 0) / TILE), ty = Math.floor((p.y || 0) / TILE);
+      if (tx < z.x0 || tx > z.x1 || ty < z.y0 || ty > z.y1) continue;
+      nowIn.add(uid);
+      // Nur der Übergang zählt, nicht das Drinstehen: sonst feuerte die Regel
+      // jeden Frame, solange jemand in der Zone steht.
+      if (!was.has(uid)) {
+        const ctx = graphPlayerCtx(uid, p);
+        ctx.zone = name;
+        fireGraphEvent('onPlayerEnterZone', ctx);
+      }
+    }
+    // Verlassen: wer vorher drin war und jetzt nicht mehr, meldet sich ab, mit
+    // der letzten bekannten Position, falls noch verbunden. Wer die Praesenz
+    // komplett verloren hat (Absturz, Weltwechsel) bekommt onPlayerLeave schon
+    // aus graphSyncPresence -- das hier ist nur der Zonenaustritt selbst.
+    for (const uid of was) {
+      if (uid === GRAPH_LOCAL_ZONE_KEY || nowIn.has(uid)) continue;
+      const p = live.get(uid);
+      const ctx = p ? graphPlayerCtx(uid, p)
+                    : { playerUid: uid, playerTag: graphPlayerTag(uid), playerX: 0, playerY: 0, playerDist: 0, playerTeam: 0 };
+      ctx.zone = name;
+      fireGraphEvent('onPlayerLeaveZone', ctx);
+    }
+
+    // Ich selbst zaehle auch, nicht nur andere Spieler: sonst liesse sich ein
+    // Zonen-Mod nie allein testen, und "Offline - solo test run" ist der
+    // haeufigste Arena-Testfall ueberhaupt. Eigener Zweig statt ueber `live`,
+    // weil ich dort nicht drinstehe -- otherPlayers meldet nur die anderen.
+    const t = graphPlayerTile();
+    const meIn = t.x >= z.x0 && t.x <= z.x1 && t.y >= z.y0 && t.y <= z.y1;
+    if (meIn) {
+      nowIn.add(GRAPH_LOCAL_ZONE_KEY);
+      if (!was.has(GRAPH_LOCAL_ZONE_KEY)) {
+        const ctx = graphLocalZoneCtx(); ctx.zone = name;
+        fireGraphEvent('onPlayerEnterZone', ctx);
+      }
+    } else if (was.has(GRAPH_LOCAL_ZONE_KEY)) {
+      const ctx = graphLocalZoneCtx(); ctx.zone = name;
+      fireGraphEvent('onPlayerLeaveZone', ctx);
+    }
+
+    graphZoneState[name] = nowIn;
+  }
+}
+
+function graphSweepTouch(live, now) {
+  for (const [uid, p] of live) {
+    const until = graphTouchCooldown.get(uid) || 0;
+    if (now < until) continue;
+    const px = player.x + player.w / 2, py = player.y + player.h / 2;
+    const dx = (p.x || 0) - px, dy = (p.y || 0) - py;
+    const distTiles = Math.sqrt(dx * dx + dy * dy) / TILE;
+    // Die Reichweite steht auf der Karte, nicht hier: eine feste Zahl würde
+    // "Fangen" und "in der Nähe" zu demselben Ereignis machen. Der weiteste
+    // Wert, den irgendeine Karte verlangt, entscheidet, ob es überhaupt feuert.
+    if (distTiles > GRAPH_TOUCH_MAX_RANGE) continue;
+    const ctx = graphPlayerCtx(uid, p);
+    ctx.touchDist = distTiles;
+    fireGraphEvent('onPlayerTouch', ctx);
+    graphTouchCooldown.set(uid, now + GRAPH_TOUCH_COOLDOWN_MS);
+  }
+}
 // Set by the remapDrop action: mined block id -> what it yields instead. A
 // standing rule rather than a one-off, so it lives here with the rest of the
 // per-session graph state and is cleared with it.
@@ -2159,8 +3452,8 @@ let graphDamageScale = 1;
 // loadout without that mod. An empty object is exactly "no mod has touched
 // this block", which is why it is cleared on every reload below rather than
 // only ever added to.
-let graphBlockHardness = {};
-let graphBlockSoundFamily = {};
+graphBlockHardness = {};
+graphBlockSoundFamily = {};
 // True only while the engine's own breakSingleBlock is running, so the drop
 // remap applies to what a mined block yields and not to every block that ever
 // enters the inventory (a shop purchase, a "Give the player" action).
@@ -2185,6 +3478,12 @@ function registerCustomGraphPieces(pieceCodes) {
   graphJumpMult = 1;
   graphMaxHealth = 0;
   graphVars = {};
+  graphLists = {};
+  graphTexts = {};
+  // Erst leeren, dann neu zeichnen: sonst blieben die Kaesten des vorigen
+  // Mod-Satzes auf dem Bildschirm stehen, obwohl die Regel dahinter weg ist.
+  graphPanels = {};
+  graphRenderPanels();
   graphSignalDepth = 0;
   graphDropRemap = {};
   graphDamageScale = 1;
@@ -2194,6 +3493,30 @@ function registerCustomGraphPieces(pieceCodes) {
   // reload drops them rather than letting a countdown from the previous set
   // fire into the new one.
   graphPending.length = 0;
+  // Same reasoning as graphPending above: an announcement queued by the
+  // previous mod set has no business reaching listeners in the new one.
+  graphAnnounceQueue = [];
+  // Präsenz und Zonen gehören ebenfalls dem alten Mod-Satz.
+  //
+  // graphSeenPlayers startet bewusst LEER, nicht mit den gerade Anwesenden
+  // gefüllt. Ein frisch geladener Mod hat noch niemanden gesehen, also gilt
+  // jeder, der danach auftaucht, als beigetreten. Praktisch fällt das kaum auf,
+  // weil beim Weltstart ohnehin noch niemand in otherPlayers steht und die
+  // anderen erst nach und nach eintreffen. Für eine Regel wie "wer kommt, wird
+  // in die Liste aufgenommen" ist genau das das gewünschte Verhalten.
+  graphSeenPlayers = new Map();
+  graphTouchCooldown = new Map();
+  graphZones = {};
+  graphZoneState = {};
+  graphCtxNow = null;
+  // Ein Countdown des alten Mod-Satzes darf im neuen nicht weiterlaufen, und
+  // eine eingeblendete Tafel gehört ebenfalls dem Mod, der sie gezeigt hat.
+  graphCountdowns = {};
+  graphHideBoard();
+  // Ein offener Dialog gehoert dem Mod, der ihn gezeigt hat. Bliebe er beim
+  // Wechsel stehen, haette niemand mehr eine Regel, die auf seinen Knopf
+  // hoert, und bei "hold me still" saesse der Spieler fest.
+  graphCloseDialog();
   installGraphHooks();
   const codes = Array.isArray(pieceCodes)
     ? pieceCodes.filter(isGraphCode)
@@ -2229,6 +3552,11 @@ window.registerCustomGraphPieces = registerCustomGraphPieces;
 // of quietly losing everything past that point.
 function graphWalk(graph, byId, node, ctx, budget, inLoop) {
   while (node && budget.n++ < GRAPH_MAX_STEPS) {
+    // Der Kontext dieser Kette, damit die "event player"-Werte ihn lesen
+    // können. Je Schritt gesetzt und nicht einmal je Kette, weil eine
+    // verschachtelte Schleife mit eigenem ctx dazwischenliegen kann: kommt sie
+    // zurück, muss wieder der äussere gelten.
+    graphCtxNow = ctx;
     const def = NODE_CATALOG[node.type];
     if (!def) return;
     let port = 'out';
@@ -2278,6 +3606,24 @@ function graphWalk(graph, byId, node, ctx, budget, inLoop) {
           // over from an outer pass, the same isolation callSignal's sigCtx
           // already relies on.
           graphWalk(graph, byId, bodyStart, { ...ctx, block: it.block, count: it.count }, budget, true);
+        }
+      }
+      port = 'done';
+    } else if (node.type === 'forEachInList') {
+      const bodyWire = graph.wires.find(w => w.from === node.id && w.fromPort === 'body');
+      const bodyStart = bodyWire ? byId.get(bodyWire.to) : null;
+      if (bodyStart) {
+        // A copy, for exactly the reason forEachItem snapshots the inventory:
+        // the body is free to add to or remove from the very list being walked
+        // (the natural way to write "keep only the ones above 10"), and walking
+        // the live array would then skip entries or never finish.
+        const snapshot = graphGetList(node.params.list).slice(0, GRAPH_MAX_LIST);
+        for (let i = 0; i < snapshot.length; i++) {
+          if (budget.n >= GRAPH_MAX_STEPS) break;
+          graphSetVar(node.params.itemVar, snapshot[i]);
+          graphSetVar(node.params.indexVar, i + 1);
+          // A fresh ctx per pass, the same isolation the loop above relies on.
+          graphWalk(graph, byId, bodyStart, { ...ctx }, budget, true);
         }
       }
       port = 'done';
@@ -2361,6 +3707,17 @@ function graphTileIsFree(tx, ty) {
 const GRAPH_CONDS = {
   ifChance:  p => Math.random() * 100 < p.percent,
   ifCompare: p => graphCompare(graphResolveValue(p.a), p.op, graphResolveValue(p.b)),
+  // Case-insensitive on purpose. These are words a player typed into two
+  // different boxes, possibly weeks apart, and "Gold" failing to match "gold"
+  // would read as a broken mod rather than as a rule about capitals.
+  ifTextIs: p => {
+    const a = graphResolveText(p.a).toLowerCase();
+    if (p.op === 'is empty') return a === '';
+    const b = graphResolveText(p.b).toLowerCase();
+    if (p.op === 'is not') return a !== b;
+    if (p.op === 'contains') return b !== '' && a.includes(b);
+    return a === b;
+  },
   ifBlock:   (p, ctx) => {
     if (p.how === 'is holding') {
       const h = inventory[selectedSlot];
@@ -2394,6 +3751,16 @@ const GRAPH_CONDS = {
   },
   ifWearingArmor: p => typeof equippedArmor !== 'undefined' && equippedArmor.has(p.dim),
 
+  // Dieselbe Tile-Frage wie graphSweepZones fuer andere Spieler stellt, nur
+  // fuer mich selbst und auf Abruf statt ereignisgetrieben -- damit lassen
+  // sich Dinge bauen, die WEITERLAUFEN, solange jemand in der Zone steht.
+  ifInZone: p => {
+    const z = graphZones[p.zone];
+    if (!z) return false;
+    const t = graphPlayerTile();
+    return t.x >= z.x0 && t.x <= z.x1 && t.y >= z.y0 && t.y <= z.y1;
+  },
+
   // ── Arena ──
   // window.VxArena rather than a bare name: voxeria-arena.js loads AFTER this
   // file, so the object does not exist yet while this table is being built.
@@ -2405,7 +3772,9 @@ const GRAPH_CONDS = {
     return window.VxArena.inRegion(t.x, t.y);
   },
   ifScoreAtLeast: p => !!(window.VxArena && window.VxArena.getScore() >= graphResolveInt(p.points, 1, 999)),
-  ifLeading:      () => !!(window.VxArena && window.VxArena.isLeading())
+  ifLeading:      () => !!(window.VxArena && window.VxArena.isLeading()),
+  ifTeamScoreAtLeast: p => !!(window.VxArena && window.VxArena.teamScore(window.VxArena.getTeam()) >= graphResolveInt(p.points, 1, 999)),
+  ifTeamLeading:      () => !!(window.VxArena && window.VxArena.isTeamLeading())
 };
 
 // Shared by both comparison conditions so the two can never drift apart on
@@ -2428,6 +3797,15 @@ function graphCompare(a, op, b) {
 // land in the same store the player's own typed numbers do, and get compared
 // against them. Anything that throws or is missing reads as 0 via graphSetVar.
 const GRAPH_STAT_READERS = {
+  // Die fünf Werte des Spielers, um den es im laufenden Ereignis geht. Sie
+  // lesen den Kontext der gerade abgearbeiteten Kette, den graphWalk je Schritt
+  // setzt. Ausserhalb eines Spieler-Ereignisses ist dort nichts, und sie
+  // liefern 0, statt einen Fehler zu werfen.
+  'event player tag':      () => (graphCtxNow && graphCtxNow.playerTag) || 0,
+  'event player team':     () => (graphCtxNow && graphCtxNow.playerTeam) || 0,
+  'event player x':        () => (graphCtxNow && graphCtxNow.playerX) || 0,
+  'event player y':        () => (graphCtxNow && graphCtxNow.playerY) || 0,
+  'event player distance': () => (graphCtxNow && graphCtxNow.playerDist) || 0,
   'health':           () => player.health / 2,
   'max health':       () => maxHealth / 2,
   'depth':            () => graphPlayerTile().y,
@@ -2437,8 +3815,78 @@ const GRAPH_STAT_READERS = {
   'blocks carried':   () => inventory.reduce((n, it) => n + (it ? it.count : 0), 0),
   'creatures nearby': () => (typeof animals === 'undefined' ? 0 : animals.length),
   'jumps left':       () => (typeof jumpsLeft === 'undefined' ? 0 : jumpsLeft),
-  'random 1-100':     () => 1 + Math.floor(Math.random() * 100)
+  'random 1-100':     () => 1 + Math.floor(Math.random() * 100),
+
+  // ── The other players ──
+  // Counting yourself, so "players here" is the number a person would say out
+  // loud when asked how many are in the world. Alone in a world reads as 1,
+  // never 0, which is what makes "if players here is at least 2" the natural
+  // way to write "only once somebody else turns up".
+  'players here':            () => 1 + graphLivePlayers().length,
+  // 9999 when nobody else is here, not 0: distance is the one reading where the
+  // obvious empty value is also the most dangerous one. A tag mod asking "is
+  // the nearest player at most 3 blocks away" would fire continuously in an
+  // empty world if absence read as zero. 9999 is also exactly the ceiling
+  // graphSetVar clamps to, so it survives being parked in a saved number.
+  'nearest player distance': () => { const n = graphNearestPlayer(); return n ? Math.round(n.dist) : 9999; },
+  // Absolute world tiles, the same frame 'position x' and 'depth' report in, so
+  // the two can be compared and subtracted without a unit in between.
+  // Falls back to the player's OWN tile rather than 0 when nobody is there:
+  // 0 is a real place in the world that a chain would happily teleport to.
+  'nearest player x':        () => { const n = graphNearestPlayer(); return n ? Math.floor(n.p.x / TILE) : graphPlayerTile().x; },
+  'nearest player y':        () => { const n = graphNearestPlayer(); return n ? Math.floor(n.p.y / TILE) : graphPlayerTile().y; },
+  // Teams live in the Arena's own score documents, not in the position feed, so
+  // this asks VxArena rather than reading otherPlayers. 0 outside a match and
+  // for anyone who never joined a team, which is also what 'my team' reports
+  // there — so "same team" is a comparison that stays true rather than a
+  // special case.
+  'nearest player team':     () => {
+    const n = graphNearestPlayer();
+    return (n && window.VxArena && window.VxArena.teamOf) ? window.VxArena.teamOf(n.id) : 0;
+  },
+  'my team':                 () => (window.VxArena && window.VxArena.getTeam ? window.VxArena.getTeam() : 0)
 };
+
+// ── Who else is actually here ─────────────────────────────────────────────
+// Three filters, and all three matter. `seed` because otherPlayers can still
+// hold somebody who has since switched worlds; `dim` because a player inside a
+// pocket dimension is not two blocks away from you even when their last known
+// x/y says so; and the 5-second staleness cut because a document outlives the
+// player who stopped sending updates.
+//
+// 5000ms is not a fresh number — it is exactly what drawOtherPlayers() uses to
+// decide whether to draw somebody. That is the point: a mod must never be able
+// to score a hit on a player who is no longer on screen, and tying the two to
+// one number is what guarantees it rather than hoping two constants stay equal.
+function graphLivePlayers() {
+  if (typeof otherPlayers === 'undefined') return [];
+  const now = Date.now();
+  const out = [];
+  for (const id in otherPlayers) {
+    const p = otherPlayers[id];
+    if (!p || p.seed !== rawSeedString || p.dim !== currentDim) continue;
+    if (now - (p.ts || 0) > 5000) continue;
+    out.push({ id, p });
+  }
+  return out;
+}
+// Straight-line distance from body centre to body centre, in blocks. Not the
+// horizontal gap alone: a player standing on the roof directly above you is not
+// nearby in any sense a minigame means, and every "tag" rule would have been
+// wrong about it.
+function graphNearestPlayer() {
+  const list = graphLivePlayers();
+  if (!list.length) return null;
+  const px = player.x + player.w / 2, py = player.y + player.h / 2;
+  let best = null, bestD = Infinity;
+  for (const e of list) {
+    const dx = (e.p.x + player.w / 2) - px;
+    const dy = (e.p.y + player.h / 2) - py;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  return best ? { id: best.id, p: best.p, dist: bestD / TILE } : null;
+}
 
 // An unset name reads as 0 rather than undefined, so "If a number is at
 // least 1" behaves sensibly on the very first run instead of comparing
@@ -2449,10 +3897,52 @@ function graphGetVar(name) {
 }
 // Clamped to the same range the catalog allows a literal, so repeatedly
 // running "Change a number by 999" can only ever walk to the ceiling instead
-// of drifting toward Infinity.
-function graphSetVar(name, value) {
+// of drifting toward Infinity. Anything unusable (NaN, Infinity, a missing
+// value) lands on 0 rather than poisoning every later sum that touches it.
+function graphClampNum(value) {
   const n = Number(value);
-  graphVars[name] = isFinite(n) ? Math.max(-9999, Math.min(9999, Number(n.toFixed(1)))) : 0;
+  return isFinite(n) ? Math.max(-9999, Math.min(9999, Number(n.toFixed(1)))) : 0;
+}
+function graphSetVar(name, value) {
+  graphVars[name] = graphClampNum(value);
+}
+
+// The text half of the pair above. An unset name reads as "" rather than
+// undefined, so "If a text is" behaves sensibly on the very first run.
+function graphGetText(name) {
+  const t = graphTexts[name];
+  return typeof t === 'string' ? t : '';
+}
+// Bounded the way graphClampNum bounds a number, and for the same reason:
+// "join with" run on a timer would otherwise grow one string without limit.
+// GRAPH_MAX_TEXT is the length a banner already allows, so a text that fits
+// the store always fits the place it is shown.
+function graphClampText(value) {
+  return _modCleanText(value == null ? '' : value, GRAPH_MAX_TEXT);
+}
+function graphSetText(name, value) {
+  graphTexts[name] = graphClampText(value);
+}
+
+// ── Lists ────────────────────────────────────────────────────────────────
+// Created on first touch, so a mod never has to declare one and an unset name
+// behaves like an empty list rather than a crash. Every entry that goes in
+// passes through graphClampNum, which is what lets a list item be used
+// anywhere a saved number can without a second range check.
+function graphGetList(name) {
+  let l = graphLists[name];
+  if (!Array.isArray(l)) { l = []; graphLists[name] = l; }
+  return l;
+}
+// Positions are 1-based, because these are read and written by people through
+// a dropdown that says "at position", not by code. Anything outside the list
+// reads as 0, the same answer graphGetVar gives for a number nobody set yet.
+function graphGetListItem(name, position) {
+  const l = graphLists[name];
+  if (!Array.isArray(l)) return 0;
+  const i = Math.round(Number(position)) - 1;
+  if (!(i >= 0 && i < l.length)) return 0;
+  return isFinite(l[i]) ? l[i] : 0;
 }
 
 // Divide by zero returns the left side untouched rather than Infinity or NaN:
@@ -2509,7 +3999,7 @@ const GRAPH_ACTIONS = {
     // The number slot resolves to null when it is set to "nothing", which is
     // how one block covers text alone, a number alone, and both together.
     const n = graphResolveValue(p.number);
-    let out = p.text || '';
+    let out = graphResolveText(p.text);
     if (n !== null) {
       // Whole numbers read as "3", not "3.0": the store keeps one decimal so
       // half-steps are possible, but most mods only ever count whole things.
@@ -2636,11 +4126,69 @@ const GRAPH_ACTIONS = {
     def.biome = p.biome;
     def.traits = { glows: p.traits === 'glows' || p.traits === 'both', trail: p.traits === 'trail' || p.traits === 'both' };
   },
+  // Mutates the same live definition setCreatureBehavior does, and for the
+  // same reasons (see its note). One difference worth knowing: creatures
+  // ALREADY roaming keep the health they spawned with, because an instance
+  // copies `health` once at birth. Retuning mid-fight therefore changes what
+  // spawns next rather than healing or executing whatever is on screen, which
+  // is the only behaviour that does not produce a creature at 3 of 6 health
+  // suddenly sitting at 3 of 40.
+  setCreatureCombat(p) {
+    const def = customCreatureTypes[p.creature];
+    if (!def) return;
+    def.health = graphResolveInt(p.health, 0, 40);
+    def.damage = graphResolveInt(p.damage, 1, 12);
+    def.attack = p.attack;
+    def.aggro  = graphResolveInt(p.aggro, 0, 24);
+  },
   playSound(p) { playSound(p.sound); },
   // The one writer for saved numbers. Every old way of filling one (set, add,
   // read a game value, maths against a literal, maths against another name) is
   // this single line with a different op and a different slot source.
   changeVar(p) { graphSetVar(p.name, graphApplyMath(graphGetVar(p.name), p.op, graphResolveValue(p.to))); },
+  // graphSetText clamps the result, so joining in a loop walks up to the
+  // ceiling and stops there rather than growing without limit — the same
+  // shape graphClampNum gives "add 999" on a number.
+  changeText(p) {
+    const cur = graphGetText(p.name);
+    const add = graphResolveText(p.to);
+    if (p.op === 'join with') graphSetText(p.name, cur + add);
+    else if (p.op === 'join with a space') graphSetText(p.name, cur ? cur + ' ' + add : add);
+    else graphSetText(p.name, add);
+  },
+  // Every branch is a no-op rather than an error when it cannot apply (adding
+  // to a full list, removing from an empty one, naming a position past the
+  // end): a mod is shared code, and "that step did nothing" is a far better
+  // failure than a chain that stops halfway through.
+  changeList(p) {
+    const list = graphGetList(p.list);
+    const pos = graphResolveInt(p.position, 1, GRAPH_MAX_LIST) || 1;
+    switch (p.how) {
+      case 'add to the end':
+        if (list.length < GRAPH_MAX_LIST) list.push(graphClampNum(graphResolveValue(p.value)));
+        break;
+      case 'set the item at': {
+        const i = pos - 1;
+        if (i < 0 || i >= GRAPH_MAX_LIST) break;
+        // Writing past the end grows the list with zeros up to that spot, so
+        // "set position 5" on an empty list gives a list of five rather than
+        // silently doing nothing. That is what makes a list usable as a fixed
+        // set of slots (four team scores, say) without filling it first.
+        while (list.length <= i) list.push(0);
+        list[i] = graphClampNum(graphResolveValue(p.value));
+        break;
+      }
+      case 'remove the item at':
+        if (pos - 1 < list.length) list.splice(pos - 1, 1);
+        break;
+      case 'remove the last':
+        list.pop();
+        break;
+      case 'clear it':
+        list.length = 0;
+        break;
+    }
+  },
   // Never reached: graphWalk intercepts a wait before the action table is
   // consulted. Present so the completeness check and anything that walks
   // GRAPH_ACTIONS still finds every action type.
@@ -2650,6 +4198,7 @@ const GRAPH_ACTIONS = {
   repeatTimes() {},
   repeatWhile() {},
   forEachItem() {},
+  forEachInList() {},
 
   // The two overrule actions write into the context the chain is walking, and
   // the hook that started the chain reads it back afterwards. Outside a
@@ -2701,6 +4250,124 @@ const GRAPH_ACTIONS = {
     }
   },
 
+  // Queued, never delivered here: see the note on graphAnnounceQueue for why
+  // the whole point is that the listeners do NOT run inside this chain. Over
+  // the cap the announcement is dropped, which is the same "that step did
+  // nothing" failure a full wait queue already has.
+  announce(p) {
+    if (graphAnnounceQueue.length >= GRAPH_MAX_ANNOUNCE) return;
+    graphAnnounceQueue.push({ event: p.event, value: graphResolveValue(p.value) });
+  },
+
+  // Über der Zonen-Obergrenze wird eine NEUE Zone verworfen, eine bestehende
+  // aber weiterhin verschoben: sonst könnte eine Regel, die ihre eigene Zone
+  // jedes Mal neu setzt, sich selbst aussperren.
+  setCountdown(p) {
+    if (p.how === 'stop') { delete graphCountdowns[p.timer]; return; }
+    // Über der Obergrenze wird ein NEUER Countdown verworfen, ein bestehender
+    // aber weiterhin neu gestellt: sonst könnte eine Regel, die ihren eigenen
+    // Countdown regelmässig erneuert, sich selbst aussperren.
+    if (!graphCountdowns[p.timer] && Object.keys(graphCountdowns).length >= GRAPH_MAX_COUNTDOWNS) return;
+    graphCountdowns[p.timer] = Date.now() + graphResolveInt(p.seconds, 1, 600) * 1000;
+  },
+
+  showDialog(p) {
+    // MINDESTENS EIN KNOPF, immer. Ein Dialog ohne Knopf liesse sich nicht
+    // schliessen, und bei "hold me still" waere der Spieler damit dauerhaft
+    // festgehalten, ohne Ausweg. Das ist die eine Stelle, an der ein Mod den
+    // Spieler wirklich aussperren koennte, deshalb wird hier notfalls ein
+    // Knopf ergaenzt statt sich auf die Eingabe zu verlassen.
+    const labels = [p.b1, p.b2, p.b3]
+      .map(t => String(t == null ? '' : t).trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    if (!labels.length) labels.push('OK');
+    graphOpenDialog(graphResolveText(p.title).trim() || 'Choose', labels,
+                    p.freeze === 'hold me still', p.into);
+  },
+
+  setPanel(p) {
+    // "hide" und "clear" legen NICHTS an. Ein Panel zu verstecken, das es gar
+    // nicht gibt, soll nichts tun, statt eines der vier Plaetze zu verbrauchen.
+    if (p.how !== 'show') {
+      const ex = graphPanels[p.panel];
+      if (!ex) return;
+      if (p.how === 'hide') ex.shown = false;
+      else ex.lines = {};
+      graphRenderPanels();
+      return;
+    }
+    const panel = graphGetPanel(p.panel);
+    if (!panel) return;
+    panel.where = p.where;
+    panel.title = graphResolveText(p.title);
+    panel.shown = true;
+    graphRenderPanels();
+  },
+
+  panelLine(p) {
+    const panel = graphGetPanel(p.panel);
+    if (!panel) return;
+    // Dieselbe Zusammensetzung wie bei showText, damit "Leben: 3" hier und dort
+    // gleich zustande kommt: die Zahl faellt weg, wenn ihr Schlitz auf "nichts"
+    // steht, und ganze Zahlen stehen als "3" da, nicht als "3.0".
+    const n = graphResolveValue(p.number);
+    let out = graphResolveText(p.text);
+    if (n !== null) {
+      const shown = Number.isInteger(n) ? String(n) : n.toFixed(1);
+      out = out ? out + ' ' + shown : shown;
+    }
+    const line = Math.max(1, Math.min(GRAPH_MAX_PANEL_LINES, Math.round(Number(p.line) || 1)));
+    // Eine leer geschriebene Zeile verschwindet, statt als leere Luecke stehen
+    // zu bleiben. So raeumt eine Regel eine einzelne Zeile wieder ab, ohne dass
+    // es dafuer eine eigene Karte braucht.
+    if (out) panel.lines[line] = { text: out, color: p.color };
+    else delete panel.lines[line];
+    panel.shown = true;
+    graphRenderPanels();
+  },
+
+  showBoard(p) {
+    if (p.how === 'hide it') { graphHideBoard(); return; }
+    // Ohne laufendes Match gibt es keine abgeglichenen Punkte, also auch nichts
+    // zu zeigen. Still, nicht fehlerhaft: ein für die Arena gebauter Mod soll
+    // in einer Exploration-Welt trotzdem laden.
+    if (!window.VxArena || !VxArena.board) return;
+    graphRenderBoard(p.how, p.title, VxArena.board());
+  },
+
+  markZone(p, ctx) {
+    if (!graphZones[p.zone] && Object.keys(graphZones).length >= GRAPH_MAX_ZONES) return;
+    const t = graphTargetTile(ctx);
+    const w = graphResolveInt(p.w, 1, 64), h = graphResolveInt(p.h, 1, 64);
+    const x0 = t.x - ((w / 2) | 0), y0 = t.y - ((h / 2) | 0);
+    graphZones[p.zone] = { x0, y0, x1: x0 + w - 1, y1: y0 + h - 1 };
+    // Der bisherige Stand wird verworfen, nicht behalten: wer nach dem
+    // Verschieben schon drinsteht, soll als "betritt sie" gelten und nicht
+    // stumm bleiben, weil er zufällig auch vorher drin war.
+    delete graphZoneState[p.zone];
+  },
+
+  // Zufällige Versuche statt eines Rasterdurchlaufs: eine 64x64-Zone hätte bis
+  // zu 4096 Felder, und die allermeisten Zonen finden schon im ersten oder
+  // zweiten Griff einen freien Platz. Bleibt die Zone leer oder ist sie
+  // komplett zugebaut, tut die Karte einfach nichts -- kein Absturz in eine
+  // Wand ist besser als ein Absturz IN die Wand.
+  teleportToZone(p) {
+    const z = graphZones[p.zone];
+    if (!z) return;
+    const w = z.x1 - z.x0 + 1, h = z.y1 - z.y0 + 1;
+    for (let i = 0; i < 20; i++) {
+      const tx = z.x0 + Math.floor(Math.random() * w);
+      const ty = z.y0 + Math.floor(Math.random() * h);
+      if (!graphTileIsFree(tx, ty)) continue;
+      player.x = tx * TILE + (TILE - player.w) / 2;
+      player.y = ty * TILE;
+      player.vx = 0; player.vy = 0;
+      return;
+    }
+  },
+
   callSignal(p, ctx) {
     if (graphSignalDepth >= GRAPH_MAX_SIGNAL_DEPTH) {
       console.warn('Voxeria: mod signal "' + p.signal + '" nested too deep — stopped.');
@@ -2712,7 +4379,11 @@ const GRAPH_ACTIONS = {
     // inherited from whatever `ctx.result` may already have held — otherwise
     // a nested call whose own callee never returns anything would still read
     // back its OUTER caller's stale result instead of "nothing came back".
-    const sigCtx = { ...ctx, signal: p.signal, arg: graphResolveValue(p.arg), result: undefined };
+    const sigCtx = { ...ctx, signal: p.signal,
+                     arg:  graphResolveValue(p.arg),
+                     arg2: graphResolveValue(p.arg2),
+                     arg3: graphResolveValue(p.arg3),
+                     result: undefined };
     // Restored in `finally` so an action that throws inside the called chain
     // can't leak the depth upward and permanently wedge every later call.
     try { fireGraphEvent('onSignal', sigCtx); }
@@ -2730,6 +4401,14 @@ const GRAPH_ACTIONS = {
   },
   endRound() {
     if (window.VxArena) window.VxArena.endMatch('Round ended by a rule');
+  },
+  // Unlike addScore/endRound this is allowed OUTSIDE a running match on
+  // purpose: teams are picked during the build phase, before the round starts,
+  // which is the one moment a "join the red side" button has to work.
+  // VxArena.setTeam is the only writer, so the value still travels to everyone
+  // else through the same score document it always did.
+  setTeam(p) {
+    if (window.VxArena && window.VxArena.setTeam) window.VxArena.setTeam(graphResolveInt(p.team, 0, 8));
   }
 };
 
@@ -2767,15 +4446,46 @@ function fireGraphEvent(type, ctx) {
           node.params.block !== ctx.block) continue;
       // Same idea for dimension entry: only the dimension the node picked.
       if (type === 'onEnterDim' && node.params.dim !== ctx.dim) continue;
+      // And for creatures: only the verb the node picked. No creature filter
+      // here on purpose — see the note on onCreature in the catalog.
+      if (wanted === 'onCreature' && node.params.how !== ctx.how) continue;
       // And for a named signal: only the "When called by name" node whose
       // name matches what "Call by name" asked for. If the call passed a
       // value, it lands in the saved number this node names BEFORE its chain
       // runs, so "receiving ARG" already holds it from the very first node.
       // A call that passed nothing (ctx.arg is null, see graphResolveValue)
       // leaves whatever ARG already held untouched rather than zeroing it.
+      // Each of the three is written only if the call actually passed one, so
+      // the slots a call leaves at "nothing" leave the matching name holding
+      // whatever it already held rather than being zeroed.
+      // Only the listeners for this announcement, and only those. The value is
+      // written before the chain starts, the same way a signal's is, so
+      // "value into INFO" already holds it at the very first node.
+      if (type === 'onAnnounced') {
+        if (node.params.event !== ctx.event) continue;
+        if (ctx.value !== null && ctx.value !== undefined) graphSetVar(node.params.valueVar, ctx.value);
+      }
+      // Nur die Karte, die diese Zone benennt.
+      if ((type === 'onPlayerEnterZone' || type === 'onPlayerLeaveZone') && node.params.zone !== ctx.zone) continue;
+      // Und nur die, die genau diesen Countdown benennt.
+      if (type === 'onCountdownEnd' && node.params.timer !== ctx.timer) continue;
+      // Der Knopf wird ueber die Aufschrift getroffen. Gross- und Kleinschreibung
+      // sowie Leerraum aussen bleiben unberuecksichtigt: die Aufschrift wird an
+      // zwei Stellen von Hand getippt (im Dialog und in der Regel), und ein
+      // stiller Fehlschlag wegen eines Grossbuchstabens waere sehr schwer zu
+      // finden.
+      if (type === 'onButtonPress' &&
+          String(node.params.button).trim().toLowerCase() !== String(ctx.button).trim().toLowerCase()) continue;
+      // Der Durchlauf feuert bis zur weitesten erlaubten Reichweite; welche
+      // Karte tatsächlich gemeint ist, entscheidet sich hier an ihrem eigenen
+      // Wert. So kann eine Regel auf 2 Feldern und eine andere auf 6 hören,
+      // ohne dass der Durchlauf zweimal laufen müsste.
+      if (type === 'onPlayerTouch' && ctx.touchDist > node.params.range) continue;
       if (type === 'onSignal') {
         if (node.params.signal !== ctx.signal) continue;
-        if (ctx.arg !== null && ctx.arg !== undefined) graphSetVar(node.params.argVar, ctx.arg);
+        if (ctx.arg  !== null && ctx.arg  !== undefined) graphSetVar(node.params.argVar,  ctx.arg);
+        if (ctx.arg2 !== null && ctx.arg2 !== undefined) graphSetVar(node.params.argVar2, ctx.arg2);
+        if (ctx.arg3 !== null && ctx.arg3 !== undefined) graphSetVar(node.params.argVar3, ctx.arg3);
       }
       graphRunChain(g, node, ctx);
     }
@@ -2817,6 +4527,36 @@ let graphHooksInstalled = false;
 function installGraphHooks() {
   if (graphHooksInstalled) return;
   graphHooksInstalled = true;
+
+  // ── Bewegungssperre waehrend eines Dialogs ──
+  // Umhuellt statt in die Engine geschrieben, genau wie die drei Hooks
+  // darunter. Der bestehende goldFrozenTimer waere der naheliegende Weg
+  // gewesen, zeichnet aber eine goldene Ummantelung um den Spieler (siehe
+  // drawPlayer) und wuerde einen Dialog wie einen Gold-Schleim-Treffer
+  // aussehen lassen.
+  //
+  // Unterdrueckt werden nur die BEWEGUNGSTASTEN, nicht der ganze Aufruf: die
+  // Physik laeuft weiter, damit der Spieler stehenbleibt statt in der Luft zu
+  // haengen. Der Auslauf im Original (`player.vx *= 0.7^dt`) bremst ihn dabei
+  // weich ab, statt ihn hart anzuhalten.
+  if (typeof updatePlayer === 'function') {
+    const originalUpdate = updatePlayer;
+    window.updatePlayer = function (dt) {
+      if (!graphDialog || !graphDialog.freeze || typeof keys === 'undefined') {
+        return originalUpdate(dt);
+      }
+      // Die Belegung wird bei jedem Aufruf frisch gelesen, weil sie umlegbar
+      // ist und eine einmal gemerkte Liste nach dem Umlegen die falschen
+      // Tasten sperren wuerde.
+      const bind = (typeof keyBinds !== 'undefined') ? keyBinds : {};
+      const held = [bind.left, bind.right, bind.jump, 'arrowleft', 'arrowright', 'arrowup', 'w']
+        .filter(Boolean);
+      const was = {};
+      for (const k of held) { was[k] = keys[k]; keys[k] = false; }
+      try { return originalUpdate(dt); }
+      finally { for (const k of held) keys[k] = was[k]; }
+    };
+  }
 
   // ── Damage: cancellable, and re-scalable ──
   if (typeof takeDamage === 'function') {
@@ -2910,7 +4650,27 @@ function updateGraphRuntime(dt) {
     catch (e) { console.warn('Voxeria: mod chain failed to resume', e); }
   }
 
+  // Announcements queued since the last frame. The whole batch is taken and the
+  // queue replaced before any listener runs, so an announcement made BY a
+  // listener is delivered next frame instead of extending this pass. That is
+  // what bounds a chain reaction without a depth counter: each round of it
+  // costs one frame, and the queue cap bounds how wide one round can get.
+  if (graphAnnounceQueue.length) {
+    const batch = graphAnnounceQueue;
+    graphAnnounceQueue = [];
+    for (const item of batch) {
+      try { fireGraphEvent('onAnnounced', { event: item.event, value: item.value }); }
+      catch (e) { console.warn('Voxeria: announcement failed', item.event, e); }
+    }
+  }
+
   if (!activeGraphs.length) return;
+
+  // Beitritt, Weggang, Zonen und Berührung. Erst hier, nach dem frühen
+  // Ausstieg: ohne laufende Mods gibt es niemanden, der zuhören könnte, und
+  // dann muss auch nichts verglichen werden.
+  graphSyncPresence();
+  graphTickCountdowns();
 
   for (const g of activeGraphs) {
     for (const node of g.nodes) {
@@ -5116,23 +6876,39 @@ const NG_KIND_ICON = { event: 'bolt', cond: 'fork', action: 'gear', loop: 'loop'
 const NODE_ICONS = {
   onWorldStart: 'bolt',   onTimer: 'clock',   onBlock: 'pick',       onPlayer: 'boot',
   onEnterDim: 'portal',   onDayPhase: 'moon', onSignal: 'signal',
+  onAnnounced: 'speech',  announce: 'speech',
+  onPlayerJoin: 'hand',   onPlayerLeave: 'hand',
+  onPlayerEnterZone: 'grid', onPlayerLeaveZone: 'grid', ifInZone: 'grid',
+  onPlayerTouch: 'hand', markZone: 'grid', teleportToZone: 'portal',
+  onCountdownEnd: 'clock', setCountdown: 'clock', showBoard: 'trophy',
+  setPanel: 'eye',        panelLine: 'eye',
+  showDialog: 'speech',  onButtonPress: 'hand',
   onBeforeHurt: 'heart',  onBeforeMine: 'pick', onPickup: 'bag',
+  onCreature: 'beast',
 
   repeatTimes: 'loop',   repeatWhile: 'loop',   forEachItem: 'stack',
+  forEachInList: 'loop',
 
   ifChance: 'dice',       ifCompare: 'math',      ifBlock: 'cube',    ifState: 'drop',
+  ifTextIs: 'speech',     changeText: 'speech',
   ifWorldIs: 'portal',    ifBlockAt: 'cube',      ifWearingArmor: 'shield',
 
   changeItems: 'cube',    changeInvolvedItem: 'stack', showText: 'speech', changeHealth: 'heart',
   setStat: 'boot',        movePlayer: 'portal',   setWorld: 'sun',
-  spawnCreature: 'beast', setCreatureBehavior: 'beast', emitParticles: 'star',  shake: 'boom',      playSound: 'speaker',
-  changeVar: 'tag',       wait: 'clock',          callSignal: 'signal',   returnValue: 'signal',
+  spawnCreature: 'beast', setCreatureBehavior: 'beast', setCreatureCombat: 'beast',
+  emitParticles: 'star',  shake: 'boom',      playSound: 'speaker',
+  changeVar: 'tag',       changeList: 'stack',    wait: 'clock',
+  callSignal: 'signal',   returnValue: 'signal',
   preventIt: 'ban',       setEventAmount: 'math', remapDrop: 'swap', setBlockMining: 'pick',
   fillArea: 'grid',
 
   onMatchStart: 'flag',   onMatchEnd: 'flag',     endRound: 'flag',
   ifInArena: 'grid',      ifScoreAtLeast: 'trophy', ifLeading: 'trophy',
-  addScore: 'trophy'
+  ifTeamScoreAtLeast: 'trophy', ifTeamLeading: 'trophy',
+  addScore: 'trophy',
+  // 'flag' rather than 'trophy': picking a side is what the match is played
+  // BETWEEN, not something you win — the same reason the phase nodes carry it.
+  setTeam: 'flag'
 };
 // Same dev-time completeness check ACTION_GROUPS gets: an unmapped node still
 // works (it falls back to its kind's glyph) but loses the family cue the map
@@ -5148,13 +6924,37 @@ function ngIconFor(type) {
   const def = NODE_CATALOG[type];
   return NODE_ICONS[type] || (def && NG_KIND_ICON[def.kind]) || 'gear';
 }
-function ngMakeIcon(type, className) {
+// Ein Canvas je Icon war der teuerste Einzelposten beim Öffnen eines Boards:
+// 60 Karten kosteten allein dafür rund 39 ms, weil jedes Mal ein Canvas samt
+// 2D-Kontext entsteht und neu gezeichnet wird, obwohl höchstens 34 verschiedene
+// Icons existieren.
+//
+// Jedes Icon wird deshalb genau einmal gezeichnet und als Data-URL behalten;
+// die Karten bekommen davon ein <img>, das um ein Vielfaches billiger ist.
+// Sicher ist das, weil die Zeichenfunktionen in NG_ICONS mit festen Farbwerten
+// arbeiten und nichts aus dem Stil der Seite lesen. Ein Icon sieht deshalb
+// gebacken genauso aus wie frisch gezeichnet.
+const _ngIconUrls = new Map();
+function ngIconDataUrl(key) {
+  let url = _ngIconUrls.get(key);
+  if (url !== undefined) return url;
   const cv = document.createElement('canvas');
-  cv.className = className;
   cv.width = NG_ICON_PX; cv.height = NG_ICON_PX;
-  (NG_ICONS[ngIconFor(type)] || NG_ICONS.gear)(cv.getContext('2d'));
+  (NG_ICONS[key] || NG_ICONS.gear)(cv.getContext('2d'));
   if (typeof _vxCrispen === 'function') _vxCrispen(cv);
-  return cv;
+  url = cv.toDataURL();
+  _ngIconUrls.set(key, url);
+  return url;
+}
+function ngMakeIcon(type, className) {
+  const img = document.createElement('img');
+  img.className = className;
+  img.src = ngIconDataUrl(ngIconFor(type));
+  img.alt = '';
+  // Sonst zieht der Browser das Bild beim Verschieben einer Karte als eigenes
+  // Drag-Objekt mit, was die Karte selbst am Ziehen hindert.
+  img.draggable = false;
+  return img;
 }
 
 // The editor's own look, injected from here so the whole mod system stays in
@@ -5171,6 +6971,15 @@ function ngInjectStyle() {
   st.textContent = `
     .ng-node-icon, .ng-pal-icon {
       width: 14px; height: 14px; flex-shrink: 0; image-rendering: pixelated;
+    }
+    /* Bedingungs-Marke an einem Mod in der Liste "My mods". Bernstein, weil es
+       eine Einschraenkung ist und keine Auszeichnung. */
+    .ng-needs {
+      display: inline-block; margin-left: 6px; padding: 1px 5px;
+      border: 1px solid rgba(255, 213, 74, 0.45); border-radius: 3px;
+      background: rgba(255, 213, 74, 0.10); color: #ffd54a;
+      font-size: 9.5px; letter-spacing: 0.04em; vertical-align: middle;
+      white-space: nowrap;
     }
     .ng-pal-btn { display: flex; align-items: center; gap: 7px; }
     .ng-pal-icon { opacity: 0.85; }
@@ -5898,19 +7707,30 @@ function ngRender() {
   world.querySelectorAll('.ng-node').forEach(elx => { if (!keep.has(elx.dataset.id)) elx.remove(); });
   for (const id of ngHeights.keys()) if (!keep.has(id)) ngHeights.delete(id);
   for (const id of ngWidths.keys()) if (!keep.has(id)) ngWidths.delete(id);
+  // ZWEI Durchgänge, und das ist der Punkt: schreiben und messen dürfen sich
+  // nicht abwechseln. Vorher hing in derselben Schleife ein Einhängen, ein
+  // Setzen von left/top und direkt danach ein Lesen von offsetHeight. Jedes
+  // Lesen zwingt den Browser, das eben Geschriebene sofort durchzurechnen, also
+  // einmal pro Karte statt einmal für alle. Gemessen: 87 ms für 60 Karten so,
+  // 9 ms getrennt.
+  //
+  // Der zweite Durchgang liest weiterhin ALLE Maße, weil ngRenderWires sie
+  // gleich darauf aus den Maps nimmt und sonst selbst je Linie ein Reflow
+  // auslösen würde.
+  const touched = [];
   for (const node of ngGraph.nodes) {
     let elx = world.querySelector('.ng-node[data-id="' + node.id + '"]');
     if (!elx) { elx = ngBuildNode(node); world.appendChild(elx); }
     elx.style.left = node.x + 'px';
     elx.style.top = node.y + 'px';
-    // Measured here, while every node is laid out, so ngRenderWires below can
-    // read both dimensions straight from the maps instead of forcing a reflow
-    // per wire.
-    if (elx.offsetHeight) ngHeights.set(node.id, elx.offsetHeight);
-    if (elx.offsetWidth) ngWidths.set(node.id, elx.offsetWidth);
     // Re-applied on every pass: a node element that was just rebuilt has none
     // of these classes yet, and a selection has to survive that.
     elx.classList.toggle('picked', ngSelection.has(node.id));
+    touched.push([node.id, elx]);
+  }
+  for (const [id, elx] of touched) {
+    if (elx.offsetHeight) ngHeights.set(id, elx.offsetHeight);
+    if (elx.offsetWidth) ngWidths.set(id, elx.offsetWidth);
   }
   ngRenderMinimap();
   ngCoachRefresh();
@@ -6022,6 +7842,62 @@ function ngBuildNode(node) {
   return elx;
 }
 
+// ── Auswahllisten, die erst beim Öffnen gefüllt werden ───────────────────
+// Ein Board mit 60 Karten erzeugte 3360 <option>-Elemente, im Schnitt 56 je
+// Karte, weil jeder Wert-Slot alle 20 Quellen als DOM-Einträge anlegt. Das war
+// der Hauptteil der Zeit, die das Öffnen eines Mods gekostet hat, und fast
+// alles davon war umsonst: eine Auswahlliste braucht ihre Einträge erst, wenn
+// jemand sie aufklappt.
+//
+// Bis dahin genügt genau ein Eintrag, nämlich der gerade gewählte, damit die
+// Liste richtig beschriftet dasteht. Die Einträge selbst werden als JS-Array
+// weiterhin sofort berechnet: teuer sind die DOM-Knoten, nicht die Liste.
+function ngFillSelect(sel) {
+  if (sel._vxFilled) return;
+  sel._vxFilled = true;
+  const want = sel.value;
+  const opts = sel._vxOptions();
+  sel.innerHTML = opts.map(o =>
+    '<option value="' + escapeHtml(String(o.v)) + '">' + escapeHtml(String(o.l)) + '</option>').join('');
+  ngSetSelectValue(sel, want);
+}
+// Setzt einen Wert auch dann, wenn seine Option noch nicht angelegt ist. Ohne
+// das würde eine Zuweisung an einen noch nicht gefüllten Auswahlkasten still
+// auf den leeren String fallen, und die Karte zeigte plötzlich nichts an.
+function ngSetSelectValue(sel, value) {
+  const v = String(value == null ? '' : value);
+  let has = false;
+  for (let i = 0; i < sel.options.length; i++) if (sel.options[i].value === v) { has = true; break; }
+  if (!has) {
+    const o = document.createElement('option');
+    o.value = v;
+    // Beschriftung aus der echten Liste, damit ein noch ungefüllter Kasten
+    // denselben Text zeigt wie ein gefüllter (bei Kreaturen ist der Wert ein
+    // Index, die Beschriftung aber ein Name).
+    let label = v;
+    try {
+      const hit = sel._vxOptions ? sel._vxOptions().find(x => String(x.v) === v) : null;
+      if (hit) label = String(hit.l);
+    } catch (e) {}
+    o.textContent = label;
+    sel.appendChild(o);
+  }
+  sel.value = v;
+}
+function ngLazySelect(className, optionsFn, current) {
+  const sel = document.createElement('select');
+  if (className) sel.className = className;
+  sel._vxOptions = optionsFn;
+  sel._vxFilled = false;
+  ngSetSelectValue(sel, current);
+  const fill = () => ngFillSelect(sel);
+  // Jeder Weg, auf dem die Liste aufgehen kann: Maus, Tastatur, Fokus.
+  sel.addEventListener('pointerdown', fill);
+  sel.addEventListener('focus', fill);
+  sel.addEventListener('keydown', fill);
+  return sel;
+}
+
 function ngBuildParamRow(node, spec) {
   const row = document.createElement('div');
   row.className = 'ng-row';
@@ -6038,10 +7914,9 @@ function ngBuildParamRow(node, spec) {
     // that is a fixed amount or a saved number, the amount or the name. Only
     // one of the latter two is ever shown, so the row stays one line.
     const range = graphSpecRange(spec, node.params);
-    const sel = document.createElement('select');
-    sel.className = 'ng-val-src';
     const sources = spec.sources || VALUE_SOURCE_KEYS;
-    sel.innerHTML = sources.map(v => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>').join('');
+    const cur = (node.params[spec.k] || {}).s;
+    const sel = ngLazySelect('ng-val-src', () => sources.map(v => ({ v, l: v })), cur);
     const num = document.createElement('input');
     num.className = 'ng-val-num';
     num.type = 'number';
@@ -6055,21 +7930,70 @@ function ngBuildParamRow(node, spec) {
     // entries can still be clipped at this font size, and hovering is a cheaper
     // escape hatch than making every node wider still.
     sel.title = 'Where this number comes from';
+    // The nested "at position" row for VALUE_LIST_DYNAMIC. Only built when
+    // this slot's own sources actually include that source: LIST_INDEX_SOURCES
+    // (what the nested row itself is restricted to) deliberately excludes it,
+    // so building this unconditionally would have the nested row try to build
+    // a nested row of its own, forever. Guarding on `sources.includes(...)`
+    // is what turns "one level of indirection" from a convention into
+    // something the recursion cannot get past even if the guard were removed
+    // by mistake somewhere else.
+    const supportsDynList = sources.includes(VALUE_LIST_DYNAMIC);
+    let idxRow = null;
+    if (supportsDynList) {
+      // A thin host whose `params` is a GETTER re-reading node.params[spec.k]
+      // on every access rather than a value captured once: the outer write()
+      // below replaces that object wholesale on every edit (same as it
+      // always did), so a snapshot taken at build time would go stale the
+      // first time the source, number or name field changed. A getter
+      // instead means the nested row's own read/write always lands on
+      // whichever object is CURRENTLY there, including one the outer write()
+      // just swapped in.
+      const idxHost = { get params() { return node.params[spec.k]; } };
+      const idxSpecOwn = { k: 'idx', label: 'at position', kind: 'value', sources: LIST_INDEX_SOURCES,
+                            min: 1, max: GRAPH_MAX_LIST, dec: 0, def: 1 };
+      idxRow = ngBuildParamRow(idxHost, idxSpecOwn);
+      idxRow.classList.add('ng-subrow');
+      idxRow.style.marginLeft = '14px';
+      idxRow.style.display = 'none';
+    }
+
     const sync = () => {
       const val = node.params[spec.k] || {};
-      sel.value = val.s;
+      // Nicht sel.value =, weil die Liste noch ungefüllt sein kann.
+      ngSetSelectValue(sel, val.s);
       num.value = val.n;
       name.value = val.v;
-      num.style.display = val.s === VALUE_FIXED ? '' : 'none';
-      name.style.display = val.s === VALUE_VAR ? '' : 'none';
+      // "An item in a list" needs the number AND the name at once: the name
+      // says which list, the number says which fixed position in it. The
+      // dynamic version needs the name plus the nested row instead of the
+      // number, since its position is no longer a single typed-in figure.
+      const isList = val.s === VALUE_LIST;
+      const isDynList = val.s === VALUE_LIST_DYNAMIC;
+      const isTimer = val.s === VALUE_COUNTDOWN;
+      const namesSomething = val.s === VALUE_VAR || isList || isDynList ||
+                             val.s === VALUE_LIST_LEN || isTimer;
+      num.style.display = (val.s === VALUE_FIXED || isList) ? '' : 'none';
+      name.style.display = namesSomething ? '' : 'none';
+      if (idxRow) idxRow.style.display = isDynList ? '' : 'none';
+      // The placeholder names what the field is being asked for, since the same
+      // two controls mean "amount"/"number name" or "position"/"list name"
+      // depending on the source above them.
+      name.placeholder = isTimer ? 'ROUND'
+        : (isList || isDynList || val.s === VALUE_LIST_LEN) ? 'ITEMS' : 'SCORE';
+      num.title = isList ? 'Which position in the list (1 is the first)' : '';
     };
     const write = () => {
       // Before the write, so undo lands on the value as it was. `change` fires
       // after the CONTROL has updated but before node.params has, which is
       // exactly the moment the old value is still readable.
       ngCommit();
+      // `idx` rides along untouched so switching away from and back to this
+      // source, or just renaming the list, does not reset a position the
+      // player already set up in the nested row below.
+      const prevIdx = node.params[spec.k] && node.params[spec.k].idx;
       node.params[spec.k] = graphCleanValue(graphSpecRange(spec, node.params),
-        { s: sel.value, n: num.value, v: name.value });
+        { s: sel.value, n: num.value, v: name.value, idx: prevIdx });
       sync();
     };
     [sel, num, name].forEach(el => el.addEventListener('pointerdown', e => e.stopPropagation()));
@@ -6079,11 +8003,57 @@ function ngBuildParamRow(node, spec) {
     // costs one undo step per visit, not one per keystroke.
     ngWireTextHistory(name);
     name.addEventListener('input', () => {
+      const prevIdx = node.params[spec.k] && node.params[spec.k].idx;
       node.params[spec.k] = graphCleanValue(graphSpecRange(spec, node.params),
-        { s: sel.value, n: num.value, v: name.value });
+        { s: sel.value, n: num.value, v: name.value, idx: prevIdx });
     });
     sync();
     row.appendChild(sel); row.appendChild(num); row.appendChild(name);
+    if (idxRow) row.appendChild(idxRow);
+  } else if (spec.kind === 'textvalue') {
+    // The same two-controls-in-one-row shape the number slot above uses, with
+    // a text box where that one has a number box. Only one of the two is ever
+    // visible, so the row stays one line like every other.
+    const sources = spec.sources || TEXT_SOURCE_KEYS;
+    const cur = (node.params[spec.k] || {}).s;
+    const sel = ngLazySelect('ng-val-src', () => sources.map(v => ({ v, l: v })), cur);
+    sel.title = 'Where this text comes from';
+    const txt = document.createElement('input');
+    txt.className = 'ng-val-text';
+    txt.type = 'text';
+    txt.maxLength = spec.max || GRAPH_MAX_TEXT;
+    const name = document.createElement('input');
+    name.className = 'ng-val-name';
+    name.type = 'text';
+    name.maxLength = 16;
+    name.placeholder = 'LINE';
+
+    const sync = () => {
+      const val = node.params[spec.k] || {};
+      ngSetSelectValue(sel, val.s);
+      txt.value = val.t == null ? '' : val.t;
+      name.value = val.v;
+      txt.style.display = val.s === TEXT_FIXED ? '' : 'none';
+      name.style.display = val.s === TEXT_VAR ? '' : 'none';
+    };
+    const write = () => {
+      ngCommit();
+      node.params[spec.k] = graphCleanTextValue(spec, { s: sel.value, t: txt.value, v: name.value });
+      sync();
+    };
+    [sel, txt, name].forEach(el => el.addEventListener('pointerdown', e => e.stopPropagation()));
+    sel.addEventListener('change', write);
+    // Both typed fields update live but cost one undo step per visit rather
+    // than one per keystroke, the same as the number slot's name field.
+    ngWireTextHistory(txt);
+    ngWireTextHistory(name);
+    const liveWrite = () => {
+      node.params[spec.k] = graphCleanTextValue(spec, { s: sel.value, t: txt.value, v: name.value });
+    };
+    txt.addEventListener('input', liveWrite);
+    name.addEventListener('input', liveWrite);
+    sync();
+    row.appendChild(sel); row.appendChild(txt); row.appendChild(name);
   } else if (spec.kind === 'block') {
     const chip = document.createElement('div');
     chip.className = 'ng-blockchip';
@@ -6104,20 +8074,22 @@ function ngBuildParamRow(node, spec) {
     });
     row.appendChild(chip);
   } else if (spec.kind === 'creature') {
-    const sel = document.createElement('select');
-    const list = VxPieces.list('CREATURE');
-    sel.innerHTML = list.length
-      ? list.map((p, i) => '<option value="' + i + '">' + escapeHtml(p.name) + '</option>').join('')
-      : '<option value="0">(no creatures yet)</option>';
-    sel.value = String(node.params[spec.k]);
+    // Die Liste wird bei jedem Öffnen neu abgefragt, nicht einmal beim Bauen:
+    // wer eine Kreatur malt, während das Board offen ist, findet sie danach
+    // sofort im Kasten, statt bis zum nächsten Neuaufbau zu warten.
+    const sel = ngLazySelect('', () => {
+      const list = VxPieces.list('CREATURE');
+      return list.length ? list.map((p, i) => ({ v: i, l: p.name }))
+                         : [{ v: 0, l: '(no creatures yet)' }];
+    }, String(node.params[spec.k]));
     sel.addEventListener('pointerdown', e => e.stopPropagation());
     sel.addEventListener('change', () => { node.params[spec.k] = parseInt(sel.value, 10) || 0; });
     row.appendChild(sel);
   } else if (spec.kind === 'enum') {
-    const sel = document.createElement('select');
-    const list = graphSpecList(spec, node.params);
-    sel.innerHTML = list.map(v => '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>').join('');
-    sel.value = node.params[spec.k];
+    // Die Liste hängt an den Nachbar-Parametern (welche Werte ein Weltaspekt
+    // hat), deshalb wird sie beim Öffnen ausgewertet und nicht eingefroren.
+    const sel = ngLazySelect('', () => graphSpecList(spec, node.params).map(v => ({ v, l: v })),
+                             node.params[spec.k]);
     sel.addEventListener('pointerdown', e => e.stopPropagation());
     sel.addEventListener('change', () => {
       ngCommit();
@@ -6152,6 +8124,9 @@ function ngBuildParamRow(node, spec) {
     inp.type = 'text';
     inp.maxLength = spec.max || 48;
     inp.value = node.params[spec.k];
+    // Was ein leer gelassenes Feld bedeutet, steht sonst nirgends. Genau das
+    // braucht ein Feld, dessen Leersein die Einstellung IST.
+    if (spec.placeholder) inp.placeholder = spec.placeholder;
     inp.addEventListener('pointerdown', e => e.stopPropagation());
     // Same reasoning as the value slot's name field: live update, one history
     // step per visit to the field rather than one per keystroke.
@@ -6270,7 +8245,13 @@ function ngWirePath(p0, p1, colour, key) {
   return path(6, 'rgba(8,10,16,0.85)') + path(2.5, colour);
 }
 
-function ngAddNode(type) {
+// `preset` fills some of the new node's parameters instead of leaving them at
+// their catalog defaults. Used by the "My blocks" palette group (see
+// voxeria-terminal.js), where every entry is the same "Call by name" card with
+// a different signal already filled in -- without this the palette could only
+// offer the bare card and the player would have to retype the name it was
+// dropped there to save them typing.
+function ngAddNode(type, preset) {
   if (ngGraph.nodes.length >= GRAPH_MAX_NODES) {
     showNotification('⚠️ That is the most blocks one mod can hold (' + GRAPH_MAX_NODES + ').');
     return;
@@ -6280,11 +8261,17 @@ function ngAddNode(type) {
   // Dropped near the middle of whatever the player is currently looking at,
   // then nudged so a run of new nodes does not land in one stack.
   const jitter = (ngGraph.nodes.length % 6) * 26;
+  // Routed through graphCleanNodeParams like every other parameter that
+  // reaches a node, so a preset can only ever set something the catalog
+  // allows.
+  const params = preset
+    ? graphCleanNodeParams(type, Object.assign(graphDefaultParams(type), preset))
+    : graphDefaultParams(type);
   ngGraph.nodes.push({
     id: ngNewId(), type,
     x: Math.round(stage.width / 2 - ngPan.x - NG_NODE_W / 2 + jitter),
     y: Math.round(stage.height / 2 - ngPan.y - 60 + jitter),
-    params: graphDefaultParams(type)
+    params
   });
   ngRender();
 }
@@ -6361,18 +8348,53 @@ function ngOpenBlockPicker(anchor, onPick, allowEmpty) {
   pop.classList.add('open');
 }
 
+// Welche Karten nur unter bestimmten Bedingungen etwas tun. Aus dem Katalog
+// abgeleitet und nicht von Hand gepflegt, damit eine neue Karte hier nicht
+// vergessen wird.
+//
+// ARENA: diese Karten sind ausserhalb eines laufenden Matches still
+// wirkungslos (siehe die Wachen in GRAPH_ACTIONS und GRAPH_CONDS).
+// MEHRSPIELER: diese brauchen einen ZWEITEN Spieler in derselben Welt, sonst
+// gibt es niemanden, der sie ausloesen koennte.
+const NG_ARENA_ONLY = new Set(['onMatchStart', 'onMatchEnd', 'ifInArena',
+  'ifScoreAtLeast', 'ifLeading', 'ifTeamScoreAtLeast', 'ifTeamLeading',
+  'addScore', 'endRound', 'setTeam', 'showBoard']);
+// onPlayerEnterZone/onPlayerLeaveZone stehen bewusst NICHT mehr hier: seit
+// graphSweepZones auch den lokalen Spieler prueft, feuern beide auch allein.
+const NG_NEEDS_OTHERS = new Set(['onPlayerJoin', 'onPlayerLeave', 'onPlayerTouch']);
+
+// Was ein Mod zum Laufen braucht, aus seinen eigenen Karten gelesen.
+function ngModNeeds(code) {
+  const g = decodeGraphCode(code);
+  if (!g) return [];
+  const types = new Set(g.nodes.map(n => n.type));
+  const needs = [];
+  if ([...types].some(t => NG_ARENA_ONLY.has(t))) needs.push('Arena');
+  if ([...types].some(t => NG_NEEDS_OTHERS.has(t))) needs.push('2+ players');
+  return needs;
+}
+
 function ngRenderPieceList() {
   const elx = document.getElementById('ng-piece-list');
   const mods = VxPieces.list('GRAPH');
   if (!mods.length) { elx.innerHTML = '<div class="mb-hint">No mods yet. Build one on the board.</div>'; return; }
-  elx.innerHTML = mods.map(p => `
+  elx.innerHTML = mods.map(p => {
+    // Der Hinweis steht an der Liste und nicht nur beim Speichern: dort sucht
+    // man, wenn ein Mod "nichts tut", und genau dann ist die Bedingung die
+    // wahrscheinlichste Ursache.
+    const needs = ngModNeeds(p.code).map(n =>
+      '<span class="ng-needs" title="This mod only does something ' +
+      (n === 'Arena' ? 'in a running Arena match' : 'when another player is in the world') +
+      '">' + escapeHtml(n) + '</span>').join('');
+    return `
     <div class="bd-piece-row" data-id="${p.localId}">
       <label class="mb-check"><input type="checkbox" class="bd-piece-enable" ${p.enabled !== false ? 'checked' : ''}></label>
-      <span class="bd-piece-name">${escapeHtml(p.name)}</span>
+      <span class="bd-piece-name">${escapeHtml(p.name)}${needs}</span>
       <button type="button" class="bd-piece-edit">Edit</button>
       <button type="button" class="bd-piece-delete">Delete</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
   elx.querySelectorAll('.bd-piece-enable').forEach(cb => cb.addEventListener('change', e => {
     VxPieces.setEnabled(e.target.closest('.bd-piece-row').dataset.id, e.target.checked);
     reapplyCustomPieces();
@@ -6431,12 +8453,25 @@ function ngSave() {
   const wasEditing = ngEditingId && VxPieces.get(ngEditingId);
   // See bdSave: save first, and only retire the old copy once the new one is
   // safely stored.
-  if (!VxPieces.save('GRAPH', code, name)) return;
-  if (wasEditing) VxPieces.delete(ngEditingId);
+  const newId = VxPieces.save('GRAPH', code, name);
+  if (!newId) return;
+  if (wasEditing) {
+    // Bearbeiten legt technisch eine neue Kopie an und wirft die alte weg. Ohne
+    // das Uebertragen des Schalters wuerde ein eingeschalteter Mod sich beim
+    // Speichern selbst abschalten, weil ein neuer Mod ausgeschaltet startet.
+    if (wasEditing.enabled !== false) VxPieces.setEnabled(newId, true);
+    VxPieces.delete(ngEditingId);
+  }
   ngEditingId = null;
   reapplyCustomPieces();
   ngRenderPieceList();
-  showNotification(wasEditing ? '✅ "' + name + '" updated.' : '✅ "' + name + '" saved.');
+  if (wasEditing) {
+    showNotification('✅ "' + name + '" updated.');
+  } else {
+    // Beim ERSTEN Speichern ist der Mod bewusst noch aus, siehe VxPieces.save.
+    // Das muss dastehen, sonst sucht man den Fehler im Mod statt im Schalter.
+    showNotification('✅ "' + name + '" saved, still switched off. Tick it under "My mods" to run it.');
+  }
 }
 
 // =========================================================
@@ -6461,7 +8496,7 @@ const NG_SIM_MAX_STEPS = GRAPH_MAX_STEPS;
 // dispatching through GRAPH_CONDS/GRAPH_ACTIONS. Kept as its own set (not
 // `def.kind === 'loop'`) because the dry run needs a different one-line
 // summary for each, not just "this is some loop or other".
-const NG_LOOP_TYPES = new Set(['repeatTimes', 'repeatWhile', 'forEachItem']);
+const NG_LOOP_TYPES = new Set(['repeatTimes', 'repeatWhile', 'forEachItem', 'forEachInList']);
 let ngTrySelectedId = null;   // which event node the dummy block fires
 let ngTryStance = 'yes';      // which branch a condition takes in the dry run
 let ngTryLog = [];
@@ -6476,7 +8511,20 @@ function ngDescribeValue(val) {
   if (val.s === VALUE_NONE) return 'nothing';
   if (val.s === VALUE_FIXED) return String(val.n);
   if (val.s === VALUE_VAR) return 'saved “' + val.v + '”';
+  if (val.s === VALUE_LIST) return 'item ' + val.n + ' of list “' + val.v + '”';
+  if (val.s === VALUE_LIST_DYNAMIC) return 'item at (' + ngDescribeValue(val.idx) + ') of list “' + val.v + '”';
+  if (val.s === VALUE_LIST_LEN) return 'how many in list “' + val.v + '”';
+  if (val.s === VALUE_COUNTDOWN) return 'seconds left on “' + val.v + '”';
   return val.s;
+}
+
+// The text counterpart of ngDescribeValue. Also handles a bare string, since
+// that is what a mod code written before text slots existed carries.
+function ngDescribeTextValue(val) {
+  if (typeof val === 'string') return '“' + val + '”';
+  if (!val || typeof val !== 'object') return '“”';
+  if (val.s === TEXT_VAR) return 'saved text “' + val.v + '”';
+  return '“' + (val.t || '') + '”';
 }
 
 // A human-readable line built from the catalog label plus the parameters.
@@ -6495,6 +8543,7 @@ function ngDescribeNode(node) {
       return (list[v] && list[v].name) || ('creature ' + v);
     }
     if (spec.kind === 'text' || spec.kind === 'varname') return '“' + v + '”';
+    if (spec.kind === 'textvalue') return ngDescribeTextValue(v);
     if (spec.kind === 'value') return ngDescribeValue(v);
     return String(v);
   });
@@ -6554,6 +8603,8 @@ function ngSimWalk(byId, startNode, depth, out, budget) {
         suffix = ' — showing one pass of ' + (graphResolveInt(node.params.count, 1, GRAPH_MAX_LOOP_ITERS) || 1) + ':';
       } else if (node.type === 'repeatWhile') {
         suffix = ' — showing one pass (up to ' + GRAPH_MAX_LOOP_ITERS + ' while the condition holds):';
+      } else if (node.type === 'forEachInList') {
+        suffix = ' (showing one pass, once per item the list holds):';
       } else {
         suffix = ' — showing one pass, once per item actually carried:';
       }
@@ -7142,7 +9193,7 @@ function ngInit() {
 // codes are considerably longer than their prefix.
 const VX_STRAY_CODE_ROUTES = [
   {
-    prefixes: [GRAPH_PREFIX],
+    prefixes: [GRAPH_PREFIX_C, GRAPH_PREFIX],
     minLength: 16,
     what: 'Rule code',
     // The field exists in the document from page load on, even if the Mod
@@ -7429,3 +9480,264 @@ function _maybeShowModTip() {
   }, 1800);
 }
 
+// ============================================================================
+// DEBUG-ANSICHT — die abstrakten Regeln des Studios sichtbar machen
+// ============================================================================
+// Zonen und Countdowns leben bisher nur als Zahlen im Speicher. Ohne diese
+// Ansicht muss man erraten, ob eine Regel ueberhaupt auslaeuft: F3 zeigt
+// stattdessen jede Zone als Kasten genau dort, wo sie in der Welt liegt, und
+// jede gespeicherte Zahl, Liste und jeden Countdown in einer Textbox am Rand.
+//
+// Bewusst KEINE feste Rot/Gruen-Bedeutung fuer Zonen: das System kennt keinen
+// Unterschied zwischen einer "Todeszone" und einer "Zielzone", eine Zone ist
+// nur ein benannter Kasten, den ein Mod gesetzt hat. Was sie bedeutet, weiss
+// nur die Regel, die auf sie hoert. Jede Zone bekommt stattdessen eine EIGENE
+// Farbe (per Reihenfolge, in der sie angelegt wurde), damit man mehrere
+// gleichzeitig sichtbare Zonen auseinanderhalten kann, ohne dass die Farbe
+// etwas behauptet, das das System nicht weiss.
+let graphDebugView = false;
+const GRAPH_ZONE_DEBUG_COLORS = ['#ff5566', '#55e08a', '#55c8ff', '#ffd166', '#c586ff', '#ff9955', '#66e0d0', '#ff6bc4'];
+function graphZoneDebugColor(name) {
+  const i = Object.keys(graphZones).indexOf(name);
+  return GRAPH_ZONE_DEBUG_COLORS[(i < 0 ? 0 : i) % GRAPH_ZONE_DEBUG_COLORS.length];
+}
+
+// Weltraum-Kaesten, jeden Frame neu gezeichnet (nicht nur beim Umschalten):
+// die Welt selbst wird jeden Frame komplett neu gemalt, ein einmalig
+// gezeichneter Kasten waere also sofort wieder ueberdeckt.
+function drawGraphDebugZones() {
+  if (typeof ctx === 'undefined' || typeof TILE === 'undefined') return;
+  for (const name in graphZones) {
+    const z = graphZones[name];
+    const sx = z.x0 * TILE - drawCamX, sy = z.y0 * TILE - drawCamY;
+    const w = (z.x1 - z.x0 + 1) * TILE, h = (z.y1 - z.y0 + 1) * TILE;
+    if (sx + w < -8 || sx > canvas.width + 8 || sy + h < -8 || sy > canvas.height + 8) continue; // ausserhalb des Bildschirms
+    const col = graphZoneDebugColor(name);
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = col;
+    ctx.fillRect(sx, sy, w, h);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx + 1, sy + 1, w - 2, h - 2);
+    ctx.font = '10px monospace';
+    ctx.fillStyle = col;
+    ctx.fillText(name, sx + 3, sy + 11);
+    ctx.restore();
+  }
+}
+
+// Die Textbox am Rand. Ein eigenes DOM-Element wie graphBoardElement/
+// graphDialogElement oben, aus demselben Grund: gestochen scharfer Text bei
+// jeder Aufloesung, ohne selbst Schriftgroessen gegen die Canvas-Aufloesung
+// rechnen zu muessen.
+let graphDebugPanelEl = null;
+function graphDebugPanelElement() {
+  if (graphDebugPanelEl && graphDebugPanelEl.isConnected) return graphDebugPanelEl;
+  graphDebugPanelEl = document.createElement('div');
+  graphDebugPanelEl.id = 'vx-debug-panel';
+  graphDebugPanelEl.style.cssText =
+    'position:fixed;left:14px;top:96px;z-index:59;min-width:150px;max-width:260px;' +
+    'padding:8px 10px;border:1px solid rgba(85,224,138,0.55);border-radius:4px;' +
+    'background:rgba(10,14,10,0.82);color:#d8ffe6;' +
+    'font-family:var(--font-mono,monospace);font-size:10.5px;line-height:1.55;' +
+    'pointer-events:none;display:none;';
+  document.body.appendChild(graphDebugPanelEl);
+  return graphDebugPanelEl;
+}
+
+// Alle Speicher, in genau der Reihenfolge, in der ein Mod-Autor eine Regel
+// typischerweise nachverfolgt: erst Zahlen, dann Texte, dann Listen, dann
+// Countdowns (weil die von selbst weiterlaufen), dann Zonen (als Farblegende
+// zu den Kaesten oben).
+function graphDebugPanelHtml() {
+  const rows = [];
+  rows.push('<div style="color:#8fffb0;letter-spacing:0.08em;margin-bottom:4px">DEBUG (F3)</div>');
+
+  const varNames = Object.keys(graphVars);
+  if (varNames.length) {
+    rows.push('<div style="opacity:0.7">Zahlen</div>');
+    for (const n of varNames.slice(0, 10)) {
+      rows.push('<div>' + escapeHtml(n) + ': <b>' + graphVars[n] + '</b></div>');
+    }
+  }
+  const textNames = Object.keys(graphTexts);
+  if (textNames.length) {
+    rows.push('<div style="opacity:0.7;margin-top:4px">Texte</div>');
+    for (const n of textNames.slice(0, 6)) {
+      rows.push('<div>' + escapeHtml(n) + ': <b>„' + escapeHtml(graphTexts[n]) + '“</b></div>');
+    }
+  }
+  const listNames = Object.keys(graphLists);
+  if (listNames.length) {
+    rows.push('<div style="opacity:0.7;margin-top:4px">Listen</div>');
+    for (const n of listNames.slice(0, 6)) {
+      rows.push('<div>' + escapeHtml(n) + ': [' + graphLists[n].join(', ') + ']</div>');
+    }
+  }
+  const timerNames = Object.keys(graphCountdowns);
+  if (timerNames.length) {
+    rows.push('<div style="opacity:0.7;margin-top:4px">Countdowns</div>');
+    for (const n of timerNames) {
+      rows.push('<div>' + escapeHtml(n) + ': <b>' + graphCountdownLeft(n).toFixed(1) + 's</b></div>');
+    }
+  }
+  const zoneNames = Object.keys(graphZones);
+  if (zoneNames.length) {
+    rows.push('<div style="opacity:0.7;margin-top:4px">Zonen</div>');
+    for (const n of zoneNames) {
+      const col = graphZoneDebugColor(n);
+      rows.push('<div><span style="display:inline-block;width:8px;height:8px;background:' +
+                col + ';margin-right:5px;vertical-align:middle"></span>' + escapeHtml(n) + '</div>');
+    }
+  }
+  if (rows.length === 1) rows.push('<div style="opacity:0.6">(noch nichts gesetzt)</div>');
+  return rows.join('');
+}
+
+let graphDebugPanelLastUpdate = 0;
+function drawGraphDebugOverlay(now) {
+  drawGraphDebugZones();
+  // Die Textbox seltener aktualisieren als die Kaesten: ein DOM-Schreibvorgang
+  // ist teurer als ein paar Rechtecke, und Text muss nicht mit 60fps zittern.
+  if (now - graphDebugPanelLastUpdate < 150) return;
+  graphDebugPanelLastUpdate = now;
+  graphDebugPanelElement().innerHTML = graphDebugPanelHtml();
+}
+
+function graphToggleDebugView() {
+  graphDebugView = !graphDebugView;
+  graphDebugPanelElement().style.display = graphDebugView ? '' : 'none';
+  if (typeof showNotification === 'function') {
+    showNotification(graphDebugView ? '🩻 Debug view on (F3)' : '🩻 Debug view off');
+  }
+}
+
+// Eigener, unabhaengiger Tastendruck-Beobachter statt eines Eingriffs in den
+// bestehenden in voxeria-engine.js -- genau das Muster, das Ctrl+T fuers
+// Terminal schon benutzt (siehe voxeria-terminal.js).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'F3') return;
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  e.preventDefault();
+  graphToggleDebugView();
+});
+
+// Haengt die Kaesten und die Textbox ans Ende jedes Frames, ohne eine Zeile
+// in voxeria-engine.js zu aendern: _gameLoopInner ist eine gewoehnliche
+// Funktion und damit von aussen ersetzbar, genau wie updateGraphRuntime es
+// schon ist. Laeuft NACH dem Original, zeichnet also ueber Welt, Spieler und
+// HUD -- und damit auch ueber allem, was ein Mod selbst einblendet.
+if (typeof _gameLoopInner === 'function') {
+  const _origGameLoopInner = _gameLoopInner;
+  window._gameLoopInner = function (now) {
+    _origGameLoopInner(now);
+    if (!graphDebugView) return;
+    if (typeof vxMenuIsOpen === 'function' && vxMenuIsOpen()) return;
+    try { drawGraphDebugOverlay(now); }
+    catch (e) { console.warn('Voxeria: Debug-Ansicht fehlgeschlagen', e); }
+  };
+}
+
+
+// =========================================================
+// ANMELDUNG BEI DER ENGINE
+// =========================================================
+// Dasselbe Prinzip wie installGraphHooks() weiter oben, nur andersherum. Dort
+// umhuellt diese Datei Engine-Funktionen, weil sie einen Ausgang aendern will,
+// den die Engine sonst schon gefaellt haette. Hier geht es nur darum, im Frame
+// aufgerufen zu werden, und dafuer ist Umhuellen zu viel Werkzeug: die Engine
+// rief updateGraphRuntime() bisher direkt und musste dafuer wissen, dass es
+// ein Mod-System gibt.
+//
+// 'update' und nicht 'updateLate': die Graph-Runtime lief schon immer vor
+// Tageszeit, Wetter und Drops, damit ein Mod-Ereignis den Frame sieht, der
+// gerade simuliert wird, und nicht den davor.
+VxHooks.on('update', updateGraphRuntime);
+
+// Zwoelf Stellen in der Engine riefen bis eben fireGraphEvent() direkt: beim
+// Sprung, beim Tod, beim Abbauen, bei Tagesanbruch. Damit stand in einer
+// Datei, die auch ohne Mod-System laufen soll, zwoelf Mal dessen Name.
+//
+// Jetzt meldet die Engine nur noch, DASS etwas passiert ist, an einen Punkt,
+// der nichts ueber Mods weiss. Der Gewinn ist nicht nur die Richtung: Arena,
+// Erfolge oder eine Statistik koennen sich an dieselbe Stelle haengen, ohne
+// dass die Engine dafuer eine Zeile aendert.
+VxHooks.on('gameEvent', function (type, ctx) { fireGraphEvent(type, ctx); });
+
+// F6 Mod-Editor, F8 Konsole, F10 Zufallscode, F12 Hilfe. Vier Tastenkuerzel,
+// die vorher im keydown-Handler der Engine standen und jetzt in der Datei
+// stehen, der sie gehoeren. Wer nichts zurueckgibt, hat die Taste nicht
+// angefasst und laesst sie fuer den naechsten liegen.
+// Mod-Codes und Loadout-Codes im Seed-Feld. Diese sechzig Zeilen standen bis
+// eben in applySeedFromUI() in voxeria-engine.js, also mitten in dem Pfad, der
+// ueber Weltidentitaet entscheidet. Sie sind hier unveraendert, nur mit einem
+// return statt jeweils zwoelf Zeilen Weltneustart drumherum: den macht die
+// Engine jetzt einmal fuer alle drei Faelle.
+//
+// Alles bis zum return laeuft garantiert VOR resetGameAndWorld(). Deshalb darf
+// registerLoadoutPieces() hier stehen, und deshalb muss es das auch: der Reset
+// leert jede Dimension, und die danach neu erzeugten Chunks lesen customOreTiers.
+VxHooks.on('seedInput', function (claimed, inputVal) {
+  if (claimed) return; // jemand anders war schneller
+
+  // Ein Loadout ist ein Mod PLUS eine Liste eigener Teile. Zuerst geprueft,
+  // weil ein VXL1- Code kein VXM3- Code ist und isModCode() ihn abweisen wuerde.
+  if (isLoadoutCode(inputVal)) {
+    const loadout = decodeLoadoutCode(inputVal);
+    if (!loadout) return { error: "⚠️ Invalid loadout code" };
+    if (!activeMod) realInventorySnapshot = JSON.parse(JSON.stringify(inventory));
+    activeMod = loadout.mod;
+    activeLoadoutPieceCodes = loadout.pieceCodes;
+    window._activeModCode = inputVal;
+    registerLoadoutPieces(loadout.pieceCodes);
+    return {
+      seed: String(loadout.mod.seed || inputVal).slice(0, 60) || String(Date.now() % 9999999),
+      display: inputVal,
+      done: function () {
+        showModBanner(loadout.mod);
+        if (loadout.skipped) showNotification('⚠️ ' + loadout.skipped + ' piece(s) in that loadout were unreadable and were skipped.');
+      }
+    };
+  }
+
+  if (isModCode(inputVal)) {
+    const mod = decodeModCode(inputVal);
+    if (!mod) return { error: "⚠️ Invalid mod code" };
+    // Nur schnappschussen, wenn wir aus einem normalen Zustand kommen: direkt
+    // von einem Mod in den naechsten zu wechseln darf das echte Inventar nicht
+    // ueberschreiben, das vor dem ersten gesichert wurde.
+    if (!activeMod) realInventorySnapshot = JSON.parse(JSON.stringify(inventory));
+    activeMod = mod;
+    // Ein reiner Mod-Code bringt keine Teile mit: zurueck auf die lokale
+    // Bibliothek, damit die Teile eines vorherigen Loadouts nicht mitwandern.
+    activeLoadoutPieceCodes = null;
+    registerLoadoutPieces();
+    window._activeModCode = inputVal; // wandert im geteilten ?mod= Link mit
+    return {
+      seed: String(mod.seed || inputVal).slice(0, 60) || String(Date.now() % 9999999),
+      display: inputVal,
+      done: function () { showModBanner(mod); }
+    };
+  }
+
+  // Kein Code. Damit endet ein eventuell aktiver Mod genau hier, und weil das
+  // vor dem Weltneustart passiert, startet die neue Welt sauber ohne ihn.
+  activeMod = null;
+  activeLoadoutPieceCodes = null;
+  registerLoadoutPieces();
+  window._activeModCode = null;
+  hideModBanner();
+});
+
+VxHooks.on('keyDown', function (handled, key) {
+  if (handled) return;
+  switch (key) {
+    case 'F6':  toggleModEditor();       return true;
+    case 'F8':  toggleCommandConsole();  return true;
+    case 'F10': generateRandomModCode(); return true;
+    case 'F12': toggleCommandHelp();     return true;
+  }
+});

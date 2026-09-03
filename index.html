@@ -244,81 +244,27 @@
 </head>
 <body>
   <!-- EARLY LOADING HINT — this is the single-file game's entire payload, so
-       on a slow connection the browser can sit on a dark background for a
-       while with nothing else parsed yet before the rest of the page becomes
-       visible. Placed as the very first thing in <body>, purely inline
-       HTML/CSS (no JS dependency, nothing to wait for), so it paints before
-       the huge stylesheet and script further down have even arrived. Removed
-       automatically once gameState reaches "PLAYING" (see updateAndDrawIntro),
-       with a hard timeout fallback so it can never get stuck on-screen.
-
-       REBUILT much simpler than the previous version (no pickaxe animation,
-       no sparks, no progress bar) — just the logo, a blinking cursor, and a
-       rotating line of absurd fake "progress" text in the spirit of the
-       game's own Block/Creature Designers ("Pixelating Blocks by Hand" is
-       literally what those do). Colours and font name are hardcoded literals,
-       not custom-property references: the real @font-face and --accent/etc.
-       definitions live in the big stylesheet further down this same file,
-       which — on the exact slow connection this element exists for — may not
-       have been parsed yet, and referencing them here would risk a flash of
-       unstyled fallback. -->
-  <style>
-    @keyframes elh-blink{0%,100%{opacity:1}50%{opacity:.15}}
-    @keyframes elh-tipin{from{opacity:0}to{opacity:1}}
-    #early-loading-hint{image-rendering:pixelated}
-    #early-loading-hint .elh-title{font-family:'Silkscreen','Courier New',monospace;font-size:40px;letter-spacing:0;color:#f0b429;text-shadow:4px 4px 0 rgba(0,0,0,.6)}
-    #early-loading-hint .elh-cursor{display:inline-block;width:10px;height:20px;margin-left:4px;background:#e0a83c;animation:elh-blink 1s steps(1,end) infinite;vertical-align:-3px}
-    #early-loading-hint .elh-tip{font-family:'Silkscreen','Courier New',monospace;font-size:10px;color:rgba(224,168,60,0.95);min-height:14px;animation:elh-tipin .25s steps(3,end)}
-  </style>
-  <div id="early-loading-hint" style="position:fixed;inset:0;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:linear-gradient(180deg,#0b0d14 0%,#12141f 55%,#171a28 100%);color:#f0f0f5;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;text-align:center;padding:24px;box-sizing:border-box;">
-    <div class="elh-title">VOXERIA<span class="elh-cursor"></span></div>
-    <div class="elh-tip" id="elh-tip-text">&gt; Pixelating Blocks by Hand</div>
-  </div>
+       on a slow connection the browser can sit blank for a while with
+       nothing else parsed yet before the rest of the page becomes visible.
+       Placed as the very first thing in <body>, purely inline HTML/CSS (no
+       JS dependency, nothing to wait for), so it paints before the huge
+       stylesheet and script further down have even arrived. Just a flat
+       black fill on purpose, no text or logo — the canvas-drawn BOOT scene
+       that takes over once the engine is ready (introKind "BOOT" in
+       updateAndDrawIntro, voxeria-engine.js) opens on the same black, so the
+       handoff between the two is invisible instead of a jump-cut or a
+       flash. Removed once that scene reaches gameState "PLAYING", with a
+       hard timeout fallback below so it can never get stuck on-screen (e.g.
+       a script error earlier in this huge file). -->
+  <div id="early-loading-hint" style="position:fixed;inset:0;z-index:999999;background:#000;"></div>
   <script>
-    // Hard fallback: if the game somehow never reaches "PLAYING" (e.g. a script
-    // error earlier in this huge file), don't leave the player staring at this
-    // forever — remove it after a generous timeout either way.
+    // Hard fallback: if the game somehow never reaches "PLAYING", don't leave
+    // the player staring at this forever — remove it after a generous
+    // timeout either way.
     setTimeout(function () {
       var elh = document.getElementById('early-loading-hint');
       if (elh) elh.remove();
     }, 15000);
-    // Rotating absurd "progress" log — purely cosmetic, swaps to the next line
-    // every ~1.6s. Stops on its own once the hint is removed (checks the
-    // element is still attached rather than clearing the interval from the
-    // outside).
-    (function () {
-      var tips = [
-        "Pixelating Blocks by Hand",
-        "Bribing Gold Slimes to Hold Still",
-        "Teaching Butterflies Basic Formation Flying",
-        "Polishing Every Single Aquamarine",
-        "Asking the Void for Directions",
-        "Reheating the Lava Core",
-        "Untangling the Portal Book's Pages",
-        "Convincing Moganite It's Not Just Grey Rock",
-        "Aligning 32×32 Pixels Very Carefully",
-        "Waking Up This Week's Seed",
-        "Sharpening All Pickaxes at Once",
-        "Debugging Gravity (Again)",
-        "Assembling Mountains From Spare Pebbles",
-        "Letting the Butterflies Out of Their Boxes",
-        "Forging Armor Nobody Asked For Yet",
-        "Painting a Creature Nobody Has Met Yet",
-        "Double-Checking That Water Is, In Fact, Wet",
-        "Counting Every Block in The Erg"
-      ];
-      var i = 0;
-      var el = document.getElementById('elh-tip-text');
-      if (!el) return;
-      setInterval(function () {
-        if (!document.body.contains(el)) return;
-        i = (i + 1) % tips.length;
-        el.textContent = '> ' + tips[i];
-        el.style.animation = 'none';
-        void el.offsetWidth; // restart the fade-in keyframe on every swap
-        el.style.animation = '';
-      }, 1600);
-    })();
   </script>
 
 <style>
@@ -586,11 +532,53 @@
     #seed-btn:hover { background: var(--accent-hover); }
     #health { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; max-width: 220px; }
     @keyframes heartbeat { 0% { transform: scale(1); } 20% { transform: scale(1.2); } 40% { transform: scale(1); } 100% { transform: scale(1); } }
-    .heart { color: #ff4757; font-size: 18px; filter: drop-shadow(0 2px 2px rgba(255,0,0,0.4)); animation: heartbeat 1.5s infinite; display: inline-block; transition: all 0.3s; }
-    .heart.cracked { color: #ff8c00; filter: drop-shadow(0 2px 4px rgba(255,100,0,0.7)); animation: none; }
-    .heart.empty { color: rgba(255, 255, 255, 0.2); filter: none; animation: none; }
+    /* A <canvas> now (see drawHealth() in voxeria-engine.js), drawn as blocky
+       pixel-art the same way every other in-game icon is -- not the smooth
+       vector ♥ glyph a text ".heart{font-size}" rendered before. Size is
+       therefore width/height on the element, not font-size, and the fill
+       colour (full red vs. dim "empty") is baked into the canvas pixels by
+       drawHealth() itself rather than read from CSS `color`, which a canvas
+       ignores. image-rendering:pixelated and the hard, zero-blur drop-shadow
+       match .slot canvas's convention so a heart reads as the same kind of
+       object as every hotbar icon. */
+    .heart {
+      width: 18px; height: 18px; image-rendering: pixelated;
+      filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.55));
+      animation: heartbeat 1.5s infinite; display: inline-block; transition: all 0.3s;
+    }
+    /* Bigger in Normal specifically: health is the one stat that whole mode
+       revolves around (there is no creative safety net), so it earns more
+       visual weight there than it needs in Exploration, where losing a heart
+       is a much smaller deal. In Normal it also moves down to sit right above
+       the hotbar (see the #health position overrides near #hotbar below) --
+       the two are read together there, so they belong in the same glance. */
+    body[data-vx-mode="normal"] .heart { width: 26px; height: 26px; }
+    body[data-vx-mode="normal"] #health { gap: 6px; max-width: 320px; }
+    .heart.cracked { filter: drop-shadow(2px 2px 0 rgba(100,40,0,0.6)); animation: none; }
+    .heart.empty { filter: none; animation: none; }
     @keyframes heartLost { 0% { transform: scale(1.4); opacity: 1; } 60% { transform: scale(0.5) rotate(20deg); opacity: 0.5; } 100% { transform: scale(0) rotate(-30deg); opacity: 0; } }
     .heart.losing { animation: heartLost 0.5s forwards; }
+    /* Normal mode only (see the comment above): fixed above the hotbar
+       instead of flowing inside #info-bar at the top. bottom is the hotbar's
+       own bottom offset + its rendered height + an 8px gap, matched by hand
+       against the three breakpoints #hotbar itself uses (see its rules near
+       #hotbar and the two @media blocks that touch it) -- there is no CSS
+       mechanism to read another element's live layout, so this has to be
+       kept in sync by hand if the hotbar's own sizing ever changes again. */
+    /* absolute, not fixed, and specifically matching #hotbar's own technique:
+       #info-bar has backdrop-filter, which -- like transform -- makes it the
+       containing block for ANY fixed/absolute descendant, fixed included. A
+       #health still nested inside #info-bar would resolve `bottom` against
+       that small top bar instead of the viewport and land off-screen. The
+       real fix is applyModeGating() (voxeria-menu-worlds.js) reparenting
+       #health out to be a direct sibling of #hotbar under #ui in Normal
+       mode; #ui has no filter of its own, so #hotbar's existing
+       position:absolute already resolves correctly against it, and matching
+       that exactly is what keeps the two aligned. */
+    body[data-vx-mode="normal"] #health {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      bottom: calc(112px + env(safe-area-inset-bottom)); z-index: 50;
+    }
     /* Defense/multiplayer/position/timer readouts used to each carry their own
        accent hue (blue, gold, green) purely for visual variety — no red/green
        "good/bad" meaning behind any of them. Neutralised along with the rest
@@ -694,6 +682,13 @@
     }
     #vx-help-btn:hover { filter: brightness(1.15); border-color: var(--accent); }
     #vx-help-btn:active { box-shadow: var(--bevel-in); }
+    /* Hidden at the world-select start screen (#vx-menu, body.vx-menu-open):
+       unlike the in-game pause menu (#game-menu-panel, a separate element),
+       #vx-menu has no Help entry of its own to be redundant with, but Jaylen
+       still wants the floating button gone there -- it clutters a screen the
+       player hasn't started playing on yet. F1 and the pause menu's own
+       "Help (F1)" entry still reach the same PDF once a world is running. */
+    body.vx-menu-open #vx-help-btn { display: none; }
     /* F2 debug menu -- Minecraft-F3-style readout. pointer-events:none so it
        never steals a click meant for the game underneath it, same reasoning
        as #controls-hint. white-space:pre because updateDebugMenu() below
@@ -717,7 +712,20 @@
     body.vx-hide-ui #controls-hint,
     body.vx-hide-ui #fps-counter,
     body.vx-hide-ui #debug-menu,
-    body.vx-hide-ui #canvas-wrapper > *:not(#canvas):not(.open) {
+    body.vx-hide-ui #canvas-wrapper > *:not(#canvas):not(.open),
+    /* Same shape as body.vx-hide-ui just above, on its own class: the main
+       menu now paints a live panorama onto #canvas (drawMenuPanorama() in
+       voxeria-engine.js) instead of sitting on an opaque background, so the
+       game's OWN HUD chrome (hearts, hotbar, the X/Y/biome bar, the minimap)
+       needs hiding too or it shows through behind the menu. Deliberately a
+       separate class from vx-hide-ui rather than reusing it: that one is the
+       player's own F4 preference and opening the menu must not read or
+       overwrite it. */
+    body.vx-menu-open #info-bar,
+    body.vx-menu-open #controls-hint,
+    body.vx-menu-open #fps-counter,
+    body.vx-menu-open #debug-menu,
+    body.vx-menu-open #canvas-wrapper > *:not(#canvas):not(.open) {
       display: none !important;
     }
     /* F8 -- tiny command console, Exploration mode only (see vxCreatorAllowed()
@@ -1254,6 +1262,11 @@
     .ng-row .ng-val-src { flex: 2 1 0; min-width: 0; }
     .ng-row .ng-val-num,
     .ng-row .ng-val-name { flex: 1 1 0; min-width: 0; }
+    /* A text slot's own field gets the same share as the source dropdown next
+       to it: unlike a number, what goes in here is a sentence a player reads
+       back ("You need more torches"), so a 1-share field would show a handful
+       of characters and hide the rest. */
+    .ng-row .ng-val-text { flex: 2 1 0; min-width: 0; }
     .ng-node input[type="text"], .ng-node input[type="number"], .ng-node select {
       flex: 1; min-width: 0; background: var(--surface-2); color: var(--text-1);
       border: 1px solid var(--line-1); border-radius: var(--radius-sm);
@@ -1907,6 +1920,24 @@
     #coop-mods-btn { display: none; }
     body[data-vx-mode="explore"] #coop-mods-btn,
     body[data-vx-mode="arena"] #coop-mods-btn { display: flex; }
+    /* Normal is the guided run: the Portal Book already tells you what is
+       next, so a Map button sitting in the top bar is one more thing to
+       glance past for no reason. The map itself is not gone -- "M" and the
+       pause menu's own Minimap entry still open it -- only this permanent
+       top-bar shortcut is Exploration/Arena-only. Same reasoning, same
+       data-vx-mode source applyModeGating() already sets, just inverted:
+       everywhere else defaults to visible, Normal switches it off. */
+    body[data-vx-mode="normal"] #minimap-btn { display: none; }
+    /* The bottom-right HELP button is the controls-reference shortcut for a
+       player finding their own way around an open world. Normal already
+       hands you that structure through the Portal Book, so the shortcut is
+       redundant there -- F1 and the pause menu's own "Help (F1)" entry still
+       reach the same PDF. */
+    body[data-vx-mode="normal"] #vx-help-btn { display: none; }
+    /* Same call for the pause menu's "Block Guide" entry: it is a browse-
+       everything reference (including blocks Normal's fixed route never
+       hands you), which fits the open half of the game, not the guided one. */
+    body[data-vx-mode="normal"] #menu-block-inv-btn { display: none; }
     #game-menu-btn.open { border-color: var(--accent); color: var(--accent); }
     #minimap-btn.open, #block-inv-btn.open { border-color: var(--accent); color: var(--accent); }
 
@@ -2212,6 +2243,9 @@
   #fps-counter { font-size: 10px; }
   #hotbar { bottom: calc(8px + env(safe-area-inset-bottom)); padding: 6px; gap: 4px; min-height: 48px; }
   .slot { width: 40px; height: 40px; }
+  /* #hotbar is 56px tall at this breakpoint (6px padding + 40px slot + 2px
+     border, times two) sitting 8px up -- 8+56=64px of clearance, +8px gap. */
+  body[data-vx-mode="normal"] #health { bottom: calc(72px + env(safe-area-inset-bottom)); }
   #touch-controls { bottom: calc(64px + env(safe-area-inset-bottom)); }
   #top-right-hud { top: 6px; right: 6px; gap: 4px; }
   #hud-side-actions > div { width: 26px; height: 26px; font-size: 12px; border-radius: 0; }
@@ -2296,6 +2330,9 @@
   }
   #hotbar::-webkit-scrollbar { display: none; }
   #hotbar .slot { width: 38px; height: 38px; flex: 0 0 auto; }
+  /* #hotbar is 52px tall here (5px padding + 38px slot + 2px border, times
+     two) sitting 6px up -- 6+52=58px of clearance, +8px gap. */
+  body[data-vx-mode="normal"] #health { bottom: calc(66px + env(safe-area-inset-bottom)); }
 
   /* The once-ever onboarding hint sits at a fixed top:150px (see its base
      rule above) sized for a desktop-sized viewport underneath it. On a short
@@ -2699,6 +2736,8 @@
 #cm-toggle-row input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 #arena-start-btn:disabled, #arena-reset-btn:disabled { opacity: 0.45; cursor: default; }
 #arena-start-btn:disabled:hover, #arena-reset-btn:disabled:hover { background: var(--surface-2); border-color: var(--line-1); }
+#arena-stop-btn { margin-top: 8px; border-color: #ff5566; color: #ff5566; }
+#arena-stop-btn:hover { background: rgba(255, 85, 102, 0.12); }
 
 /* ── ARENA-HUD — Phase, Uhr, Tabelle ──────────────────────────────────────
    Steht 78px unter der Oberkante statt an ihr: der Pocket-Timer sitzt bei
@@ -3170,6 +3209,7 @@
         <input type="number" id="arena-round-len" value="120" min="30" max="900" step="10">
         <button class="rp-btn" id="arena-start-btn" onclick="VxArena.startMatch()">Start match</button>
       </div>
+      <button class="rp-btn wide ghost" id="arena-stop-btn" onclick="VxArena.stopMatch()">Stop match</button>
     </div>
     <div id="ap-hint">The whole world is the arena — build it however you like, then start a round. The rules themselves live in the Mod Editor: build a chain off &ldquo;When the match starts&rdquo;.</div>
   </div>
@@ -3728,7 +3768,7 @@
       <div id="mod-editor-modal">
         <div class="ae-head">
           <h2><canvas class="vx-icon vx-icon-settings" data-icon="puzzle"></canvas> Mod Editor</h2>
-          <div class="ae-head-sub">Drag blocks onto the board and connect them with lines. An event starts a chain, actions run in order, conditions split it in two.</div>
+          <div class="ae-head-sub">Drag blocks onto the board and connect them with lines. An event starts a chain, actions run in order, conditions split it in two. Prefer typing? The Terminal writes the same blocks as text.</div>
           <button id="close-mod-editor-top" onclick="toggleModEditor()">✕</button>
         </div>
 
@@ -3860,6 +3900,7 @@
               <div class="ng-guide-more">
                 Drag a node to move it · click a wire to unhook it ·
                 drag the empty board to pan.
+                <br>Once you know the blocks, <b>Ctrl+T</b> writes the same ones as text.
               </div>
               <div class="ng-example-label">Or start from an example</div>
               <div class="ng-examples" id="ng-examples"></div>
@@ -3947,7 +3988,7 @@
               <div class="ae-group-label">Load a mod</div>
               <div class="mb-field">
                 <div class="mb-import-row">
-                  <input type="text" id="ng-import" class="mb-input" placeholder="VXG1-...">
+                  <input type="text" id="ng-import" class="mb-input" placeholder="VXG2-...">
                   <button type="button" class="mb-btn-ghost" id="ng-import-btn">Load</button>
                 </div>
               </div>
@@ -4207,15 +4248,28 @@
   #vx-menu {
     position: fixed; inset: 0; z-index: 100050;
     display: none; flex-direction: column; align-items: center; justify-content: center;
-    background: #0b0d14;
+    /* Was a flat #0b0d14, fully opaque -- hid the live world panorama
+       (drawMenuPanorama() in voxeria-engine.js) that now scrolls behind this
+       screen. A dark scrim instead of no background at all: the title sits
+       directly on #vx-menu (not inside .vx-panel, which keeps its own solid
+       fill below), and needs to stay readable against whatever terrain
+       colour happens to be passing underneath at that moment. */
+    background: linear-gradient(180deg, rgba(11,13,20,0.62) 0%, rgba(11,13,20,0.42) 45%, rgba(11,13,20,0.62) 100%);
     font-family: var(--font-display);
     color: var(--text-1);
     padding: 24px; overflow-y: auto;
   }
   #vx-menu.show { display: flex; }
+  /* Same wordmark recipe as the marketing site (website/index.html): white
+     glyphs, an accent-purple contact edge, then a hard black offset behind
+     that -- a sprite sitting on its own drop shadow, not a soft text-shadow.
+     Still the shared --accent (Jaylen wants the app-wide violet, not a
+     colour of its own) -- just a wider offset than the rest of the UI's
+     standard --px so more of that violet edge shows around the letters. */
   #vx-menu h1 {
-    font-size: 40px; color: #f0b429; margin-bottom: 4px;
-    text-shadow: 4px 4px 0 rgba(0,0,0,0.6); letter-spacing: 0;
+    font-size: 64px; color: var(--text-1); margin-bottom: 4px;
+    text-shadow: calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--accent), 6px 6px 0 rgba(0,0,0,0.6);
+    letter-spacing: 0;
   }
   #vx-menu .vx-sub { font-size: 8px; color: var(--text-3); margin-bottom: 28px; }
   .vx-panel {
@@ -4315,31 +4369,27 @@
     box-shadow: var(--bevel); padding: 12px; margin: 2px 0 12px;
   }
   .vx-studio.show { display: block; }
-  /* The whole header is the collapse/expand control — one big, obvious click
-     target rather than a small caret button, matching how chunky every other
-     control in this menu already is. */
-  .vx-studio-head {
-    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
-    cursor: pointer; user-select: none;
+  /* No longer a collapse control: the panel owns its own screen now (see
+     #vx-view-explore), so there is nothing to collapse it out of the way of,
+     and hiding the mode's headline feature behind a click is exactly the
+     problem that screen exists to fix. The mode name itself moved to the
+     trail above (see .vx-trail) rather than repeating as a badge here too. */
+  .vx-studio-head { margin-bottom: 8px; user-select: none; }
+  .vx-studio-title { font-family: var(--font-display); font-size: 15px; color: var(--text-1); }
+
+  /* The trail: three screens, always three words wide, so where you are and
+     what happens next is legible before reading anything else on the screen.
+     Plain text rather than a progress bar, since the whole flow is two clicks
+     long, and a bar implies a length worth measuring that this does not
+     have. */
+  .vx-trail {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 14px;
+    font-family: var(--font-display); font-size: 10px; letter-spacing: 0.02em;
   }
-  .vx-studio-head:hover { filter: brightness(1.15); }
-  .vx-studio-badge {
-    font-family: var(--font-display); font-size: 8px; color: #fff;
-    background: var(--accent); padding: 3px 6px; box-shadow: var(--bevel);
-  }
-  .vx-studio-title { font-family: var(--font-display); font-size: 13px; color: var(--text-1); }
-  /* Pushed to the far right by the head's flex layout. Rotated rather than
-     swapped for a different glyph on collapse, so there is only ever one
-     character to keep in sync with the state. */
-  .vx-studio-caret {
-    margin-left: auto; font-family: var(--font-display); font-size: 11px;
-    color: var(--text-2); transition: transform 0.1s steps(2, end);
-  }
-  .vx-studio.collapsed .vx-studio-caret { transform: rotate(-90deg); }
-  /* Collapsed by default (see vxStudioSetVisible) so the new-world screen
-     opens short enough to fit without scrolling — this single rule is what
-     that default hides. */
-  .vx-studio.collapsed .vx-studio-body { display: none; }
+  .vx-trail-step { color: var(--text-3); }
+  .vx-trail-step.done { color: var(--text-2); }
+  .vx-trail-step.now { color: var(--accent-hover); }
+  .vx-trail-sep { color: var(--text-3); }
   /* Same reasoning as .vx-mode-desc: the longest prose in the menu is set in
      the UI face, not the bitmap one. */
   .vx-studio-pitch {
@@ -4371,6 +4421,80 @@
     margin-bottom: 9px; min-height: 14px;
   }
   .vx-studio-have b { color: var(--accent); font-weight: 700; }
+
+  /* The one tile on the Exploration screen, sized like the offer it is rather
+     than like one of three equal options: art on the left, name and sentence
+     stacked beside it, so it reads as a door and not as a toolbar button.
+     Relatively positioned so the "Recommended" tag can pin to its corner. */
+  .vx-studio-tile-hero {
+    position: relative; flex-direction: row; align-items: center; gap: 10px;
+    padding: 14px 12px 12px; text-align: left;
+  }
+  .vx-studio-tile-hero .vx-studio-art { width: 44px; height: 44px; flex: 0 0 auto; }
+  .vx-studio-tile-hero .vx-studio-tile-name { font-size: 13px; }
+  .vx-studio-tile-hero .vx-studio-tile-sub { text-align: left; font-size: 11px; }
+  /* Stacks name over sentence while the art stays beside both. */
+  .vx-studio-tile-hero > span { display: block; }
+  /* Says, in one word, why this is the bigger of the two doors below,
+     without it, "big tile vs. small row" is a layout choice the player has
+     to infer instead of a claim the screen actually makes. */
+  .vx-tile-tag {
+    position: absolute; top: -8px; left: 10px;
+    font-family: var(--font-display); font-size: 8px; color: #fff;
+    background: var(--accent); padding: 3px 6px; box-shadow: var(--bevel);
+  }
+
+  /* The second door. Deliberately quieter than the tile above it: a terminal
+     is the right tool for somebody who already knows the vocabulary and the
+     wrong first impression for somebody who does not, so it is named and one
+     click away without competing for the eye. */
+  .vx-studio-alt {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+    background: var(--surface-1); color: var(--text-2);
+    border: var(--px) solid var(--line-1); box-shadow: var(--bevel);
+    padding: 8px 10px; margin-bottom: 10px; cursor: pointer;
+    transition: filter 0.1s steps(2, end);
+  }
+  .vx-studio-alt:hover { filter: brightness(1.25); border-color: var(--accent); }
+  .vx-studio-alt:active { box-shadow: var(--bevel-in); }
+  .vx-studio-alt-key {
+    font-family: var(--font-mono); font-size: 13px; color: var(--accent-hover);
+    flex: 0 0 auto;
+  }
+  .vx-studio-alt-text {
+    font-family: var(--font-ui); font-size: 11px; line-height: 1.45; color: var(--text-3);
+  }
+  .vx-studio-alt-text b { color: var(--text-1); font-weight: 700; }
+  .vx-studio-alt-kbd {
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-2);
+    background: var(--surface-3); border: 1px solid var(--hud-border);
+    padding: 0 4px;
+  }
+
+  /* Normal's three beats. Numbered because the run really is a sequence --
+     see the note on structure in the mode screens above. */
+  .vx-run-steps { display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; }
+  .vx-run-step { display: flex; align-items: flex-start; gap: 8px; }
+  .vx-run-num {
+    flex: 0 0 auto; width: 18px; height: 18px; line-height: 18px; text-align: center;
+    font-family: var(--font-display); font-size: 9px; color: #fff;
+    background: var(--accent); box-shadow: var(--bevel);
+  }
+  .vx-run-text {
+    font-family: var(--font-ui); font-size: 11.5px; line-height: 1.45; color: var(--text-2);
+  }
+  .vx-run-text b { color: var(--text-1); font-weight: 700; }
+
+  /* Where the shared name/seed form is parked while nothing shows it. Without
+     this it would sit visible at the bottom of the menu on every screen. */
+  #vx-world-setup { display: none; }
+  .vx-setup-slot > #vx-world-setup { display: block; }
+  /* The mode tiles are now navigation, so each one says where it goes. */
+  .vx-mode-go {
+    font-family: var(--font-display); font-size: 9px; color: var(--accent-hover);
+    margin-top: 7px;
+  }
+  .vx-mode:hover { border-color: var(--accent); }
 
   /* ── UI BUTTON TEXTURE ─────────────────────────────────────────────────
      Same 32x32 per-pixel noise the player character and blocks use (see the
@@ -4406,6 +4530,146 @@
   #seed-btn:hover, #policy-close:hover, .mb-btn-primary:hover, #sell-all-btn:hover, #voxeriahub-confirm:hover, #new-world-confirm:hover,
   .vx-btn.primary:hover, .craft-btn:hover {
     background-image: var(--tex-accent-hover);
+  }
+</style>
+
+<!-- ===================================================================== -->
+<!-- MOD GALLERY (window.VxGallery, voxeria-gallery.js)                     -->
+<!-- Sidebar + publish modal live as SIBLINGS of #vx-menu (not inside it):  -->
+<!-- #vx-menu is a column flexbox that centers its own children as a       -->
+<!-- group, so a "left of the panel" sidebar can't just become another     -->
+<!-- flex child without fighting that centering. Sitting outside it lets   -->
+<!-- the sidebar use its own independent position:fixed, and its           -->
+<!-- visibility can piggyback on #vx-menu's own .show class via a plain    -->
+<!-- CSS sibling selector -- no JS hook needed in VxWorlds.show()/hide().  -->
+<!-- ===================================================================== -->
+<style>
+  #vx-gallery-sidebar { display: none; }
+  #vx-menu.show ~ #vx-gallery-sidebar { display: block; }
+
+  #vx-gallery-sidebar {
+    /* 230px half-panel + 80px gap + 300px sidebar = 610. max() keeps the
+       sidebar on screen instead of sliding off the left edge on the narrower
+       windows that still clear the breakpoint below -- it just tucks closer
+       to the panel there rather than disappearing halfway. */
+    position: fixed; top: 50%; left: max(16px, calc(50vw - 610px)); transform: translateY(-50%);
+    width: 300px; max-height: 78vh; overflow-y: auto;
+    z-index: 100050; padding: 14px; box-sizing: border-box;
+    /* Genuine translucency (Jaylen: "durchsichtig wie im Minecraft Launcher"),
+       NOT the --hud-* tokens: those are pinned opaque/blur:0 on purpose (see
+       the comment where they're defined) after the game deliberately moved
+       away from a glassmorphism look for the regular HUD. This sidebar is a
+       different family, same one #vx-menu's own scrim already belongs to. */
+    background: linear-gradient(180deg, rgba(11,13,20,0.55) 0%, rgba(11,13,20,0.35) 45%, rgba(11,13,20,0.55) 100%);
+    border: var(--px) solid var(--hud-border);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    font-family: var(--font-ui);
+  }
+  #vx-gallery-sidebar h2 {
+    font-family: var(--font-display); font-size: 15px; color: var(--text-1);
+    margin: 0 0 10px; letter-spacing: 0.04em;
+  }
+  #vx-gallery-publish-btn { width: 100%; margin-bottom: 10px; }
+  .vx-gallery-hint { color: var(--text-3); font-size: 12px; padding: 10px 4px; }
+
+  /* The "newspaper laying itself out" effect: every entry starts invisible
+     and offset, then settles in with a slight rotation correction, staggered
+     purely via each entry's own inline animation-delay (set in JS) so the
+     CSS here doesn't need to know how many entries there are. */
+  @keyframes vx-gallery-in {
+    from { opacity: 0; transform: translateY(14px) rotate(-0.6deg); }
+    to   { opacity: 1; transform: translateY(0) rotate(0); }
+  }
+  .vx-gallery-entry {
+    opacity: 0; animation: vx-gallery-in 0.42s cubic-bezier(.2,.7,.3,1) both;
+    background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 10px 8px;
+  }
+  .vx-gallery-entry:last-child { border-bottom: none; }
+  .vx-gallery-title { font-family: var(--font-display); font-size: 13px; color: var(--text-1); }
+  .vx-gallery-byline { font-size: 11px; color: var(--text-3); margin: 3px 0 8px; }
+  .vx-gallery-entry .vx-btn { padding: 7px 10px; font-size: 12px; margin-bottom: 0; }
+
+  /* Below this width there is no longer room for the 460px main panel PLUS
+     this sidebar side by side (neither the phone-portrait query at ~820px
+     nor the creator-tools query at 760px are about this panel — measured
+     against the sidebar's own footprint instead). The number comes straight
+     out of the max() clamp above: once the sidebar is pinned at left:16px,
+     its right edge sits at 316px, and the panel's left edge is 50vw-230 —
+     those meet at a 1092px viewport, so 1100 is the last width where the two
+     still don't touch. The gallery stays a desktop bonus; the menu itself is
+     untouched below this width, exactly as it is today. */
+  @media (max-width: 1100px) {
+    #vx-gallery-sidebar { display: none !important; }
+  }
+
+  /* Shared shape for all four gallery dialogs -- same self-centering fixed
+     recipe #policy-modal already established, just stacked above #vx-menu
+     (100050) instead of above the in-game HUD. */
+  #vx-gallery-publish-modal, #vx-gallery-full-modal,
+  #vx-gallery-details-modal, #vx-gallery-report-modal {
+    display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: var(--surface-1); border: var(--px) solid var(--line-1);
+    box-shadow: var(--shadow-panel); padding: 20px; max-width: 92vw;
+    max-height: 84vh; overflow-y: auto; box-sizing: border-box; font-family: var(--font-ui);
+  }
+  #vx-gallery-publish-modal { z-index: 100060; width: 420px; }
+  #vx-gallery-full-modal    { z-index: 100060; width: 880px; }
+  /* Above the full gallery: both open on top of it, never beside it. */
+  #vx-gallery-details-modal { z-index: 100070; width: 420px; }
+  #vx-gallery-report-modal  { z-index: 100070; width: 380px; }
+  #vx-gallery-publish-modal.open, #vx-gallery-full-modal.open,
+  #vx-gallery-details-modal.open, #vx-gallery-report-modal.open { display: block; }
+  #vx-gallery-publish-modal h3, #vx-gallery-full-modal h3,
+  #vx-gallery-details-modal h3, #vx-gallery-report-modal h3 {
+    font-family: var(--font-display); font-size: 16px; color: var(--text-1); margin: 0 0 4px;
+  }
+  .vx-gallery-modal-sub { color: var(--text-2); font-size: 12px; margin: 0 0 16px; }
+
+  /* Category row: the game's own icon set, never system emoji (those render
+     differently per OS and would sit wrong next to 32x32 block art). */
+  #vx-gallery-categories { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .vx-gallery-cat {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    background: var(--surface-2); color: var(--text-2);
+    border: var(--px) solid var(--line-1); box-shadow: var(--bevel);
+    font-family: var(--font-display); font-size: 11px; padding: 7px 10px;
+  }
+  .vx-gallery-cat:hover { filter: brightness(1.2); border-color: var(--accent); }
+  .vx-gallery-cat.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .vx-gallery-ico { width: 14px; height: 14px; image-rendering: pixelated; display: block; }
+
+  #vx-gallery-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px;
+  }
+  .vx-gallery-card {
+    background: var(--surface-2); border: var(--px) solid var(--line-1); box-shadow: var(--bevel);
+    padding: 8px; opacity: 0; animation: vx-gallery-in 0.42s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .vx-gallery-thumb {
+    display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
+    image-rendering: pixelated; border: var(--px) solid var(--line-1); margin-bottom: 8px;
+  }
+  .vx-gallery-thumb-empty { background: repeating-linear-gradient(45deg, #1a1a24 0 6px, #20202c 6px 12px); }
+  .vx-gallery-card-title { font-family: var(--font-display); font-size: 12px; color: var(--text-1); }
+  .vx-gallery-card-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .vx-gallery-act {
+    flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    background: var(--surface-1); border: var(--px) solid var(--line-1); box-shadow: var(--bevel);
+    padding: 7px 0;
+  }
+  .vx-gallery-act:hover { filter: brightness(1.3); border-color: var(--accent); }
+  .vx-gallery-act:active { box-shadow: var(--bevel-in); }
+  .vx-gallery-act.primary { background: var(--accent); border-color: var(--accent); flex: 1.4; }
+  .vx-gallery-act[disabled] { opacity: 0.4; cursor: default; }
+
+  #vx-gallery-details-body { color: var(--text-2); font-size: 12.5px; line-height: 1.6; white-space: pre-line; margin-bottom: 16px; }
+  .vx-gallery-reason { display: block; color: var(--text-2); font-size: 12.5px; margin-bottom: 8px; cursor: pointer; }
+  .vx-gallery-reason input { margin-right: 8px; }
+
+  @media (max-width: 980px) {
+    #vx-gallery-full-modal { width: 96vw; }
+    #vx-gallery-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   }
 </style>
 
@@ -4477,7 +4741,176 @@
     <button class="vx-btn" onclick="VxWorlds.view('mp')">Back</button>
   </div>
 
+  <!-- STEP 1 of creating a world: pick the mode, and nothing else. It used to
+       carry the name, the seed, the mode tiles AND the (collapsed) creator
+       panel all at once, which buried the thing that makes each mode worth
+       picking under a form. Now each mode owns the screen that follows, and
+       "Start World" lives there, so the choice leads somewhere instead of
+       just ticking a box on a page you were already finished with. -->
   <div class="vx-panel" id="vx-view-new" style="display:none">
+    <!-- The trail, shared by all three screens in this flow (see .vx-trail
+         below): step 1 is always "here", so it never needs a variant of its
+         own the way the other two screens' trails do. -->
+    <div class="vx-trail">
+      <span class="vx-trail-step now">1&ensp;Mode</span>
+      <span class="vx-trail-sep">&rsaquo;</span>
+      <span class="vx-trail-step">2&ensp;Set up</span>
+    </div>
+    <div class="vx-field"><label>CHOOSE A MODE</label></div>
+    <div class="vx-mode" data-mode="explore" onclick="VxWorlds.pickMode('explore')">
+      <div class="vx-mode-name">Exploration</div>
+      <div class="vx-mode-desc">Endless overworld for building and unwinding. Make your own blocks, creatures and rules, and play in a world nobody else has.</div>
+      <div class="vx-mode-go">Make it yours &rsaquo;</div>
+    </div>
+    <div class="vx-mode" data-mode="normal" onclick="VxWorlds.pickMode('normal')">
+      <div class="vx-mode-name">Normal</div>
+      <div class="vx-mode-desc">The full loop. The Portal Book unlocks the dimensions; the goal is to craft every armor set.</div>
+      <div class="vx-mode-go">Start the run &rsaquo;</div>
+    </div>
+    <div class="vx-mode" data-mode="arena" onclick="VxWorlds.pickMode('arena')">
+      <div class="vx-mode-name">Arena</div>
+      <div class="vx-mode-desc">An empty field of your chosen width. Build it, write the rules for it, then play a round in it, on your own or with people you invite later.</div>
+      <div class="vx-mode-go">Build a field &rsaquo;</div>
+    </div>
+    <button class="vx-btn" onclick="VxWorlds.view('root')">Back</button>
+  </div>
+
+  <!-- STEP 2c: Arena. Bisher nur ueber "Raum hosten" erreichbar, obwohl ein
+       Match seit jeher auch allein laeuft. Genau hier fehlte der Weg: eigene
+       Minispielregeln testet man am einfachsten in einem leeren Feld, das man
+       selbst gebaut hat, und nicht in einer endlosen Welt. -->
+  <div class="vx-panel" id="vx-view-arena" style="display:none">
+    <div class="vx-trail">
+      <span class="vx-trail-step done">1&ensp;Mode</span>
+      <span class="vx-trail-sep">&rsaquo;</span>
+      <span class="vx-trail-step now">2&ensp;Arena</span>
+    </div>
+    <div class="vx-studio show">
+      <div class="vx-studio-head">
+        <span class="vx-studio-title">Your own field</span>
+      </div>
+      <div class="vx-studio-body">
+        <div class="vx-studio-pitch">
+          A flat, empty world with walls, and nothing in it but what you put there.
+        </div>
+        <div class="vx-run-steps">
+          <div class="vx-run-step">
+            <span class="vx-run-num">1</span>
+            <span class="vx-run-text"><b>Build</b> &middot; the field stays in the build phase until you start a round.</span>
+          </div>
+          <div class="vx-run-step">
+            <span class="vx-run-num">2</span>
+            <span class="vx-run-text"><b>Write the rules</b> &middot; the Mod Editor and the Terminal are both on here.</span>
+          </div>
+          <div class="vx-run-step">
+            <span class="vx-run-num">3</span>
+            <span class="vx-run-text"><b>Play a round</b> &middot; alone to test it, or with others once you share the seed.</span>
+          </div>
+        </div>
+        <div class="vx-studio-have">Your build is kept between rounds, so a round can be replayed on the same field.</div>
+      </div>
+    </div>
+    <div class="vx-field"><label>FIELD LAYOUT</label></div>
+    <div class="vx-seg" id="vx-arena-template-row"></div>
+    <div class="vx-field"><label>FIELD WIDTH</label></div>
+    <div class="vx-seg" id="vx-arena-width-row"></div>
+    <div class="vx-field"><label>THEN, NAME YOUR WORLD</label></div>
+    <div class="vx-setup-slot"></div>
+    <button class="vx-btn" onclick="VxWorlds.view('new')">Back</button>
+  </div>
+
+  <!-- STEP 2a: Exploration. Modding IS this mode, so it is the screen rather
+       than a panel on it. The node editor is the recommended door on purpose:
+       it is the half of the system somebody who has never written code can
+       walk into, and it is what makes the feature look inviting rather than
+       technical. The Terminal sits underneath as the second door, named and
+       one click away, but visibly the option for someone who already knows
+       what they are doing. -->
+  <div class="vx-panel" id="vx-view-explore" style="display:none">
+    <div class="vx-trail">
+      <span class="vx-trail-step done">1&ensp;Mode</span>
+      <span class="vx-trail-sep">&rsaquo;</span>
+      <span class="vx-trail-step now">2&ensp;Exploration</span>
+    </div>
+    <div id="vx-studio" class="vx-studio show">
+      <div class="vx-studio-head">
+        <span class="vx-studio-title">Make it yours</span>
+      </div>
+      <div class="vx-studio-body">
+        <div class="vx-studio-pitch">
+          Paint blocks and creatures, wire up rules &mdash; all in one place. One short code, no downloads.
+        </div>
+        <!-- One door, not three: Blocks/Creatures used to be separate tiles here,
+             but that made a player choose between three lookalike buttons before
+             they had even seen any of them. Painting a block or a creature is now
+             a "Create" action reached from inside the Mod Editor itself (see
+             ngCreateBlock/ngCreateCreature), so this panel only ever opens one
+             thing. -->
+        <div class="vx-studio-tiles">
+          <button type="button" class="vx-studio-tile vx-studio-tile-hero" onclick="VxWorlds.openStudio('GRAPH')">
+            <span class="vx-tile-tag">Recommended</span>
+            <canvas class="vx-studio-art" id="vx-studio-art-rule" width="32" height="32"></canvas>
+            <span class="vx-studio-tile-name">Mod Editor</span>
+            <span class="vx-studio-tile-sub" id="vx-studio-sub-rule">Drag blocks onto a board and join them with lines. No typing.</span>
+          </button>
+        </div>
+        <button type="button" class="vx-studio-alt" onclick="VxWorlds.openStudio('TERMINAL')">
+          <span class="vx-studio-alt-key">&gt;_</span>
+          <span class="vx-studio-alt-text"><b>World Terminal</b> &middot; the same blocks as text, for experienced modders. <span class="vx-studio-alt-kbd">Ctrl</span>+<span class="vx-studio-alt-kbd">T</span></span>
+        </button>
+        <div class="vx-studio-have" id="vx-studio-have"></div>
+      </div>
+    </div>
+    <div class="vx-field"><label>THEN, NAME YOUR WORLD</label></div>
+    <div class="vx-setup-slot"></div>
+    <button class="vx-btn" onclick="VxWorlds.view('new')">Back</button>
+  </div>
+
+  <!-- STEP 2b: Normal. Its own screen for the same reason Exploration has one:
+       the guided run has a shape worth showing before it starts, and a mode
+       that led straight back to a shared form would read as the afterthought
+       of the other one. -->
+  <div class="vx-panel" id="vx-view-normal" style="display:none">
+    <div class="vx-trail">
+      <span class="vx-trail-step done">1&ensp;Mode</span>
+      <span class="vx-trail-sep">&rsaquo;</span>
+      <span class="vx-trail-step now">2&ensp;Normal</span>
+    </div>
+    <div class="vx-studio show">
+      <div class="vx-studio-head">
+        <span class="vx-studio-title">The run</span>
+      </div>
+      <div class="vx-studio-body">
+        <div class="vx-studio-pitch">
+          A fixed route with a fixed world. Mine your way down, open the dimensions in order, and come back out wearing what you found.
+        </div>
+        <div class="vx-run-steps">
+          <div class="vx-run-step">
+            <span class="vx-run-num">1</span>
+            <span class="vx-run-text"><b>Dig</b> &middot; the Portal Book tracks what you are still missing.</span>
+          </div>
+          <div class="vx-run-step">
+            <span class="vx-run-num">2</span>
+            <span class="vx-run-text"><b>Open a dimension</b> &middot; Gold, Lava, Ocean and Void, each behind its own portal.</span>
+          </div>
+          <div class="vx-run-step">
+            <span class="vx-run-num">3</span>
+            <span class="vx-run-text"><b>Forge the armor</b> &middot; one set per dimension. All four is the goal.</span>
+          </div>
+        </div>
+        <div class="vx-studio-have">Creator tools stay off here &mdash; this half is the guided one.</div>
+      </div>
+    </div>
+    <div class="vx-field"><label>THEN, NAME YOUR WORLD</label></div>
+    <div class="vx-setup-slot"></div>
+    <button class="vx-btn" onclick="VxWorlds.view('new')">Back</button>
+  </div>
+
+  <!-- The name/seed form and its Start button, shared by both mode screens and
+       moved into whichever one is showing (see view()). One copy rather than
+       two, so there is exactly one #vx-new-name for createWorld() to read and
+       no way for the two screens to drift apart. -->
+  <div id="vx-world-setup">
     <div class="vx-err" id="vx-new-err"></div>
     <div class="vx-field">
       <label>WORLD NAME</label>
@@ -4487,51 +4920,7 @@
       <label>SEED (BLANK = RANDOM)</label>
       <input id="vx-new-seed" maxlength="40" placeholder="e.g. voxeria-42">
     </div>
-    <div class="vx-field"><label>MODE</label></div>
-    <div class="vx-mode sel" data-mode="explore" onclick="VxWorlds.pickMode('explore')">
-      <div class="vx-mode-name">Exploration</div>
-      <div class="vx-mode-desc">Endless overworld for building and unwinding. No Portal Book, no dimensions, no time pressure.</div>
-    </div>
-    <div class="vx-mode" data-mode="normal" onclick="VxWorlds.pickMode('normal')">
-      <div class="vx-mode-name">Normal</div>
-      <div class="vx-mode-desc">The full loop. The Portal Book unlocks the dimensions; the goal is to craft every armor set.</div>
-    </div>
-
-    <!-- Creator Studio invitation. Always on this screen, whichever mode is
-         picked: modding is a headline feature of the game, not a consolation
-         prize for the mode without a goal ladder. Wired up in vxStudio*(). -->
-    <div id="vx-studio" class="vx-studio collapsed">
-      <div class="vx-studio-head" onclick="VxWorlds.toggleStudioCollapse()">
-        <span class="vx-studio-badge">STUDIO</span>
-        <span class="vx-studio-title">MAKE IT YOURS</span>
-        <span class="vx-studio-caret">&#9660;</span>
-      </div>
-      <div class="vx-studio-body">
-        <!-- One line, not four: this used to be a paragraph of marketing copy
-             in a menu where every other label is a handful of words. The tiles
-             below carry the rest of the pitch on their own. -->
-        <div class="vx-studio-pitch">
-          Paint blocks and creatures, wire up rules — all in one place. One short code, no downloads.
-        </div>
-        <!-- One door, not three: Blocks/Creatures used to be separate tiles here,
-             but that made a player choose between three lookalike buttons before
-             they had even seen any of them. Painting a block or a creature is now
-             a "Create" action reached from inside the Mod Editor itself (see
-             ngCreateBlock/ngCreateCreature), so this panel only ever opens one
-             thing. -->
-        <div class="vx-studio-tiles">
-          <button type="button" class="vx-studio-tile" onclick="VxWorlds.openStudio('GRAPH')">
-            <canvas class="vx-studio-art" id="vx-studio-art-rule" width="32" height="32"></canvas>
-            <span class="vx-studio-tile-name">Mod Editor</span>
-            <span class="vx-studio-tile-sub" id="vx-studio-sub-rule">Paint blocks, creatures &amp; wire up rules</span>
-          </button>
-        </div>
-        <div class="vx-studio-have" id="vx-studio-have"></div>
-      </div>
-    </div>
-
     <button class="vx-btn primary" onclick="VxWorlds.createWorld()">Start World</button>
-    <button class="vx-btn" onclick="VxWorlds.view('root')">Back</button>
   </div>
 
   <div class="vx-panel" id="vx-view-load" style="display:none">
@@ -4548,29 +4937,118 @@
   </div>
 </div>
 
+<div id="vx-gallery-sidebar">
+  <h2>MOD GALLERY</h2>
+  <button class="vx-btn primary" id="vx-gallery-publish-btn" onclick="VxGallery.openPublishModal()">+ Publish a mod</button>
+  <div id="vx-gallery-list"><div class="vx-gallery-hint">Connecting…</div></div>
+  <button class="vx-btn" id="vx-gallery-all-btn" onclick="VxGallery.openFullGallery()">See all mods &rsaquo;</button>
+</div>
+
+<div id="vx-gallery-full-modal">
+  <h3>Mod Gallery</h3>
+  <p class="vx-gallery-modal-sub">Everything players have published. Pick a category to narrow it down.</p>
+  <div id="vx-gallery-categories"></div>
+  <div id="vx-gallery-grid"></div>
+  <button class="vx-btn" style="margin-top:16px" onclick="VxGallery.closeFullGallery()">Close</button>
+</div>
+
+<div id="vx-gallery-details-modal">
+  <h3 id="vx-gallery-details-title">Mod</h3>
+  <p class="vx-gallery-modal-sub">Read straight out of the mod's own code — nothing here is typed in by hand.</p>
+  <div id="vx-gallery-details-body"></div>
+  <button class="vx-btn" onclick="VxGallery.closeDetails()">Close</button>
+</div>
+
+<div id="vx-gallery-report-modal">
+  <h3 id="vx-gallery-report-title">Report</h3>
+  <p class="vx-gallery-modal-sub">Pick everything that applies.</p>
+  <div id="vx-gallery-report-reasons"></div>
+  <div class="vx-err" id="vx-gallery-report-err"></div>
+  <button class="vx-btn primary" onclick="VxGallery.submitReport()">Send report</button>
+  <button class="vx-btn" onclick="VxGallery.closeReportModal()">Cancel</button>
+</div>
+
+<div id="vx-gallery-publish-modal">
+  <h3>Publish a mod</h3>
+  <p class="vx-gallery-modal-sub">Paste a mod code, a loadout code, or a single block/creature/rule code (e.g. the Node Graph editor's own Export button). Add more with "+" to bundle several into one listing.</p>
+  <div class="vx-field">
+    <label>MOD, LOADOUT, OR PIECE/RULE CODE</label>
+    <input id="vx-gallery-base-code" maxlength="4000" placeholder="MOD1- / VXM3- / VXL1- / VXG2- / …" spellcheck="false" autocomplete="off">
+  </div>
+  <div id="vx-gallery-extra-fields"></div>
+  <button class="vx-btn" onclick="VxGallery.addPublishCodeField()">+ Add another piece code</button>
+  <div class="vx-err" id="vx-gallery-publish-err"></div>
+  <button class="vx-btn primary" onclick="VxGallery.submitPublish()">Publish</button>
+  <button class="vx-btn" onclick="VxGallery.closePublishModal()">Cancel</button>
+</div>
 
 <!-- =====================================================================
      GAME SCRIPTS -- order matters.
      These are classic scripts, so they share one global scope exactly the
      way they did when this was a single file. The order below is the
      dependency order, and voxeria-boot.js must stay last.
-     ===================================================================== -->
-<script src="voxeria-engine.js"></script>
-<script src="voxeria-dimensions-progress.js"></script>
-<script src="voxeria-modding.js"></script>
-<script src="voxeria-menu-worlds.js"></script>
+
+     ?v=2 on every tag below: itch.io's CDN serves each of these files with
+     Cache-Control: max-age=2678400 (31 days) at its plain, unversioned path
+     -- confirmed 2026-09-01 by reading the actual response headers. Itch DOES
+     put a fresh ?v=<timestamp> on the outer index.html request itself on
+     every new upload, so a returning player's browser is guaranteed to fetch
+     a new copy of THIS file -- but that freshly-fetched index.html used to
+     still point at the exact same unversioned voxeria-engine.js etc. URLs as
+     always, which the browser then happily served straight out of its
+     31-day cache, network request skipped entirely. A player could be
+     looking at a build that was already fixed on the server and see the
+     old, broken one anyway, with nothing in the browser (no error, no failed
+     request) to suggest why. Bump every ?v=N below by one before zipping a
+     new itch/pitch build -- same manual-version-marker habit as
+     BLOCK_TEXTURE_VERSION (voxeria-engine.js) and the World Terminal's
+     header version. Forgetting to bump it just means this build caches
+     exactly as long as the last one did, not a broken one -- it's a "get
+     the update out sooner" habit, not a correctness requirement. -->
+<!-- Fundament: BLOCKS, Weltgeometrie, Dimensionen, Seed und Zufall. MUSS als
+     erste Datei stehen. Alles darunter liest von hier, und const/let sind vor
+     ihrer eigenen Deklaration nicht benutzbar, anders als Funktionen. -->
+<script src="voxeria-core.js?v=2"></script>
+<script src="voxeria-engine.js?v=2"></script>
+<!-- Weltgenerierung. Nach voxeria-engine.js, weil sie von dort BLOCKS,
+     CHUNK_W, WORLD_H, dimensions und die Seed-Zufallsfunktionen bezieht, und
+     vor voxeria-dimensions-progress.js, dessen Pocket- und Arena-Generatoren
+     von getChunk() aufgerufen werden. -->
+<script src="voxeria-worldgen.js?v=2"></script>
+<script src="voxeria-dimensions-progress.js?v=2"></script>
+<script src="voxeria-modding.js?v=2"></script>
+<script src="voxeria-menu-worlds.js?v=2"></script>
 <!-- Arena-Modus. Muss NACH voxeria-menu-worlds.js stehen: der Modus traegt
      sich selbst in dessen exportierte MODES-Tabelle ein, statt sie dort zu
      erweitern. Aendert keine Zeile im Motor -- entfernt man dieses Tag, ist
      der Modus restlos weg. -->
-<script src="voxeria-arena.js"></script>
+<script src="voxeria-arena.js?v=2"></script>
 <!-- Koop-Mods (Modus 2). Nach voxeria-modding.js, weil es dessen
      Registrierung und VxPieces benutzt, und nach voxeria-menu-worlds.js,
      weil es das studio-Flag aus MODES liest. -->
-<script src="voxeria-coop-mods.js"></script>
-<script src="voxeria-devtools.js"></script>
-<script src="voxeria-juice.js"></script>
-<script src="voxeria-desert-prototype.js"></script>
-<script src="voxeria-boot.js"></script>
+<script src="voxeria-coop-mods.js?v=2"></script>
+<!-- Mod-Galerie (window.VxGallery). Nach voxeria-modding.js (Mod-/
+     Loadout-Code-Funktionen) und voxeria-menu-worlds.js (VxWorlds.applySave/
+     save/show/hide). Entfernt man dieses Tag, ist die Galerie restlos weg --
+     die Sidebar/das Modal in #vx-menu bleiben einfach leer und unsichtbar. -->
+<script src="voxeria-gallery.js?v=2"></script>
+<!-- World Terminal. Nach voxeria-modding.js, weil es dessen NODE_CATALOG,
+     Graph-Runtime und Mod-Editor benutzt: das Terminal ist kein zweites
+     Skriptsystem, sondern dieselbe Blocksprache als Text. Entfernt man dieses
+     Tag, ist das Terminal restlos weg und der Node-Editor laeuft unveraendert
+     weiter. -->
+<script src="voxeria-terminal.js?v=2"></script>
+<script src="voxeria-devtools.js?v=2"></script>
+<script src="voxeria-juice.js?v=2"></script>
+<script src="voxeria-desert-prototype.js?v=2"></script>
+<!-- voxeriaSelfTest(): one console command that re-checks the things that have
+     broken before. Loaded last but one, because it reads VxTerminal,
+     modSelfTest and worldGenSelfTest and therefore has to come after all
+     three. It only DEFINES a function, so it costs a page load nothing until
+     someone calls it, and it ships with the build on purpose: the bug it was
+     written for (the BOOT intro drawing under an opaque cover) was only ever
+     wrong in a finished zip, so the check has to be runnable inside one. -->
+<script src="voxeria-tests.js?v=2"></script>
+<script src="voxeria-boot.js?v=2"></script>
 </body>
 </html>
