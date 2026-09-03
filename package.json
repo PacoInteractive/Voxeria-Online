@@ -8,8 +8,13 @@
     "type": "commonjs",
     "scripts": {
         "start": "electron .",
+        "check": "node tools/check.js",
+        "check:syntax": "node tools/check.js syntax",
+        "check:deps": "node tools/check.js deps",
+        "check:cycles": "node tools/check.js cycles",
         "build": "node build-zip.js",
-        "build:desktop": "electron-builder --win nsis"
+        "build:desktop": "electron-builder --win nsis",
+        "build:itch": "node build-zip.js itch"
     },
     "devDependencies": {
         "archiver": "^7.0.1",
