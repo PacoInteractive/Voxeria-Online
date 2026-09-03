@@ -3,6 +3,9 @@
 Das Spiel lag vorher komplett in **einer** Datei (`Voxeria_core.html`, ~20.000 Zeilen).
 Es ist jetzt aufgeteilt — inhaltlich identisch, nur auf mehrere Dateien verteilt.
 
+Die kurze Fassung der Regeln, die beim Arbeiten gelten, steht in `CLAUDE.md`.
+Diese Datei hier ist das Nachschlagewerk mit den Begruendungen.
+
 ## Was liegt wo
 
 | Datei | Inhalt | Wer arbeitet dran |
