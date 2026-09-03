@@ -45,3 +45,10 @@ npm-debug.log*
 # Lokale Claude-Berechtigungen. Gelten nur auf diesem Rechner; launch.json und
 # serve.ps1 daneben sind dagegen projektweit nuetzlich und bleiben versioniert.
 .claude/settings.local.json
+
+# Zwischenstaende von build-zip.js. Der Build raeumt sie selbst weg, aber bei
+# einem Abbruch bleiben sie liegen, und dann darf keiner davon versehentlich
+# committet werden: es sind Kopien, keine Quellen.
+index.build.html
+*.build.js
+*.strip.js

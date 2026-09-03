@@ -19,10 +19,16 @@
 // Nach dem Packen prueft sich der Build selbst (siehe pruefeInhalt unten): war
 // ein Skript aus index.html nicht dabei, oder ist die Musik im falschen Ziel
 // gelandet, bricht er ab statt ein kaputtes ZIP abzuliefern.
+//
+// Jedes Skript verliert auf dem Weg ins Archiv seine Kommentare (Schritt 3.5).
+// Die Dateien im Ordner bleiben davon unberuehrt, und die Zeilennummern im
+// Archiv stimmen weiterhin mit denen der Quelle ueberein. Das Warum steht im
+// Kopf von tools/strip-comments.js.
 // ============================================================================
 
 const fs = require('fs');
 const archiver = require('archiver');   // npm install archiver --save-dev
+const { bereinige } = require('./tools/strip-comments.js');
 
 function heute() {
   const d = new Date();
@@ -145,6 +151,50 @@ if (!fs.existsSync('Assets')) abbruch('der Ordner Assets/ fehlt.');
 if (ZIEL.musikOrdner && !fs.existsSync('Music')) abbruch('der Ordner Music/ fehlt, wird fuer den itch-Build aber gebraucht.');
 
 // ---------------------------------------------------------------------------
+// 3.5 Kommentare raus, aber nur fuer das Archiv
+// ---------------------------------------------------------------------------
+// Die Dateien im Ordner bleiben, wie sie sind. Jedes Skript wandert durch
+// tools/strip-comments.js in eine Temporaerdatei, und gepackt wird die.
+// Warum ueberhaupt: rund 40 Prozent des handgeschriebenen Codes sind
+// Kommentar, und das ist im Repository richtig so, denn dort stehen die
+// Begruendungen. Im ZIP liest sie niemand, sie kosten nur Ladezeit.
+//
+// Die Zeilennummern bleiben dabei gleich, siehe Kopf von strip-comments.js:
+// Zeile 4711 im Archiv ist Zeile 4711 in der Quelle. Ein Fehlerbericht aus
+// der Konsole eines Spielers bleibt damit ohne Umrechnung nachschlagbar.
+//
+// Bricht eine der drei Gegenrechnungen dort, bricht der Build ab. Ein ZIP mit
+// einer Datei, bei der eine Heuristik danebenlag, ist schlimmer als kein ZIP:
+// es parst vielleicht noch und faellt erst beim Spieler auf.
+const strippedQuelle = {};   // Originalname -> Temporaerdatei
+let gespartGesamt = 0;
+
+function bereiteVor(name, quelle) {
+  const src = fs.readFileSync(quelle, 'utf8');
+  const r = bereinige(src, name);
+  if (r.fehler) abbruch('Kommentare entfernen fehlgeschlagen. ' + r.fehler);
+  const temp = name.replace(/\.js$/, '') + '.strip.js';
+  fs.writeFileSync(temp, r.code);
+  tempDateien.push(temp);
+  strippedQuelle[name] = temp;
+  gespartGesamt += r.gespart;
+}
+
+for (const f of scriptTags) {
+  bereiteVor(f, f === 'voxeria-engine.js' ? engineQuelle : f);
+}
+// Die Engine wird ab hier aus der bereinigten Fassung gepackt. Wichtig fuer
+// pruefeInhalt() weiter unten: die liest engineQuelle und sucht darin die
+// Musik-Attrappe, und die steht in einer Deklaration, nicht in einem
+// Kommentar, ueberlebt das Entfernen also unveraendert.
+engineQuelle = strippedQuelle['voxeria-engine.js'];
+
+// package.json und main.js sind Electron-Dateien, DATEISTRUKTUR.md ist der
+// Text, dessentwegen der Build sie ueberhaupt mitnimmt. Beides bleibt
+// unangetastet: bei den Extras ist der Kommentar nicht Ballast, sondern der
+// Inhalt.
+
+// ---------------------------------------------------------------------------
 // 4. Packen
 // ---------------------------------------------------------------------------
 const output = fs.createWriteStream(OUTPUT_ZIP);
@@ -174,10 +224,9 @@ archive.pipe(output);
 
 packe(TEMP_HTML, 'index.html');
 for (const f of ZIEL.extras) packe(f, f);
-for (const f of scriptTags) {
-  if (f === 'voxeria-engine.js') packe(engineQuelle, 'voxeria-engine.js');
-  else packe(f, f);
-}
+// Immer aus strippedQuelle, nie aus dem Ordner: sonst waere die eine Datei,
+// die jemand hier vergisst, die eine mit Kommentaren im Archiv.
+for (const f of scriptTags) packe(strippedQuelle[f], f);
 
 const assetsAnzahl = zaehleOrdner('Assets');
 archive.directory('Assets/', 'Assets');
@@ -229,6 +278,8 @@ function pruefeInhalt(mb) {
   console.log(`  Datei     ${OUTPUT_ZIP}  (${mb} MB)`);
   console.log(`  Inhalt    ${dateien} Dateien: ${scriptTags.length} Skripte, ${assetsAnzahl} Assets` +
               (ZIEL.musikOrdner ? `, ${musikAnzahl} Musikstuecke` : ', ohne Musik'));
+  console.log(`  Kommentar ${(gespartGesamt / 1024).toFixed(0)} KB aus den Skripten entfernt ` +
+              '(nur im Archiv, die Quelldateien sind unveraendert).');
   if (ZIEL.musikRaus) {
     console.log('  Hinweis   Musik ausgeschlossen (Suno-Gratis-Tarif, nicht kommerziell nutzbar).');
   }
