@@ -1,0 +1,6 @@
+# Normalizes line endings to LF in the repository and on checkout, so
+# editing a file that still has old Windows CRLF endings doesn't turn every
+# line of it into a diff the next time it's touched (this already happened
+# to index.html). Does not rewrite existing history -- only affects files
+# as they're re-checked-out or re-committed from here on.
+* text=auto eol=lf

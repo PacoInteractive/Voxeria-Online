@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "voxeria",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", ".claude/serve.ps1"
+      ],
+      "port": 4173,
+      "autoPort": true
+    }
+  ]
+}

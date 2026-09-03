@@ -1,0 +1,33 @@
+#!/bin/sh
+# ============================================================================
+# VOXERIA -- PRE-COMMIT
+# ----------------------------------------------------------------------------
+# Laeuft vor jedem Commit. Eingeschaltet wird er einmal pro Klon mit
+#
+#   git config core.hooksPath tools/hooks
+#
+# Warum nicht .git/hooks: das wird nicht versioniert, geht bei jedem neuen Klon
+# verloren und niemand merkt es. Hier steht er im Repository.
+#
+# Warum ueberhaupt lokal statt nur in der CI: dieses Projekt hat (noch) kein
+# Remote. Eine CI, die nirgends laeuft, schuetzt vor gar nichts.
+#
+# Ueberspringen im Notfall:  git commit --no-verify
+# ============================================================================
+set -e
+
+echo "pre-commit: npm run check"
+npm run --silent check || {
+  echo ""
+  echo "Der Check ist rot. Committet wird nicht."
+  echo "Wenn das Absicht ist:  git commit --no-verify"
+  exit 1
+}
+
+echo "pre-commit: npm run lint"
+npm run --silent lint || {
+  echo ""
+  echo "Der Linter meldet FEHLER (Warnungen allein blockieren nicht)."
+  echo "Wenn das Absicht ist:  git commit --no-verify"
+  exit 1
+}

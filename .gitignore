@@ -1,0 +1,54 @@
+# Build- und Abhängigkeits-Ordner
+node_modules/
+dist/
+output/
+Voxeria-win32-x64/
+/build/
+/out/
+
+# Zip-Archive (Build-Ausgabe, nicht Quellcode)
+*.zip
+
+# Alte Backup-Stände (liegen weiterhin auf der Platte, werden nur nicht versioniert –
+# jede Datei ist ~9,6 MB und würde das Repo unnötig aufblähen)
+Voxeria_core.backup*.html
+Voxeria_core.html.bak*
+Voxeria_core_(Backup*.html
+Voxeria_core.dev.html
+Voxeria_core+.html
+Voxeria_lite*.html
+
+# Archivierter Monolith (siehe archive/) — bewusst nicht versioniert,
+# index.html + die Skripte sind die einzige Quelle
+/archive/
+
+# Editor / Betriebssystem Temp-Dateien
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Sonstige temporäre Dateien
+*.bak
+*.tmp
+npm-debug.log*
+
+# Build-Reste, die *.zip oben nicht erwischt (anderer Suffix, aber dieselbe
+# 24-MB-Ausgabe)
+*.zip.broken
+
+# Windows-Kopien ("Datei - Kopie.js"). Entstehen beim Duplizieren im Explorer
+# und sind nie die Quelle, sondern immer ein Zwischenstand.
+* - Kopie.*
+* - Copy.*
+
+# Lokale Claude-Berechtigungen. Gelten nur auf diesem Rechner; launch.json und
+# serve.ps1 daneben sind dagegen projektweit nuetzlich und bleiben versioniert.
+.claude/settings.local.json
+
+# Zwischenstaende von build-zip.js. Der Build raeumt sie selbst weg, aber bei
+# einem Abbruch bleiben sie liegen, und dann darf keiner davon versehentlich
+# committet werden: es sind Kopien, keine Quellen.
+index.build.html
+*.build.js
+*.strip.js

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxeria — Spieler online</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: #ffffff;
+    color: #000000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .live-number {
+    font-size: 22vw;
+    line-height: 1;
+    font-weight: 800;
+    color: #000000;
+    letter-spacing: -0.02em;
+    transition: opacity 0.15s ease;
+  }
+  .live-label {
+    font-size: 1rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #888888;
+    margin-bottom: 2.5rem;
+  }
+  .peak-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  .peak-number {
+    font-size: 3.2rem;
+    font-weight: 700;
+    color: #444444;
+  }
+  .peak-label {
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #aaaaaa;
+  }
+  .conn-status {
+    position: fixed;
+    bottom: 1rem;
+    right: 1.2rem;
+    font-size: 0.75rem;
+    color: #cccccc;
+  }
+  @media (max-width: 600px) {
+    .live-number { font-size: 28vw; }
+    .peak-number { font-size: 2rem; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="live-label">Spieler online</div>
+  <div class="live-number" id="liveCount">–</div>
+
+  <div class="peak-row">
+    <div class="peak-number" id="peakCount">–</div>
+    <div class="peak-label">24h Highscore</div>
+  </div>
+
+  <div class="conn-status" id="connStatus">Verbinde…</div>
+
+<script type="module">
+  // Same Firebase project the game itself uses (Voxeria_core.html), so this
+  // page reads the live presence data multiplayer already writes there —
+  // no separate backend needed.
+  const firebaseConfig = {
+    apiKey: "AIzaSyAZzGkkqTyRxbJDehI-gtsNjf6IcgAPZoY",
+    authDomain: "voxeria-1e357.firebaseapp.com",
+    projectId: "voxeria-1e357",
+    storageBucket: "voxeria-1e357.firebasestorage.app",
+    messagingSenderId: "361199903585",
+    appId: "1:361199903585:web:50c05d50e9eae3b1c25b20"
+  };
+
+  const STALE_MS = 15000;   // a player doc older than this is treated as disconnected
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  const liveEl = document.getElementById('liveCount');
+  const peakEl = document.getElementById('peakCount');
+  const statusEl = document.getElementById('connStatus');
+
+  async function main() {
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+    const { getAuth, signInAnonymously, onAuthStateChanged } =
+      await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+    const { getFirestore, collection, doc, onSnapshot, runTransaction } =
+      await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = firebaseConfig.projectId;
+    const peakRef = doc(db, 'artifacts', appId, 'public', 'data', 'voxeria_stats', 'dailyPeak');
+    const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'voxeria_players');
+
+    async function reportPeak(liveCount) {
+      if (liveCount <= 0) return;
+      try {
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(peakRef);
+          const now = Date.now();
+          if (!snap.exists()) {
+            tx.set(peakRef, { count: liveCount, windowStart: now });
+            return;
+          }
+          const data = snap.data();
+          if (now - (data.windowStart || 0) > DAY_MS) {
+            tx.set(peakRef, { count: liveCount, windowStart: now });
+          } else if (liveCount > (data.count || 0)) {
+            tx.set(peakRef, { count: liveCount, windowStart: data.windowStart }, { merge: true });
+          }
+        });
+      } catch (e) {
+        console.warn('Konnte 24h-Highscore nicht aktualisieren:', e);
+      }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) return;
+      statusEl.textContent = 'Verbunden';
+
+      onSnapshot(playersRef, (snapshot) => {
+        const now = Date.now();
+        let count = 0;
+        snapshot.forEach((d) => {
+          const data = d.data();
+          if (now - (data.ts || 0) < STALE_MS) count++;
+        });
+        liveEl.textContent = count;
+        reportPeak(count);
+      }, (err) => {
+        console.error('Spieler-Snapshot-Fehler:', err);
+        statusEl.textContent = 'Verbindungsfehler';
+      });
+
+      onSnapshot(peakRef, (snap) => {
+        if (!snap.exists()) { peakEl.textContent = '0'; return; }
+        const data = snap.data();
+        if (Date.now() - (data.windowStart || 0) > DAY_MS) {
+          peakEl.textContent = '0';
+        } else {
+          peakEl.textContent = data.count ?? '0';
+        }
+      }, (err) => console.error('Highscore-Snapshot-Fehler:', err));
+    });
+
+    signInAnonymously(auth).catch((e) => {
+      console.error('Anmeldung fehlgeschlagen:', e);
+      statusEl.textContent = 'Keine Verbindung';
+    });
+  }
+
+  main().catch((e) => {
+    console.error(e);
+    statusEl.textContent = 'Ladefehler';
+  });
+</script>
+
+</body>
+</html>

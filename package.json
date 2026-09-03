@@ -1,0 +1,28 @@
+{
+    "name": "voxeria",
+    "version": "1.1.0",
+    "private": true,
+    "author": "Jaylen Winkler",
+    "license": "UNLICENSED",
+    "main": "main.js",
+    "type": "commonjs",
+    "scripts": {
+        "start": "electron .",
+        "check": "node tools/check.js",
+        "check:syntax": "node tools/check.js syntax",
+        "check:worldgen": "node tools/check.js worldgen",
+        "check:deps": "node tools/check.js deps",
+        "check:cycles": "node tools/check.js cycles",
+        "lint": "eslint voxeria-*.js tools/ main.js build-zip.js eslint.config.js",
+        "lint:fix": "eslint --fix voxeria-*.js tools/ main.js build-zip.js eslint.config.js",
+        "build": "node build-zip.js",
+        "build:desktop": "electron-builder --win nsis",
+        "build:itch": "node build-zip.js itch"
+    },
+    "devDependencies": {
+        "archiver": "^7.0.1",
+        "electron": "^43.2.0",
+        "electron-builder": "^26.15.3",
+        "eslint": "^10.9.1"
+    }
+}
