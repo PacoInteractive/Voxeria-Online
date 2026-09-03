@@ -7116,10 +7116,24 @@ function ngInjectStyle() {
 // example's ids look indistinguishable from ones the editor would generate
 // itself, and ngLoadGraph's own id-scan (see there) picks up the counter
 // correctly for whatever gets added next.
+// Jedes Beispiel traegt drei Dinge: was es IST (name), was es TUT (desc) und
+// welche Faehigkeit des Systems es VORFUEHRT (teaches). Das dritte ist der
+// eigentliche Zweck der Liste. Ohne es liest sich die Sammlung als "hier sind
+// ein paar fertige Mods"; mit ihm als Landkarte dessen, was der Katalog
+// ueberhaupt kann, und das ist die Frage, mit der jemand den Editor aufmacht.
+//
+// teaches nennt die Bausteine und beschreibt nicht noch einmal, was passiert:
+// das steht schon in desc und stuende sonst zweimal auf derselben Karte.
+//
+// Eine Bedingungsmarke ("Arena", "2+ players") gibt es hier bewusst NICHT als
+// Feld. Sie kommt aus den Knoten des Beispiels selbst (ngNeedsHtml), also aus
+// dem, was das Beispiel tatsaechlich benutzt, statt aus einer Angabe, die
+// jemand beim Hinzufuegen vergessen koennte.
 const NG_EXAMPLES = [
   {
     name: 'Double Jump Rune',
     desc: 'Touch the block to get an extra jump in the air.',
+    teaches: 'Block trigger + player stat',
     nodes: [
       { id: 'n1', type: 'onBlock', x: 40,  y: 40, params: { how: 'touches', block: BLOCKS.TORCH } },
       { id: 'n2', type: 'setStat', x: 300, y: 40, params: { stat: 'air jumps', to: { s: VALUE_FIXED, n: 2, v: 'SCORE' } } }
@@ -7129,6 +7143,7 @@ const NG_EXAMPLES = [
   {
     name: 'Reward Trigger',
     desc: 'Touch the block to receive an item.',
+    teaches: 'Block trigger + inventory',
     nodes: [
       { id: 'n1', type: 'onBlock', x: 40,  y: 40, params: { how: 'touches', block: BLOCKS.RAINBOW_ORE } },
       { id: 'n2', type: 'changeItems', x: 300, y: 40,
@@ -7139,6 +7154,7 @@ const NG_EXAMPLES = [
   {
     name: 'Night Watcher',
     desc: 'Sparkles appear the moment night falls.',
+    teaches: 'World event + effects',
     nodes: [
       { id: 'n1', type: 'onDayPhase', x: 40,  y: 40, params: { phase: 'night falls' } },
       { id: 'n2', type: 'emitParticles', x: 300, y: 40,
@@ -7153,6 +7169,7 @@ const NG_EXAMPLES = [
   {
     name: 'Depth Meter',
     desc: 'Every few seconds, tell the player how deep they are.',
+    teaches: 'Timer + live reading in a number slot',
     nodes: [
       { id: 'n1', type: 'onTimer', x: 40, y: 40, params: { seconds: 5 } },
       { id: 'n2', type: 'changeVar', x: 300, y: 40,
@@ -7165,6 +7182,15 @@ const NG_EXAMPLES = [
              { from: 'n2', fromPort: 'out', to: 'n3' } ]
   }
 ];
+
+// Im selben Geist wie checkActionGroupsComplete weiter oben: teaches ist der
+// Grund, aus dem diese Liste existiert, also faellt ein Beispiel ohne es beim
+// Laden auf und nicht erst, wenn jemand die Karten anschaut.
+(function checkExamplesTeach() {
+  for (const ex of NG_EXAMPLES) {
+    if (!ex.teaches) console.warn('Voxeria: example "' + ex.name + '" has no teaches: line, so its card cannot say what it demonstrates.');
+  }
+})();
 
 // Deep-cloned per load — ngLoadGraph hands the array straight to ngGraph, and
 // every edit after that (drag, param change, delete) mutates it in place. Without
@@ -8363,15 +8389,29 @@ const NG_ARENA_ONLY = new Set(['onMatchStart', 'onMatchEnd', 'ifInArena',
 // graphSweepZones auch den lokalen Spieler prueft, feuern beide auch allein.
 const NG_NEEDS_OTHERS = new Set(['onPlayerJoin', 'onPlayerLeave', 'onPlayerTouch']);
 
-// Was ein Mod zum Laufen braucht, aus seinen eigenen Karten gelesen.
-function ngModNeeds(code) {
-  const g = decodeGraphCode(code);
-  if (!g) return [];
-  const types = new Set(g.nodes.map(n => n.type));
+// Was ein Graph zum Laufen braucht, aus seinen eigenen Karten gelesen. Nimmt
+// die Knotenliste statt eines Codes, damit auch ein Beispiel aus NG_EXAMPLES
+// hier durchgehen kann: das liegt als offene Knotenliste vor und war nie ein
+// Code. Ein Beispiel, das jemand laedt und das dann still nichts tut, weil er
+// allein in einer Erkundungswelt steht, saehe fuer ihn nicht nach "passt hier
+// nicht" aus, sondern nach "Modding ist kaputt".
+function ngNeedsForNodes(nodes) {
+  const types = new Set((nodes || []).map(n => n.type));
   const needs = [];
   if ([...types].some(t => NG_ARENA_ONLY.has(t))) needs.push('Arena');
   if ([...types].some(t => NG_NEEDS_OTHERS.has(t))) needs.push('2+ players');
   return needs;
+}
+// Der Satz zur Marke, an einer Stelle, damit die Modliste und die
+// Beispielkarte dieselbe Bedingung nicht unterschiedlich erklaeren.
+function ngNeedsTitle(need) {
+  return need === 'Arena'
+    ? 'This only does something in a running Arena match'
+    : 'This only does something when another player is in the world';
+}
+function ngNeedsHtml(nodes) {
+  return ngNeedsForNodes(nodes).map(n =>
+    '<span class="ng-needs" title="' + ngNeedsTitle(n) + '">' + escapeHtml(n) + '</span>').join('');
 }
 
 function ngRenderPieceList() {
@@ -8382,10 +8422,8 @@ function ngRenderPieceList() {
     // Der Hinweis steht an der Liste und nicht nur beim Speichern: dort sucht
     // man, wenn ein Mod "nichts tut", und genau dann ist die Bedingung die
     // wahrscheinlichste Ursache.
-    const needs = ngModNeeds(p.code).map(n =>
-      '<span class="ng-needs" title="This mod only does something ' +
-      (n === 'Arena' ? 'in a running Arena match' : 'when another player is in the world') +
-      '">' + escapeHtml(n) + '</span>').join('');
+    const g = decodeGraphCode(p.code);
+    const needs = ngNeedsHtml(g ? g.nodes : []);
     return `
     <div class="bd-piece-row" data-id="${p.localId}">
       <label class="mb-check"><input type="checkbox" class="bd-piece-enable" ${p.enabled !== false ? 'checked' : ''}></label>
@@ -8750,8 +8788,14 @@ function ngInit() {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'ng-example-btn';
-      b.innerHTML = '<span class="ng-example-name">' + escapeHtml(ex.name) + '</span>' +
-                    '<span class="ng-example-desc">' + escapeHtml(ex.desc) + '</span>';
+      // Reihenfolge mit Absicht: Name, daneben die Bedingungsmarke (sie
+      // gehoert zum Namen, nicht zur Erklaerung), darunter was es tut, zuletzt
+      // die Faehigkeit. Wer die Liste ueberfliegt, liest die Namen; wer sucht,
+      // was das System kann, liest die unterste Zeile.
+      b.innerHTML = '<span class="ng-example-name">' + escapeHtml(ex.name) +
+                      ngNeedsHtml(ex.nodes) + '</span>' +
+                    '<span class="ng-example-desc">' + escapeHtml(ex.desc) + '</span>' +
+                    (ex.teaches ? '<span class="ng-example-teaches">' + escapeHtml(ex.teaches) + '</span>' : '');
       b.addEventListener('click', () => ngLoadExample(ex));
       exHost.appendChild(b);
     }

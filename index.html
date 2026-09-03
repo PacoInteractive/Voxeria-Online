@@ -1528,6 +1528,13 @@
     .ng-example-btn:hover { background: var(--surface-3); border-color: var(--line-2); border-left-color: var(--accent); }
     .ng-example-name { font-size: 12px; font-weight: 700; }
     .ng-example-desc { font-size: 11px; color: var(--text-2); }
+    /* Die Faehigkeitszeile. Gedaempft und klein, weil sie beim Ueberfliegen
+       nicht mit dem Namen konkurrieren soll, aber da ist, sobald jemand
+       gezielt sucht, was das System ueberhaupt kann. */
+    .ng-example-teaches {
+      margin-top: 3px; font-size: 10.5px; color: var(--text-3, var(--text-2));
+      letter-spacing: 0.02em;
+    }
     #reskin-reset-btn {
       align-self: flex-start; background: var(--surface-2); color: var(--text-2); border: 1px solid var(--line-1);
       padding: 7px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; font-weight: 600;
