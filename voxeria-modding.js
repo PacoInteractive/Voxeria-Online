@@ -9667,10 +9667,6 @@ VxHooks.on('update', updateGraphRuntime);
 // dass die Engine dafuer eine Zeile aendert.
 VxHooks.on('gameEvent', function (type, ctx) { fireGraphEvent(type, ctx); });
 
-// F6 Mod-Editor, F8 Konsole, F10 Zufallscode, F12 Hilfe. Vier Tastenkuerzel,
-// die vorher im keydown-Handler der Engine standen und jetzt in der Datei
-// stehen, der sie gehoeren. Wer nichts zurueckgibt, hat die Taste nicht
-// angefasst und laesst sie fuer den naechsten liegen.
 // Mod-Codes und Loadout-Codes im Seed-Feld. Diese sechzig Zeilen standen bis
 // eben in applySeedFromUI() in voxeria-engine.js, also mitten in dem Pfad, der
 // ueber Weltidentitaet entscheidet. Sie sind hier unveraendert, nur mit einem
@@ -9732,6 +9728,10 @@ VxHooks.on('seedInput', function (claimed, inputVal) {
   hideModBanner();
 });
 
+// F6 Mod-Editor, F8 Konsole, F10 Zufallscode, F12 Hilfe. Vier Tastenkuerzel,
+// die vorher im keydown-Handler der Engine standen und jetzt in der Datei
+// stehen, der sie gehoeren. Wer nichts zurueckgibt, hat die Taste nicht
+// angefasst und laesst sie fuer den naechsten liegen.
 VxHooks.on('keyDown', function (handled, key) {
   if (handled) return;
   switch (key) {

@@ -145,6 +145,7 @@ const BUILTIN = new Set(('Array Object String Number Boolean Symbol BigInt Math 
   'HTMLElement HTMLCanvasElement HTMLImageElement HTMLInputElement Element Node NodeList DOMParser TextEncoder TextDecoder ' +
   'parseInt parseFloat isNaN isFinite encodeURIComponent decodeURIComponent encodeURI decodeURI escape unescape ' +
   'alert confirm prompt structuredClone crypto matchMedia getComputedStyle devicePixelRatio innerWidth innerHeight ' +
+  'atob btoa CSS AbortController IntersectionObserverEntry ' +
   'undefined NaN Infinity arguments eval ' +
   'require module exports process Buffer setImmediate ' +
   'firebase').split(/\s+/));
@@ -158,39 +159,96 @@ const KEYWORD = new Set(('var let const function class return if else for while 
 // zaehlt jedes Wort in jedem Hilfetext als Bezeichner. Code in ${...} zaehlt
 // weiterhin, denn das ist echter Code.
 function strip(src) {
+  // Zaehlt die Umbrueche in einem Stueck, das gleich verschwindet.
+  const nl = text => {
+    let k = 0;
+    for (let j = 0; j < text.length; j++) if (text[j] === '\n') k++;
+    return '\n'.repeat(k);
+  };
+  // Das letzte bedeutsame Zeichen, das als echter Code herauskam. Daran
+  // entscheidet sich, ob ein '/' eine Division oder ein Regex-Literal
+  // einleitet: nach einem Wert (Bezeichner, Ziffer, schliessende Klammer) ist
+  // es eine Division, sonst ein Regex.
+  let letztes = '';
+  const merke = ch => { if (!/\s/.test(ch)) letztes = ch; };
+
   let out = '';
   let i = 0;
   const n = src.length;
   while (i < n) {
     const c = src[i];
     const d = src[i + 1];
+    // Zeilenkommentar: der Umbruch dahinter bleibt ohnehin stehen.
     if (c === '/' && d === '/') { while (i < n && src[i] !== '\n') i++; continue; }
-    if (c === '/' && d === '*') { i += 2; while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++; i += 2; continue; }
+    // Regex-Literal. Ohne diesen Zweig verschluckt sich der Scanner an einer
+    // Zeile wie
+    //
+    //   .replace(/"/g, '&quot;')
+    //
+    // Er sieht dort das Anfuehrungszeichen IM Regex, haelt es fuer einen
+    // String-Anfang und frisst alles bis zum naechsten Anfuehrungszeichen
+    // irgendwo weiter unten. In voxeria-engine.js waren das rund 350 Zeilen,
+    // und alle Deklarationen darin galten als nicht vorhanden: showHintOnce()
+    // steht auf Spaltenposition 0 und wurde trotzdem nie gefunden.
+    //
+    // Die Unterscheidung ist die uebliche Heuristik und fuer diesen Zweck
+    // genau genug. Eckige Klammern zaehlen mit, damit ein '/' in einer
+    // Zeichenklasse wie [^/] das Literal nicht vorzeitig beendet.
+    if (c === '/' && d !== '*' && !/[\w$)\]]/.test(letztes)) {
+      const von = i;
+      i++;
+      let klasse = false;
+      while (i < n) {
+        const z = src[i];
+        if (z === '\\') { i += 2; continue; }
+        if (z === '\n') break;                 // ein Regex geht nie ueber Zeilen
+        if (z === '[') klasse = true;
+        else if (z === ']') klasse = false;
+        else if (z === '/' && !klasse) { i++; break; }
+        i++;
+      }
+      while (i < n && /[a-z]/.test(src[i])) i++;   // Flags
+      out += ' ' + nl(src.slice(von, i));
+      merke('/');
+      continue;
+    }
+    if (c === '/' && d === '*') {
+      const von = i;
+      i += 2;
+      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i += 2;
+      out += nl(src.slice(von, i));
+      continue;
+    }
     if (c === '"' || c === '\'' || c === '`') {
       const q = c;
+      const von = i;
       i++;
       while (i < n && src[i] !== q) {
         if (src[i] === '\\') { i += 2; continue; }
         if (q === '`' && src[i] === '$' && src[i + 1] === '{') {
           let depth = 1;
           i += 2;
-          const start = i;
+          const inner = i;
           while (i < n && depth > 0) {
             if (src[i] === '{') depth++;
             else if (src[i] === '}') depth--;
             if (depth > 0) i++;
           }
-          out += ' ' + strip(src.slice(start, i)) + ' ';
+          out += ' ' + strip(src.slice(inner, i)) + ' ';
           i++;
           continue;
         }
         i++;
       }
       i++;
-      out += ' ';
+      out += ' ' + nl(src.slice(von, i));
+      // Ein String ist ein Wert: ein '/' danach ist Division, kein Regex.
+      merke('x');
       continue;
     }
     out += c;
+    merke(c);
     i++;
   }
   return out;
@@ -214,6 +272,31 @@ function declaredIn(code) {
   };
   // Nur Zeilenanfang ohne Einrueckung: das ist der globale Namensraum.
   collect(/^(?:var|let|const)\s+([A-Za-z_$][\w$]*)/gm);
+  // ... und die weiteren Namen derselben Deklaration. `let dimForgeX = null,
+  // dimForgeY = null;` deklariert zwei, die Regel oben sieht nur den ersten.
+  // Das war lange unsichtbar und hat gleich drei Dinge verfaelscht: die Karte
+  // meldete den zweiten Namen als fremde Abhaengigkeit, die Doppel-Pruefung
+  // haette eine Kollision darauf uebersehen, und der Linter hielt ihn fuer
+  // undefiniert. Allein userId und appId waren so 60 Fehlalarme.
+  for (const zeile of code.split('\n')) {
+    const m = /^(?:var|let|const)\s+(.*)$/.exec(zeile);
+    if (!m) continue;
+    let tiefe = 0, teil = '';
+    const stuecke = [];
+    for (const c of m[1]) {
+      if (c === '(' || c === '[' || c === '{') tiefe++;
+      else if (c === ')' || c === ']' || c === '}') tiefe--;
+      // Nur ein Komma auf Tiefe 0 trennt zwei Deklarationen. Kommas in einem
+      // Objekt- oder Array-Literal gehoeren zum Wert, nicht zur Liste.
+      if (c === ',' && tiefe === 0) { stuecke.push(teil); teil = ''; continue; }
+      teil += c;
+    }
+    stuecke.push(teil);
+    for (const s of stuecke) {
+      const n = /^\s*([A-Za-z_$][\w$]*)/.exec(s);
+      if (n) names.add(n[1]);
+    }
+  }
   collect(/^(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/gm);
   collect(/^class\s+([A-Za-z_$][\w$]*)/gm);
   collect(/^(?:var|let|const)\s*[[{]([^\]}]{0,400})[\]}]\s*=/gm);
@@ -590,7 +673,17 @@ function checkWhy(aArg, bArg) {
   return true;
 }
 
+// ----------------------------------------------------------------- Export ---
+
+// eslint.config.js baut seine Globals-Liste aus genau denselben Bausteinen.
+// Von Hand gepflegt waere sie nach der ersten neuen Funktion veraltet, und ein
+// Linter mit veralteter Globals-Liste meldet entweder Unsinn oder schweigt zu
+// echten Fehlern. Beides ist schlimmer als kein Linter.
+module.exports = { ROOT, SHIPPED, existing, strip, declaredIn, BUILTIN };
+
 // ------------------------------------------------------------------ Main ---
+
+if (require.main !== module) return;
 
 const mode = process.argv[2] || 'all';
 let ok = true;

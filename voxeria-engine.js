@@ -9663,6 +9663,7 @@ function updateWeather(dt) {
   // never draws. weather.lightning/thunderTimer are left in the state object
   // and this decay line stays too, same call as the 'snow'/'rain' removals —
   // an inert field costs nothing and keeps this reversible in one place.
+  // eslint-disable-next-line no-constant-condition -- Absicht, siehe oben.
   if (false && weather.type==='storm'&&weather.intensity>0.5) {
     if (weather.thunderTimer>0) weather.thunderTimer-=dt;
     if (Math.random()<0.003*dt*weather.intensity) { weather.lightning=8; weather.thunderTimer=30+Math.random()*60; playSound('thunder'); }
@@ -9688,6 +9689,7 @@ function drawWeather() {
   // draw call is gated too (not just relied on) in case an old save or
   // sessionStorage snapshot restores a stale positive value.
   if (weather.overlay>0.01) { ctx.fillStyle=`rgba(10,20,40,${weather.overlay})`; ctx.fillRect(0,0,canvas.width,canvas.height); }
+  // eslint-disable-next-line no-constant-condition -- Absicht, siehe oben.
   if (false && weather.lightning>2) { ctx.fillStyle=`rgba(220,230,255,${Math.min(0.6,weather.lightning*0.08)})`; ctx.fillRect(0,0,canvas.width,canvas.height); }
 
   for(const s of snowFlakes){ctx.fillStyle=`rgba(255,255,255,${0.5+weather.intensity*0.4})`;ctx.beginPath();ctx.arc(s.x,s.y,s.size,0,Math.PI*2);ctx.fill();}

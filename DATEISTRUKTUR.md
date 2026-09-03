@@ -154,6 +154,44 @@ npm run check:cycles   nur die Ringe, also die offene Arbeit
 node tools/check.js why engine dimensions-progress
 ```
 
+### Linter
+
+```
+npm run lint       meldet
+npm run lint:fix   repariert, was sich sicher reparieren lässt
+```
+
+**Kein Prettier, keine Stilregeln.** Der Code ist von Hand gesetzt, und an
+mehreren Stellen ist die Form die Aussage: die Zeichenkette in
+`_gameLoopInner` steht in EINER Zeile, weil sie eine Reihenfolge ist und keine
+Liste. Ein Formatierer würde das umbrechen, einen Diff über zehntausende Zeilen
+erzeugen und `git blame` für die gesamte Codebasis wertlos machen. Das übliche
+Argument ("dann streitet niemand mehr über Leerzeichen") greift bei einem
+Projekt mit einem Autor nicht.
+
+Konfiguriert sind nur Regeln, die **Fehler** finden. Die wichtigste ist
+`no-undef`, und sie war die schwerste einzurichten: alle Spieldateien teilen
+sich einen globalen Scope, ein Linter sieht aber immer nur eine Datei. Ohne
+Hilfe hält er jeden Aufruf über Dateigrenzen hinweg für undefiniert.
+
+Deshalb baut `eslint.config.js` seine Globals-Liste aus **demselben Scanner**,
+den auch `npm run check` benutzt. Eine von Hand gepflegte Liste wäre nach der
+ersten neuen Funktion veraltet, und ein Linter mit veralteter Liste meldet
+entweder Unsinn oder schweigt zu echten Fehlern.
+
+### Der Hook
+
+```
+git config core.hooksPath tools/hooks
+```
+
+Einmal pro Klon. Danach laufen `check` und `lint` vor jedem Commit.
+`.git/hooks` wäre der übliche Ort, wird aber nicht versioniert und geht bei
+jedem neuen Klon verloren. Notausgang: `git commit --no-verify`.
+
+`.github/workflows/check.yml` liegt fertig da für den Tag, an dem das
+Repository ein Remote bekommt. Bis dahin schützt der Hook.
+
 `worldgen` ist der Unterschied zwischen "es parst" und "es tut noch das
 Richtige". `voxeria-core.js` und `voxeria-worldgen.js` laufen dafür in einem
 nackten Node-Kontext: kein DOM, kein Canvas, kein Firebase, kein

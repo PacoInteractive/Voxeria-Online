@@ -1,0 +1,27 @@
+# Laeuft erst, wenn das Repository ein Remote auf GitHub hat. Bis dahin
+# schuetzt der Hook in tools/hooks/pre-commit lokal, und diese Datei liegt
+# fertig da, statt spaeter neu gebaut werden zu muessen.
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # npm ci braucht eine package-lock.json. npm install tut es hier auch,
+      # weil nur eine Entwicklungsabhaengigkeit gebraucht wird.
+      - run: npm install --no-audit --no-fund
+
+      # Syntax, doppelte Namen ueber Dateigrenzen, Weltgenerator-Determinismus.
+      - run: npm run check
+
+      # Fehler blockieren, Warnungen nicht.
+      - run: npm run lint
