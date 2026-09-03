@@ -32,3 +32,16 @@ Thumbs.db
 *.bak
 *.tmp
 npm-debug.log*
+
+# Build-Reste, die *.zip oben nicht erwischt (anderer Suffix, aber dieselbe
+# 24-MB-Ausgabe)
+*.zip.broken
+
+# Windows-Kopien ("Datei - Kopie.js"). Entstehen beim Duplizieren im Explorer
+# und sind nie die Quelle, sondern immer ein Zwischenstand.
+* - Kopie.*
+* - Copy.*
+
+# Lokale Claude-Berechtigungen. Gelten nur auf diesem Rechner; launch.json und
+# serve.ps1 daneben sind dagegen projektweit nuetzlich und bleiben versioniert.
+.claude/settings.local.json
