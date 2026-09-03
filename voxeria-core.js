@@ -244,6 +244,19 @@ let rawSeedString = getWeeklySeedString();
 let SEED = seedToNumber(rawSeedString);
 
 // =========================================================
+// WAS EIN MOD AN DER WELT VERSTELLEN DARF
+// =========================================================
+// Zusaetzliche Erzsorten, die getChunk() in seine ORE_TIERS-Liste mischt:
+// dieselbe Adern-Logik, dieselben seededRandom()-Aufrufe, nur mehr Stufen.
+//
+// Stand in voxeria-modding.js, und voxeria-worldgen.js las es von dort nach
+// oben. Das war der letzte Grund, warum der Weltgenerator ohne Browser nicht
+// lief, denn ohne das Mod-Skript gab es den Namen nicht. Leer heisst "keine
+// eigenen Erze", also genau der Zustand ohne Mod. Gefuellt wird die Liste
+// weiterhin nur von voxeria-modding.js.
+let customOreTiers = [];
+
+// =========================================================
 // SITZUNGSZUSTAND
 // =========================================================
 // Worauf sich gerade alle einigen muessen. Beide werden ausserhalb dieser Datei

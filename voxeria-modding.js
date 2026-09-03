@@ -2501,9 +2501,9 @@ window.VxPieces = (function () {
 // of the six parallel block tables.
 const CUSTOM_BLOCK_ID_BASE = 200;
 const CUSTOM_BLOCK_ID_MAX = 255;
-// Consumed by getChunk()'s ORE_TIERS list (~5524) — same vein-growth code,
-// same seededRandom() calls, just fed extra tiers.
-let customOreTiers = [];
+// customOreTiers selbst steht in voxeria-core.js, weil der Weltgenerator es
+// liest und der nicht nach oben in diese Datei greifen soll. Gefuellt wird es
+// weiterhin ausschliesslich hier, siehe registerLoadoutPieces() weiter unten.
 
 // `palette` is the piece's own colour table (see decodePiecePixels). Omitted,
 // it falls back to the built-in one, which is what the two 16-colour packings

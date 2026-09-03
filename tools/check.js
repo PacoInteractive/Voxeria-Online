@@ -9,6 +9,7 @@
 //   node tools/check.js               alles
 //   node tools/check.js syntax        nur Syntax
 //   node tools/check.js deps          nur die Abhaengigkeitskarte
+//   node tools/check.js worldgen      nur den Weltgenerator, ohne Browser
 //   node tools/check.js cycles        nur die Ringe, also die offene Arbeit
 //   node tools/check.js why A B       zwei Dateien vollstaendig gegenueber
 //
@@ -348,6 +349,139 @@ function checkDeps() {
   return true;
 }
 
+// -------------------------------------------------------------- Worldgen ---
+
+// Der Unterschied zwischen "es parst" und "es tut noch das Richtige".
+//
+//   node tools/check.js worldgen
+//
+// Bis voxeria-core.js entstand, ging das nicht: voxeria-engine.js starb beim
+// Laden an canvas.getContext(), und weil BLOCKS und CHUNK_W dort drinsteckten,
+// kam der Weltgenerator gar nicht erst hoch. Alles, was ihn pruefen wollte,
+// brauchte einen echten Browser und einen Menschen, der die Konsole aufmacht.
+//
+// Jetzt laufen core und worldgen in einem nackten vm-Kontext: kein DOM, kein
+// Canvas, kein Firebase, kein localStorage. Was dabei fehlt, faellt sofort auf,
+// und genau das ist der Punkt. Eine Datei, die sich so laden laesst, ist
+// nachweislich frei von Abhaengigkeiten nach oben.
+//
+// Geprueft wird die Eigenschaft, auf der bei Voxeria alles steht: derselbe Seed
+// muss dasselbe Terrain ergeben. Bricht das, sind die Welten aller Spieler
+// still verschoben, und kein Syntaxcheck der Welt sieht es.
+function checkWorldgen() {
+  const vm = require('vm');
+  const noetig = ['voxeria-core.js', 'voxeria-worldgen.js'];
+  for (const f of noetig) {
+    if (!fs.existsSync(path.join(ROOT, f))) { console.log('X  Worldgen: ' + f + ' fehlt'); return false; }
+  }
+
+  // Bewusst NUR console. Alles Weitere bringt der vm-Kontext von sich aus mit
+  // (Math, JSON, Date, die Typed Arrays). Kein document, kein window-Ersatz mit
+  // Attrappen: was hier fehlt, SOLL fehlen.
+  const sandbox = { console: { log() {}, warn() {}, error() {} } };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  const ctx = vm.createContext(sandbox);
+
+  for (const f of noetig) {
+    try {
+      vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
+    } catch (e) {
+      console.log('X  Worldgen: ' + f + ' laedt nicht ohne Browser');
+      console.log('   ' + (e && e.message ? e.message : e));
+      console.log('   Das heisst, die Datei greift auf etwas zu, das es nur im Browser gibt,');
+      console.log('   oder auf einen Namen aus einer Datei, die hier nicht geladen wird.');
+      return false;
+    }
+  }
+
+  const lauf = quelle => {
+    try { return { ok: true, wert: vm.runInContext(quelle, ctx) }; }
+    catch (e) { return { ok: false, wert: e && e.message ? e.message : String(e) }; }
+  };
+
+  const proben = [];
+
+  // 1. Determinismus: derselbe Chunk zweimal erzeugt muss Byte fuer Byte
+  //    gleich sein. Zwischendurch geleert, damit wirklich neu gerechnet wird
+  //    und nicht der Cache antwortet.
+  proben.push(['Chunks sind deterministisch', `(function () {
+    const vergleiche = (dim, cx) => {
+      dimensions[dim].clear();
+      const a = Uint8Array.from(getChunk(cx, dim));
+      dimensions[dim].clear();
+      const b = getChunk(cx, dim);
+      if (a.length !== b.length) return dim + '/' + cx + ': Laenge ' + a.length + ' vs ' + b.length;
+      for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return dim + '/' + cx + ': Abweichung bei ' + i;
+      return null;
+    };
+    for (const cx of [0, 1, -3, 47]) { const f = vergleiche('OVERWORLD', cx); if (f) return f; }
+    return null;
+  })()`]);
+
+  // 2. Ein Chunk darf nicht leer sein. Ein Generator, der still nur Luft
+  //    liefert, ist deterministisch und trotzdem kaputt.
+  proben.push(['Chunks enthalten Terrain', `(function () {
+    dimensions.OVERWORLD.clear();
+    const c = getChunk(0, 'OVERWORLD');
+    if (c.length !== CHUNK_W * WORLD_H) return 'Chunk hat ' + c.length + ' statt ' + (CHUNK_W * WORLD_H) + ' Kacheln';
+    let fest = 0;
+    for (const b of c) if (b !== BLOCKS.AIR) fest++;
+    if (fest < 100) return 'nur ' + fest + ' nicht-Luft-Kacheln, das ist keine Welt';
+    return null;
+  })()`]);
+
+  // 3. Kein Blocktyp ausserhalb dessen, was BLOCKS kennt. Faengt eine
+  //    verrutschte Id, bevor sie als unsichtbarer Block im Spiel landet.
+  proben.push(['nur bekannte Blocktypen', `(function () {
+    const erlaubt = new Set(Object.keys(BLOCKS).map(k => BLOCKS[k]));
+    for (const cx of [0, 5, -8]) {
+      dimensions.OVERWORLD.clear();
+      for (const b of getChunk(cx, 'OVERWORLD')) if (!erlaubt.has(b)) return 'unbekannter Blocktyp ' + b + ' in Chunk ' + cx;
+    }
+    return null;
+  })()`]);
+
+  // 4. Ein anderer Seed muss ein anderes Terrain ergeben. Ohne diese Probe
+  //    waere eine Welt, die den Seed gar nicht mehr liest, immer noch gruen.
+  proben.push(['der Seed wirkt sich aus', `(function () {
+    dimensions.OVERWORLD.clear();
+    const a = Uint8Array.from(getChunk(0, 'OVERWORLD'));
+    const alt = rawSeedString;
+    rawSeedString = 'ein-voellig-anderer-seed';
+    dimensions.OVERWORLD.clear();
+    const b = Uint8Array.from(getChunk(0, 'OVERWORLD'));
+    rawSeedString = alt;
+    dimensions.OVERWORLD.clear();
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return null;
+    return 'zwei verschiedene Seeds ergeben dasselbe Terrain';
+  })()`]);
+
+  // 5. Zum Schluss die Selbstpruefung des Generators selbst. Sie kennt ihre
+  //    eigenen Invarianten (Hoehen, Biome, Landmarken) besser als jede Probe,
+  //    die von aussen dazugeschrieben wird.
+  proben.push(['worldGenSelfTest()', `(function () {
+    if (typeof worldGenSelfTest !== 'function') return 'worldGenSelfTest fehlt';
+    const f = worldGenSelfTest(12, 200);
+    return (f && f.length) ? f.length + ' Problem(e): ' + f[0] : null;
+  })()`]);
+
+  const fehler = [];
+  for (const [name, quelle] of proben) {
+    const r = lauf(quelle);
+    if (!r.ok) fehler.push(name + ' -> wirft: ' + r.wert);
+    else if (r.wert) fehler.push(name + ' -> ' + r.wert);
+  }
+
+  if (fehler.length) {
+    console.log('X  Worldgen: ' + fehler.length + ' von ' + proben.length + ' Proben rot');
+    fehler.forEach(f => console.log('   ' + f));
+    return false;
+  }
+  console.log('OK Worldgen: ' + proben.length + ' Proben, ohne Browser gelaufen');
+  return true;
+}
+
 // ---------------------------------------------------------------- Cycles ---
 
 // Die Karte zeigt, wer wen liest. Sie sagt aber nicht, wo daraus ein RING
@@ -462,8 +596,12 @@ const mode = process.argv[2] || 'all';
 let ok = true;
 if (mode === 'why') ok = checkWhy(process.argv[3], process.argv[4]);
 else if (mode === 'cycles') ok = checkCycles();
+else if (mode === 'worldgen') ok = checkWorldgen();
 else {
   if (mode === 'all' || mode === 'syntax') ok = checkSyntax() && ok;
+  // Nach der Syntax, weil eine Datei, die nicht parst, hier nur eine
+  // schlechtere Fehlermeldung fuer dasselbe Problem liefern wuerde.
+  if (mode === 'all' || mode === 'syntax') ok = checkWorldgen() && ok;
   if (mode === 'all' || mode === 'deps') checkDeps();
 }
 process.exit(ok ? 0 : 1);

@@ -147,11 +147,23 @@ ersetzen, weil kein Teil ohne den Rest lief.
 Nachzählen lässt sich das jederzeit:
 
 ```
-npm run check          Syntax aller ausgelieferten Dateien + Abhängigkeitskarte
+npm run check          Syntax + doppelte Namen + Weltgenerator + Karte
+npm run check:worldgen nur den Weltgenerator, ohne Browser
 npm run check:deps     nur die Karte
 npm run check:cycles   nur die Ringe, also die offene Arbeit
 node tools/check.js why engine dimensions-progress
 ```
+
+`worldgen` ist der Unterschied zwischen "es parst" und "es tut noch das
+Richtige". `voxeria-core.js` und `voxeria-worldgen.js` laufen dafür in einem
+nackten Node-Kontext: kein DOM, kein Canvas, kein Firebase, kein
+`localStorage`. Dass das überhaupt geht, ist der eigentliche Gewinn der
+Core-Datei, und es ist zugleich der Beweis: eine Datei, die sich so laden
+lässt, ist nachweislich frei von Abhängigkeiten nach oben.
+
+Geprüft wird die Eigenschaft, auf der bei Voxeria alles steht: **derselbe Seed
+muss dasselbe Terrain ergeben.** Bricht das, sind die Welten aller Spieler
+still verschoben, und kein Syntaxcheck der Welt sieht es.
 
 `cycles` ist der wichtigste davon. Er zeigt nicht, wer wen liest, sondern wo
 daraus ein **Ring** wird, und nur der ist das Problem: A benutzt B ist gesund,
@@ -262,7 +274,12 @@ graphBlockHardness     Blocktyp -> Härte 1..8
 graphBlockSoundFamily  Blocktyp -> Klangfamilie
 ruleGravityScale       Faktor, 1 ist neutral
 graphYieldMult         Faktor, 1 ist neutral
+customOreTiers         zusätzliche Erzsorten für getChunk
 ```
+
+`customOreTiers` steht dabei in `voxeria-core.js` statt in der Engine, weil der
+Weltgenerator es liest. Es war der letzte Name, der ihn daran gehindert hat,
+ohne Browser zu laufen.
 
 Sie standen früher in `voxeria-modding.js`, und zwei der Lesestellen in der
 Engine hatten kein `typeof` davor. Ein Build ohne das Mod-Skript starb damit im

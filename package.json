@@ -10,6 +10,7 @@
         "start": "electron .",
         "check": "node tools/check.js",
         "check:syntax": "node tools/check.js syntax",
+        "check:worldgen": "node tools/check.js worldgen",
         "check:deps": "node tools/check.js deps",
         "check:cycles": "node tools/check.js cycles",
         "build": "node build-zip.js",
