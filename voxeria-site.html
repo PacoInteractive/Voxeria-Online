@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voxeria</title>
+<meta name="description" content="Voxeria is a browser sandbox: a mining game that ships with the editor it was built in.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* ============================================================================
+   VOXERIA SITE
+   The look is not invented here. It is the game's own chrome, lifted from the
+   token block in index.html: 2px pixel grid, hard bevels, zero radius, zero
+   blur, Silkscreen for short strings and a real body face for prose.
+   Single visual world on purpose (a dark block-game console), so every colour
+   is painted explicitly and nothing is inherited from the host theme.
+   ========================================================================= */
+
+:root {
+  --px: 2px;
+
+  --ground-0: #0b0d14;
+  --ground-1: #12141f;
+  --ground-2: #171a28;
+
+  --surface-1: #14141c;
+  --surface-2: #1c1c26;
+  --surface-3: #262633;
+
+  --line-1: rgba(255,255,255,0.09);
+  --line-2: rgba(255,255,255,0.16);
+
+  --text-1: rgba(255,255,255,0.94);
+  --text-2: rgba(255,255,255,0.62);
+  --text-3: rgba(255,255,255,0.42);
+
+  --accent: #a855f7;
+  --accent-hover: #b974fa;
+  --accent-dim: rgba(168,85,247,0.15);
+  --accent-line: rgba(168,85,247,0.5);
+
+  /* The one second hue on the page: the gold of the progression thread. */
+  --ore: #f0b429;
+
+  --bevel-light: rgba(255,255,255,0.22);
+  --bevel-dark: rgba(0,0,0,0.55);
+  --bevel: inset var(--px) var(--px) 0 var(--bevel-light),
+           inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--bevel-dark);
+  --bevel-in: inset var(--px) var(--px) 0 var(--bevel-dark),
+              inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--bevel-light);
+
+  --slab: 8px 8px 0 rgba(0,0,0,0.6);
+  --slab-sm: var(--px) var(--px) 0 rgba(0,0,0,0.45);
+
+  --font-display: 'Silkscreen', 'Courier New', monospace;
+  --font-ui: 'IBM Plex Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+
+  --wrap: 1080px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground-0);
+  background-image: linear-gradient(180deg, var(--ground-0) 0%, var(--ground-1) 55%, var(--ground-2) 100%);
+  background-attachment: fixed;
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+img { max-width: 100%; }
+
+a { color: var(--accent-hover); text-decoration: none; }
+a:hover { color: var(--text-1); }
+
+:focus-visible {
+  outline: var(--px) solid var(--accent-hover);
+  outline-offset: var(--px);
+}
+
+/* ---- type ---------------------------------------------------------------- */
+
+h1, h2, h3, .disp {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--text-1);
+  /* No letter-spacing on the bitmap face: the glyphs already carry their own
+     sidebearings on the pixel grid, and adding more breaks the rhythm. */
+  letter-spacing: 0;
+  text-wrap: balance;
+  margin: 0;
+}
+/* Silkscreen is a bitmap face: only whole multiples of 8px land on the grid. */
+h1 { font-size: 40px; line-height: 1.2; }
+h2 { font-size: 24px; line-height: 1.3; }
+h3 { font-size: 16px; line-height: 1.4; }
+
+@media (min-width: 720px) {
+  h1 { font-size: 64px; }
+  h2 { font-size: 32px; }
+}
+
+p { margin: 0; max-width: 68ch; }
+
+.eyebrow {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent-hover);
+  margin: 0;
+}
+.eyebrow.ore { color: var(--ore); }
+.lede { font-size: 18px; color: var(--text-2); }
+.muted { color: var(--text-3); font-size: 14px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ---- layout -------------------------------------------------------------- */
+
+.wrap {
+  width: 100%;
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+section { padding: 72px 0; border-top: var(--px) solid var(--line-1); }
+section:first-of-type { border-top: 0; }
+
+.stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.stack-sm { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.stack-lg { display: flex; flex-direction: column; gap: 40px; min-width: 0; }
+
+.grid-3 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+.grid-2 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+@media (min-width: 760px) {
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-2 { grid-template-columns: 1fr 1fr; gap: 32px; }
+}
+
+/* ---- chrome -------------------------------------------------------------- */
+
+.panel {
+  background: var(--surface-1);
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel), var(--slab);
+  padding: 24px;
+}
+.panel.flat { box-shadow: var(--bevel); }
+.panel.sunk {
+  background: var(--surface-2);
+  box-shadow: var(--bevel-in);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--text-1);
+  background: var(--surface-3);
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel), var(--slab-sm);
+  padding: 14px 22px;
+  cursor: pointer;
+  transition: background 90ms linear, transform 90ms linear;
+}
+.btn:hover { background: #30303f; color: var(--text-1); }
+.btn:active { box-shadow: var(--bevel-in); transform: translate(var(--px), var(--px)); }
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent-hover);
+  color: #fff;
+}
+.btn.primary:hover { background: var(--accent-hover); }
+
+.chip {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 8px;
+  color: var(--text-3);
+  border: var(--px) solid var(--line-1);
+  padding: 5px 8px;
+  background: var(--surface-2);
+}
+
+/* ---- hero ---------------------------------------------------------------- */
+
+#hero { padding: 64px 0 0; border-top: 0; }
+.hero-inner { display: flex; flex-direction: column; gap: 24px; }
+
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 48px;
+  line-height: 1;
+  color: var(--text-1);
+  /* The one shadow on the page that is coloured: the wordmark sits on the
+     accent the way a sprite sits on its own drop shadow, hard-edged. */
+  text-shadow: var(--px) var(--px) 0 var(--accent), 6px 6px 0 rgba(0,0,0,0.6);
+  margin: 0;
+}
+@media (min-width: 720px) { .wordmark { font-size: 88px; } }
+
+.hero-cta { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px; }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+
+#terrain {
+  display: block;
+  width: 100%;
+  height: 160px;
+  margin-top: 40px;
+  image-rendering: pixelated;
+  border-top: var(--px) solid var(--line-1);
+}
+
+/* ---- layer cards --------------------------------------------------------- */
+
+.layer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface-1);
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel), var(--slab);
+  padding: 22px;
+}
+.layer-num {
+  font-family: var(--font-display);
+  font-size: 8px;
+  color: var(--accent-hover);
+}
+.layer h3 { color: var(--text-1); }
+.layer p { font-size: 15px; }
+
+/* ---- the painter --------------------------------------------------------- */
+
+.studio { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
+/* min-width:0 on the tracks themselves: a grid item's automatic minimum size is
+   min-content, and both the canvas and the code line carry a wide one, which
+   pushed the whole page sideways. */
+.studio > * { min-width: 0; }
+@media (min-width: 900px) { .studio { grid-template-columns: 320px 1fr; } }
+
+.paint-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+#paint {
+  display: block;
+  width: 320px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  background: var(--surface-2);
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel-in);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw {
+  width: 28px; height: 28px;
+  border: var(--px) solid rgba(0,0,0,0.6);
+  box-shadow: var(--bevel);
+  cursor: pointer;
+  padding: 0;
+}
+.sw[aria-pressed="true"] { box-shadow: var(--bevel), 0 0 0 var(--px) var(--accent-hover); }
+.sw.eraser {
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-family: var(--font-display);
+  font-size: 8px;
+}
+
+.tool-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mini-btn {
+  font-family: var(--font-display);
+  font-size: 8px;
+  color: var(--text-2);
+  background: var(--surface-3);
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.mini-btn:hover { color: var(--text-1); background: #30303f; }
+.mini-btn:active { box-shadow: var(--bevel-in); }
+
+#scene {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 192px;
+  image-rendering: pixelated;
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel-in);
+  background: var(--ground-1);
+}
+
+.codeline {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.codeline output {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ore);
+  background: var(--surface-2);
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel-in);
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* ---- terminal ------------------------------------------------------------ */
+
+.term {
+  background: #0b0b10;
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel), var(--slab);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+.term-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: var(--px) solid var(--line-1);
+  font-family: var(--font-display);
+  font-size: 8px;
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+.term-body { padding: 16px 18px; white-space: pre; color: var(--text-2); }
+.term-body .t-user { color: var(--text-1); }
+.term-body .t-key { color: var(--accent-hover); }
+.term-body .t-val { color: var(--ore); }
+.term-body .t-ok { color: #7ee2a8; }
+.term-body .t-dim { color: var(--text-3); }
+.caret {
+  display: inline-block;
+  width: 9px;
+  background: var(--accent-hover);
+  animation: blink 1.1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---- fact rows ----------------------------------------------------------- */
+
+.facts { display: grid; grid-template-columns: 1fr; gap: 0; }
+.fact {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 16px 0;
+  border-bottom: var(--px) solid var(--line-1);
+}
+.fact:first-child { border-top: var(--px) solid var(--line-1); }
+@media (min-width: 700px) {
+  .fact { grid-template-columns: 200px 1fr; gap: 24px; align-items: baseline; }
+}
+.fact dt { font-family: var(--font-display); font-size: 16px; color: var(--text-1); }
+.fact dd { margin: 0; font-size: 15px; }
+
+/* ---- steps --------------------------------------------------------------- */
+
+.steps { display: grid; grid-template-columns: 1fr; gap: 2px; }
+@media (min-width: 800px) { .steps { grid-template-columns: repeat(3, 1fr); } }
+.step {
+  background: var(--surface-1);
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.step .k {
+  font-family: var(--font-display);
+  font-size: 8px;
+  color: var(--accent-hover);
+}
+.step p { font-size: 15px; }
+
+/* ---- block atlas --------------------------------------------------------- */
+
+.atlas { display: flex; flex-wrap: wrap; gap: 12px; }
+.tile { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 72px; }
+.tile canvas {
+  width: 56px; height: 56px;
+  image-rendering: pixelated;
+  border: var(--px) solid var(--line-2);
+  box-shadow: var(--bevel), var(--slab-sm);
+  background: var(--surface-2);
+}
+.tile span {
+  font-family: var(--font-display);
+  font-size: 8px;
+  color: var(--text-3);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ---- footer -------------------------------------------------------------- */
+
+footer {
+  border-top: var(--px) solid var(--line-2);
+  padding: 48px 0 64px;
+  background: var(--surface-1);
+}
+.foot-grid { display: flex; flex-direction: column; gap: 24px; }
+@media (min-width: 760px) { .foot-grid { flex-direction: row; justify-content: space-between; align-items: flex-start; } }
+.foot-links { display: flex; flex-wrap: wrap; gap: 20px; font-family: var(--font-display); font-size: 8px; }
+
+/* ---- motion -------------------------------------------------------------- */
+
+.reveal { opacity: 0; transform: translateY(12px); transition: opacity 400ms ease, transform 400ms ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
+
+<main>
+
+  <!-- ===================================================================== -->
+  <section id="hero">
+    <div class="wrap hero-inner">
+      <p class="eyebrow">Browser sandbox &middot; Playtest build</p>
+      <h1 class="wordmark">VOXERIA</h1>
+      <p class="lede" style="font-size:20px;color:var(--text-1);max-width:34ch">
+        A mining game that ships with the editor it was built in.
+      </p>
+      <p class="lede">
+        Dig a world, then open the same tools the world is made of: paint a block by
+        hand, wire up what it does, and hand the result to a friend as one short code.
+        Nothing to install, no account, no compile step.
+      </p>
+      <div class="hero-cta">
+        <a class="btn primary" id="play-link" href="https://paco-interactive.itch.io/voxeria" target="_blank" rel="noopener noreferrer">Play in the browser</a>
+        <a class="btn" href="https://discord.gg/jGyyntKFJ" target="_blank" rel="noopener noreferrer">Join the Discord</a>
+      </div>
+      <div class="hero-meta">
+        <span class="chip">FREE</span>
+        <span class="chip">RUNS IN A TAB</span>
+        <span class="chip">SOLO OR SHARED</span>
+        <span class="chip">32x32 PIXEL ART</span>
+      </div>
+    </div>
+    <canvas id="terrain" aria-hidden="true"></canvas>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section id="what">
+    <div class="wrap stack-lg">
+      <div class="stack">
+        <p class="eyebrow">What it turned into</p>
+        <h2>It stopped being only a game</h2>
+        <p class="lede">
+          Voxeria began as a mining game, and the mining is still all there. But the
+          part that grew is the workshop bolted to the inside of it: a pixel editor, a
+          node board, a scripting terminal, a shared-world mode that is really a level
+          editor with other people in it. The honest description is a sandbox platform.
+          You play it, and the same window is where you build the next thing to play.
+        </p>
+      </div>
+      <div class="grid-3">
+        <div class="layer reveal">
+          <span class="layer-num">LAYER 1</span>
+          <h3>Play</h3>
+          <p>
+            Dig down through an endless overworld, craft, fight what comes out at night,
+            and take a portal into The Erg to bring back materials nothing on the surface
+            drops.
+          </p>
+        </div>
+        <div class="layer reveal">
+          <span class="layer-num">LAYER 2</span>
+          <h3>Build</h3>
+          <p>
+            Open the Creator Studio without leaving the world. Paint a 32x32 block or
+            creature, then wire its behaviour on a node board, or type the same thing into
+            the World Terminal.
+          </p>
+        </div>
+        <div class="layer reveal">
+          <span class="layer-num">LAYER 3</span>
+          <h3>Hand it over</h3>
+          <p>
+            Everything you make packs down into one short code. Post it anywhere. Whoever
+            pastes it in is standing in your version of the game a second later.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section id="studio">
+    <div class="wrap stack-lg">
+      <div class="stack">
+        <p class="eyebrow">Creator Studio</p>
+        <h2>Paint a block. It exists.</h2>
+        <p class="lede">
+          No separate tool, no import step, no file on disk. You paint on a 32x32 grid,
+          give it a name, and it is in your hotbar. Try the grid below: it is the same
+          canvas size the real editor uses.
+        </p>
+      </div>
+
+      <div class="panel studio">
+        <div class="paint-col">
+          <canvas id="paint" width="32" height="32" aria-label="Pixel canvas, 32 by 32"></canvas>
+          <div class="swatches" id="swatches"></div>
+          <div class="tool-row">
+            <button class="mini-btn" id="btn-clear" type="button">CLEAR</button>
+            <button class="mini-btn" id="btn-sample" type="button">SURPRISE ME</button>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="stack-sm">
+            <span class="eyebrow">In the world, at block scale</span>
+            <canvas id="scene" width="768" height="192" aria-label="Preview of the painted block placed in terrain"></canvas>
+          </div>
+          <div class="stack-sm">
+            <span class="eyebrow">What you would share</span>
+            <div class="codeline">
+              <output id="code" class="mono">VXB2-</output>
+              <button class="mini-btn" id="btn-copy" type="button">COPY</button>
+            </div>
+            <p class="muted">
+              A preview of the shape, not a live export. In the game the Creator Studio
+              writes a real <span class="mono">VXB2-</span> code that any world can read
+              back in.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="stack-sm">
+          <h3>Boxes and lines, not scripting</h3>
+          <p>
+            Behaviour is a node graph. When the player touches it, when it is mined, when
+            it takes damage: connect that to an action, add a condition if it should only
+            fire sometimes. If you would rather not touch the graph at all, turn knobs
+            instead. Gravity, weather, how many enemies spawn, what you start with.
+          </p>
+        </div>
+        <div class="stack-sm">
+          <h3>The catalog is the whole language</h3>
+          <p>
+            Every node the editor offers comes from one table, and nothing in the mod
+            system can reach past it. That is why a stranger's code is safe to paste: it
+            is not a script that runs, it is a list of catalog entries the game rebuilds.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section id="terminal">
+    <div class="wrap stack-lg">
+      <div class="stack">
+        <p class="eyebrow">World Terminal</p>
+        <h2>The second door into the same room</h2>
+        <p class="lede">
+          The node board is how you learn the vocabulary. The terminal is how you use it
+          once you know it. Both compile to the identical structure, so a rule you type
+          opens on the board as nodes, and a graph you dragged reads back out as text.
+          Neither can say anything the other cannot.
+        </p>
+      </div>
+
+      <div class="term">
+        <div class="term-bar">
+          <span>WORLD TERMINAL v1.2</span>
+          <span>SCRIPT ACCESS TO THE MOD ENGINE</span>
+        </div>
+<div class="term-body"><span class="t-dim">&gt;</span> <span class="t-user">on Mine grass {</span>
+<span class="t-dim">&gt;</span> <span class="t-user">    if Chance 25 {</span>
+<span class="t-dim">&gt;</span> <span class="t-user">        Give-Item gold 1</span>
+<span class="t-dim">&gt;</span> <span class="t-user">    }</span>
+<span class="t-dim">&gt;</span> <span class="t-user">}</span>
+<span class="t-ok">OK</span>  Rule installed. Live in this world right now.
+
+<span class="t-dim">&gt;</span> <span class="t-user">rules</span>
+<span class="t-key">INSTALLED RULES (session only)</span>
+4 blocks, 3 connections.
+<span class="t-dim">Opening the Mod Editor already shows these.</span>
+
+<span class="t-dim">&gt;</span> <span class="t-user">mod save midas</span>
+<span class="t-ok">OK</span>  Saved as <span class="t-val">midas</span>. Share it with <span class="t-val">mod code midas</span>.
+
+<span class="t-dim">&gt;</span> <span class="caret">&nbsp;</span></div>
+      </div>
+
+      <div class="grid-3">
+        <div class="stack-sm">
+          <h3>Verb-Noun</h3>
+          <p class="muted">
+            <span class="mono">Give-Item</span>, <span class="mono">Spawn-Creature</span>,
+            <span class="mono">Teleport-Player</span>, <span class="mono">Set-World</span>.
+            Guessable once you have seen one.
+          </p>
+        </div>
+        <div class="stack-sm">
+          <h3>Nothing is eval'd</h3>
+          <p class="muted">
+            A script is parsed into catalog nodes and clamped like any other graph. A
+            perfectly written line naming something the game does not have is a parse
+            error, not a hole.
+          </p>
+        </div>
+        <div class="stack-sm">
+          <h3>Free by construction</h3>
+          <p class="muted">
+            Commands are generated from the node catalog, so a node added to the editor
+            becomes a terminal command with no second implementation to keep in step.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section id="handoff">
+    <div class="wrap stack-lg">
+      <div class="stack">
+        <p class="eyebrow">The handoff</p>
+        <h2>One code, no upload step</h2>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <span class="k">01 &middot; MAKE</span>
+          <h3>Build it in-world</h3>
+          <p>Blocks, creatures, rules, starting gear, world settings. All of it in the running game.</p>
+        </div>
+        <div class="step">
+          <span class="k">02 &middot; PACK</span>
+          <h3>Take the code</h3>
+          <p>The studio packs your work into one line of text. Blocks, rules and whole mods each have their own prefix.</p>
+        </div>
+        <div class="step">
+          <span class="k">03 &middot; PASTE</span>
+          <h3>Someone plays it</h3>
+          <p>They paste it into the Mod Builder. No account, no upload, no waiting for approval.</p>
+        </div>
+      </div>
+      <p class="muted">
+        Codes carry the work, not a link, so they keep working wherever you post them:
+        Discord, a forum, a screenshot someone retypes by hand.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section id="world">
+    <div class="wrap stack-lg">
+      <div class="stack">
+        <p class="eyebrow ore">Underneath all of it</p>
+        <h2>Still a real mining game</h2>
+        <p class="lede">
+          The workshop would be a toy if the game under it were one. It is not. The world
+          keeps running its own rules while you dig through it.
+        </p>
+      </div>
+      <dl class="facts">
+        <div class="fact">
+          <dt>Lava moves</dt>
+          <dd>It flows, it finds the gap you just opened, and it cools into obsidian where it meets water.</dd>
+        </div>
+        <div class="fact">
+          <dt>Things fall</dt>
+          <dd>Mine out what was holding a column of sand and the sand comes down on you.</dd>
+        </div>
+        <div class="fact">
+          <dt>Day, night, weather</dt>
+          <dd>Light levels shift, storms roll through, and what spawns changes with them.</dd>
+        </div>
+        <div class="fact">
+          <dt>The Erg</dt>
+          <dd>A bounded desert dimension behind a portal you build: wandering dunes, sunken ruins, and a sandstorm wall that will kill you if you are still out when it arrives. Bring back dune sand, erg sandstone and cactus wood.</dd>
+        </div>
+        <div class="fact">
+          <dt>Forged, not bought</dt>
+          <dd>Armour is made at a dimension's own forge, out in the world. There is no shop and no coin grind. You get the gear by getting there.</dd>
+        </div>
+        <div class="fact">
+          <dt>Two ways in</dt>
+          <dd><strong style="color:var(--text-1)">Normal</strong> gives you the Portal Book and the progression to follow. <strong style="color:var(--text-1)">Exploration</strong> drops both and hands you the creator tools and an endless world instead.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section id="together">
+    <div class="wrap stack-lg">
+      <div class="stack">
+        <p class="eyebrow">Together</p>
+        <h2>Shared worlds, and one that is only a canvas</h2>
+      </div>
+      <div class="grid-2">
+        <div class="panel flat stack-sm">
+          <h3>Rooms</h3>
+          <p>
+            Host a world, hand out the room code, and other people are digging in it at
+            the same time as you. Mods made in a shared room show up for everyone in it,
+            colour-coded by who wrote them. Multiplayer is not a mode bolted onto the
+            solo game: both are the same game.
+          </p>
+        </div>
+        <div class="panel flat stack-sm">
+          <h3>Arena</h3>
+          <p>
+            Its own kind of world rather than a marked-off corner of a normal one: an
+            empty box of a width the host picks, walled by real indestructible terrain,
+            that the players fill from nothing with blocks they painted and rules they
+            wired. Phases, a clock and a score are already there.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section id="materials">
+    <div class="wrap stack-lg">
+      <div class="stack">
+        <p class="eyebrow">Materials</p>
+        <h2>Everything is 32 pixels square</h2>
+        <p class="lede">
+          These are the real textures out of the build, at the size they are drawn. Your
+          own blocks sit on exactly the same grid, which is why a hand-painted one never
+          reads as a sticker on top of the game.
+        </p>
+      </div>
+      <div class="atlas" id="atlas"></div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section id="cta">
+    <div class="wrap">
+      <div class="panel stack" style="align-items:flex-start">
+        <p class="eyebrow">Playtest</p>
+        <h2>It is not finished, and that is the point</h2>
+        <p class="lede">
+          The build is playable and free right now. What is most useful back is anything
+          about the creator tools: where you got stuck, what you expected to be there,
+          what felt like a chore. That half of the game is the one still being shaped.
+        </p>
+        <div class="hero-cta">
+          <a class="btn primary" href="https://paco-interactive.itch.io/voxeria" target="_blank" rel="noopener noreferrer">Play in the browser</a>
+          <a class="btn" href="https://discord.gg/jGyyntKFJ" target="_blank" rel="noopener noreferrer">Report something on Discord</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div class="stack-sm">
+      <span class="disp" style="font-size:16px">VOXERIA</span>
+      <p class="muted" style="max-width:42ch">
+        Built in a browser tab, in 2D, on a 2 pixel grid. Free to play, free to take
+        apart.
+      </p>
+    </div>
+    <div class="foot-links">
+      <a href="https://voxeriahub.com/" target="_blank" rel="noopener noreferrer">HUB</a>
+      <a href="https://discord.gg/jGyyntKFJ" target="_blank" rel="noopener noreferrer">DISCORD</a>
+      <a href="#studio">CREATOR STUDIO</a>
+      <a href="#world">THE WORLD</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==== the real block textures, inlined ================================= */
+  const TEX = {"grass":"data:image/png;base64,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","dirt":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAGgSURBVFhH7ZfRbQQhEEO3gRSTdHAl5SMNpPE7cZGReZiB/c+HtYNnbLwLJyXX9+fH8/dxPdvzFG3+roaQ/tJiZ6r+z9dfrSfn6Leakf6i8QqtT1Q68lyL6wHYWNVc360ZfAiwGmbP+2kmbdTAY2q96Q4kQ6/9/CrjpCMaPwRgM/HeJ+c9/wqV5h3gFMlAfAqb1uSOAvgGjvSp25N6eaSjG36GvDgU8umQ3nsMQI8egBtxkBuRT2/JMPQRegA3cPHOMH1qwj3pP90BisnzTbxPr+RHTAEqpI0r/gQ9wEq8M1Z/dSQ7XNVZe02hb+zHsqs1PwWgmWoizSWu8hXfEH+GXLN20Dhp0lP18SWUUOtVoNMQquMl9JohEufBHL4Z+f4F+CYpaTIgpzCJr/C+A57IgxBpVkYMrkBVvwfwBoOQY62NCIamXrrhDxIXiE9GSaM3oo/mXOeew6/AB53zNVH1kx81/QtwKMHf5lSTtM7fCkAz8ncg/fRXMQdd0MDz5Rz9VjP9DtB4BV0cR6Ujz7W4//+MpjuQDL3286uMk45o/As22946uaL6gAAAAABJRU5ErkJggg==","stone":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAHMSURBVFhHlZZhroQgEIO9sifQA3jn9wJJSfnsgPujWZxpOwU36nGe59993wPP83Sw3tBqDeKwX+mkTZqjElRmHoK9SiNd0vwcYGUmjbDjN2wDpH4yFN9vz+q0hB4gDalOoDJM/Irr6AEo5u615g7Fdb6vPwXg0bkhgymMrz1o1efQKUCVXATu+KuxPLlB8kYAD0ES625Mrgeg3oMIh8grw9RLtTQ8aRw9wMpQx8ae+OqzTh9ypBsBlMgJTEswxJfhxHQLOFQ1hwfWNcO4l2uI1h/PARV3BlVdO/cNJJ7zW+8VIJHS8KRR3/X0EE+16RaQxHqqJQ3rrlEo9aY/oZIJHMYdMUgaTi09RwCSZFaFSmsOpbe4Xp8CkMxAhLjkc9Aq3CsATWSUag4/BXr4tfMbpneB74RDUq0K4BrXcd3QX8dMRiOKiUqTehqs69cHCQmqVcPVZ62hOk1HPwEn02xn4FrWU42Y/oS6HTyyXYBq0E7bevGr2E9DJrxOYYkUgNplACc6z8N4wOqXodxvvAvS8JS4Cus+5DGs97YBaKQw5JO70wmvl9GKnMKptgqx6o8HkQhpCI3Yp4fD69d1Da7wehR7WtZ8UIWqX9X/Af6/6hloypZoAAAAAElFTkSuQmCC","log":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAI4SURBVFhHnZYxTsVADERzlZTAFRAFlHAWOnpEg4S4c5C/9KKXiTeJKKysvfZ4PLvJ/9Pv292Cfb3M6xr//XFevl/vl8/nefl4mnfPyikrn/p61l4auY5NNHFj/EqAAE2cV/v2TZxG5Vc9+VjFyjYEft4eWgIGL58YEzuWRIwHpmOTnSSAuYHXBitjKtYdQdRoCeQmYG5wRMCEOwKJuyFQ05d5cwSOz53ocurp4z0lUE8fgdXIQjdwLBX0HcocYhsFEqArNAFus2OeriNAnOMbKoDvwg4oCbi+I2AFar0SYAPAbuJslgRSwREB99hdQgMkgfSTgHNGBDxIrYevYa19BGbuBga/osCQQCqA34FT3L0FBh8R8JA7BWjsb4ILbfmhMXjGvQZ3JQBQGa9IykseP0r8GjonFegIZM7tx4jLBAmIHCkwImnrCNTauJOBSKRBFnqNCnkH/FPcfYoZdEMgg1cIWDHHacpgo9odAQKcUcYBMVk3ZA8fJToCrQIEAMq4myag12cEUrlDAgnOk/wkgwKWPwlA8hKBkQImABiT5QVMApCEfEugNo4U8NoN2cM4hsTBqu+NgBNM4IoCyN016ggY85RAAvL0OqdPnIznULcvYXcEGR8R8IRds8TeKZASJXAZFyxBzxq6riNQe4dHYPsPAfZtWTt8C7C8SJBzDs3t5yAjnKECTuoKK5bK5HGawAhnVYAJUmIfATaaKAkUzhGB8tf/A04yAfZp6DWAGD5DoErWkVv2B2ATmCKmxreZAAAAAElFTkSuQmCC","leave":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAIbSURBVFhHjZZJTgQxEAT7DXBhOcKDuPAFpBH/P4NsTZpwdNnNoUS7toyqXobj4ePl5/n7fbLHz9fpemeus1Ux1hzN0SAC4gTGY8lx0+QaIuZYOx+ViAtthovPQlUv+/oGqqCnte38NPup0fx9A6uEJPnsmpXtttPs6evt7xlIU65vtZE0jW8HfQVxUNBBCrCRN2CRNlmuE2u+5Mf6BpxIS4xi7boVRqTagGsMyCGWAJw8ohZJsxVE+hDGNgGQLAmc1o0TD0Ri7rECHLdgtYU043U2wbXGqlW7n3v3tyDFBODKGasA2NRDEIbD5u8AoJAnJQBzdwAUW1nfAEVzffWEV0IeIjH63K9dd4Bqqiv65LLeMfsTI8T0W5DJ/eRzyv/AUiD9vI3Exmvo5EBYpAS4zaCEiY/+1I7XkAUsrM4EaMJVnr8b9k0AScpqfP+8ajfO9BUEe9O33QCDPE+id/OkibNXjPDsOQFUG1j5Bwg2QJHUVaAnAJJxA5XfE6+Mwrm2+LgFhugNbvUvIB88rpgWAEIYoJ2nh/AEsHsl72unoAFi8RkgeqcNECjTTve5+YonvxIdfYqHL+fpS0gIA00NBRAoCllspTP+KWXQjYa4RHaNneO66GwBEqsAHGOtc9w3vvEWVImeZsQWz4BrVvU8l6+hbdzfxXc/fwPn2M6mDVR2BXfKBWRVx3Ouxwb40XGhReyf4osvYM7u/QuNxzFxMeHb2AAAAABJRU5ErkJggg==","sand":"data:image/png;base64,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","coal":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAIKSURBVFhHrZbbDeMwDARTTepIS6kgKSA930EGRhivV/J93AeRiI/lkDKcPN7v95/v9zvt9/sdlv5hwzeMnIyv6qhtNY9VwUps+F6v18nuaqj7LwDDRtPn83mYIajByF81H3YL0OI0TYhhvh7qV80nQGuy2gCCBmggzk2NE0DeJ1MYzGtlwtxCA/lngCwGoG3BZ0MnhEGy6QXAAhYdCb5TQyTYDoahUucAGEKtMCHcELGE2IHgoxZ7MBH32ooMY4gGgB4wbRt+pg4ACzZ6F2d+rjXBUsubGPEJ4Htt22gTJEQ2N4T1PMjpChDA7iBonDDW8oYAAWDEj4fQSRZwQcI0MT5t1rYRuwC0JM4JketkatenBnn4TleQSelv29gBGAQdoIidHkKvvwFQvIJozbM2NSfAsLzz4VtBJYBrmnlA+y8ATdRTexLnuyYb7TZzAViJ8j3FW75XzdZy9cTm/wFPlaIWzwkyn3OCjNz8PuyRE3G/KWzxBtFgh7EBcmnMeb4HcDqhgTQANreDyJoJQNB3dSduMBo02BXwCcAHPzQJkMIJQ34DWUHMh7AF2AZX1IR3DZzvOEPSYwvgROclyPhOfvu0tgcb5/lb0Jo3Yos1iNTLpuhitwApBAwAbc1pWWe7/BjtkhscvpzatovPFxEJrUkKZTw10vB/Pp+Zi11exaZNnxutbBVf+f8CGjXrhXsD0eYAAAAASUVORK5CYII=","gold":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAILSURBVFhHrZbRjcMwDEOzcidoBuhON8aN00JBKTzTtHMf90G0sSXqSTbSHo/H432eZ+v1el3y9VKtlRTj+6s85aacY5WwMqu1988x6C5Hef8CULoK/34FCOVIil8VL90CpP3u3iBKPB7lr4o3QCqymoAMB4AAwlj3GAD8PNUFwThWdThNIYD8HcCSBZCmwOcB3CEA4kVnABrYGHmmhHCwLYzdjQGgjGKiQbCgzBxiC/JdU650qKM+15BEGEIkAPk1TJgG79QFQMNIj2SP97E62OSFSdR+A/Bc4zRCBw7hxQcI+qGR4QhkIN1BqLDD0IsTahC8J65LyCAaMGGCCWb6pOhNaW8CSEF6niBsnOqa+e6hOK0NR+BBvh6nsQEgiHwEpb3hEnL8CUDJK4hU3HPdswFKfua1toJyAOYksUGuzwDBlF2zkyEeOV5oN5kZYGGq726e4jlqTc1Hr73+PzB05aYw9w6meJscC/v30uEd9fm6McwjRIAtaQKKVWE993tAiwyIIAGgJ7eB8JwG0CbP6tacYN8CEXYBPADwgZdmAnBjg1F8BFlA9CVMG5qGjigabwoM8fa2ZKNbAAYybgLBr2P6pDcbq+f+LUjFEzHNEoT7eVH5SrcAbiSYBghjdnkeNf0Y7YITnNa8a2q33y8iBaQibuT77uHS+vP57FhpehWT1tdYaKXV/mr9A0hrQ4eTYbItAAAAAElFTkSuQmCC","moganite":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAIuSURBVFhHlZYxrttADET/lX0C+wA+V5AmZboA6dKnD5CACzzheTwr/RQDSbvkzJBcyf643W5/H4/HgefzuZDrg1kbEJP7uzxyW87HLmFHZhO513L+/Prxgsz5bwODKwMDi/7+/rWKDy4NtP1mgHjGM4LzPOI/v33ZmlgGmggkmdTEbYBnKh9x0EwsA5nsCjCBUSpsseb6jPgy0FqHe0BFc7VRRK8qPzWAoJEEmYxoI8zcHcfWQCMgGYLs1pWBWcMwueBjks7EIcgKMMAz98lh84zbWB1oiQlMDIg/A3nZIXdw7peBz4pPrOfvzjUOctKAsUbQkps4mByEWwHuxJmBNYL2zjYSiJj9XG0Ajl1egld/jQAyi1OlCSzuTgxatxgX8zbPcQZMkgQ2kGsJ5+6q5X7A3jJggaySK+R5ABH0fYNfPXfkMGCSPOmebzM6cFUNCOc4Xgw0IxhwB1iHGHLfW+jM3JsBk7jSrDzz3IU04mfHD47/A014At2NNAPSQCuGZ98P1s9xOoPUAhNsUUbi0VjcfN5DmOe3PyQZkEYQ5VDm4WziLjCxOuDgFIfAledX0yYyNwUTL4eQcWTLMLkzMGvs28RV9bNX/xW7Gx5RM7Br/84ARcJ5asCBxGHC34aBjeY1TZlvjcBBTm6OEQQWyWsTzY5cGkiibHerMgFf4zwOIUFnwbNG1V6juow3927/+BARcNWB1srkMLx+v9+PWPD2KbbbXLPQDrv93fo/dDdnfOaxCFQAAAAASUVORK5CYII=","aquamarine":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAIlSURBVFhHlZbBUcNAEAQVHIkQgiOwnzycDQEQAjHw4EcOUHNVrRqPZ6XiMUi6293p3bOFt8vl8nu73Xbd7/elXJe0JhGT+1MeuS1nmxKmYg6Rey3n7fPnQZnzbwDpDEBy09eP72ounQK0/QZAPMcjQz3L/OX9a4RYAM2EIpnUzB2AZzqXOWoQCyCTvQMgAKVDj/Vp+b0DNPMF0EYHPaIjXR0Uo1zj3qcwAjh5nttEn6ZNiqcp8g8BSEhzB6CAjz0LImoi93BtHtzM2wSAmABy3cFpGG1sTuYAAJkAuk5gCe0x5C2AM3MfoyshjqYyaR3BBODmTi25ccKgNiHXOgL9aQBt7NJUmM7blNKYOO2tI9CNQ+heQew181aYfTdpEJ6/joAxy9jHfgSQ5g3AQcgBir0F4BAK5Jpm2VGCNPPMzZo7gJSfdkxcFGj3aZoAxPr6A0AGO3UTsRmfRkdwTwBZhEJtzeVTyBr+7PHS/r8gO0kTX+OouE8Az/G8vJfWv+Mky0Ik+LeDbwvXltPqYczz0w+SDGDNu+ed4VefSprnNF1rAh48mXvn+dZ0iMxNw9TDh5DjyJG17tOcfYc461579VexT8OPqAFM458AaJKahwAeSBwQ+dp20LwmlNfbfxE180aMIXKTvDbTnMgpQBbKcbcuU9RrNfcPIUFHwVqja1+ju4z32tP+/iIi4GwCbZRZw+Xr1+t1j0VPr2KnzTU3mjTtT+t/qWVbrMcNglAAAAAASUVORK5CYII=","bixbit":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAI6SURBVFhHlZbBTcQwEEX3gPaEqIM2uHHYIpBoBC70wZ06oBEKoAPQRHrRy8/YYQ9f69h/5n+PZ52c7u4ffp9uPla8nL8X5Hyh5gpwcn0UR2wXcxoFjJLZRK455u38s4vrYq42MEtGDHh/fl2MjPiFQwPdepcQPsdT4p+3j8tvco3FQCcyqkAnnnzEAZXImMJiIMVy94y9Q3PNt/jX5XJo4pSlc8I0hhmPbZTzvroCFnPCAoZIgEgaq3nDPeANDg3YRCYlCSZcpc5EjalEPXtzWekT5ExIIu/EAsk3MOuqOcZYDHQJK6iaiEaqX58l/Cxr5unA7mu8GsARBHdwNpTLaRP/EU9sjiBLlBUo2DDCaca5skJGra/3AJOZwAZYzxiS8Wskz/xa2xnoSCXubsZg8ll3fJff8ZsjSBLzdPRo9xmT847BFGubJsQZSLHcURrpxDM2c64GkkSykalunKKZG67nNwaSTOkLaQ5B78pjC83M7QyQpBqPRBhwJTIOA8XN+9/GzC9s3gWQ/NdzFTrhNMDVXbEpnOPC8jp2Yl8+/v/nDmbijmUNLsI8bz5IZtdvcXgPJDrxNJExqwEWRyaOxB2bJnx1j7BpQo4jPyZm4gU4BffP7NjQ23wVu9m6t56fAfFu1lnfZOzusxwDFkIYjs3Y4OjX+R1Xz+u7wA4J7hw7mfnOk7w067VDA5kIM8lP7lEc2L2MZuTOHHMzE7P19SKC0IlkolzPHEbOwwW7q9huc85CI4zWR/N/YAEZiPnf5RoAAAAASUVORK5CYII=","obsidian":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAHTSURBVFhHlZbRTcYwEIP7gHhkDtZgE0ZhIMZiD9BFcuR89SXlwfrTO9vnpL/aXm/vH7+fL98TX68/A6wXqlYQh/1OJ23SXJ2gM/MQ7HUa6ZLm3wF2ZtIIJ37hGCD1k6H4fnt2pyWMAGlIdwKdYeJ3XMcIQDF3rzV3KK7zff0oAI/ODRlMYXztQbs+hy4BuuQicMdPjeXJDZI3A3gIklh3Y3I9APUeRLhE3hmmXqql4UnjGAF2hjo29sRXn3X6kCPdDKBETmBagiGeDCeWW8Chqjk8sK4Zxr1cQ1R/PgdUPBl0de3cN5B4zq/eLUAipeFJo77r6SGeasstIIn1VEsa1l2jUOotf0IlEziMO2KQNJxaes4AJMmsC5XWHEpvcb2+BCCZgQhxyeegXbhbAJrIKNUcfgr08GvnF5Z3ge+EQ1KtC+Aa13FdGK9jJqMRxUSnST0N1vXtg4QE1brh6rNW6E7TMU7AyTQ7GbiW9VQjlj+hbgeP7BSgG3TSVi9+FftpyITXKSyRAlC7DeBE53kYD9j9MpT7zXdBGp4Sd2HdhzyG9d4xAI0UhnxyTzrh9jLakVM41XYhdv35IBIhDaER+/RwsC6ucHsUe1rWfFCHrt/V/wBo8+IQOWOg5wAAAABJRU5ErkJggg==","ice":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA98AAAP9CAYAAACUl96NAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAABs2SURBVHhe7dlRqqxKtkDRjEeC/e+EfbEvdiBBsP4D6kHdc+aOu9MxPtefoYZOYuzHeb8AAACAzP/NAwAAAODvEt8AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQE98AAAAQG/tx3vMQgN/lc63byrf3mEfAX7Ty/V7J3gJ8GyffAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBPfAAAAEBv7cd7zkM7neuZyb+8xjwAAAB7DyTcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExn6c9zyk87meudzbe8wjvpjnHOA7rNzP7ak8wcp3bLUnvuNOvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACA29uO85yEA8O/1uXy6f9r2HvMIvs5T95aV7/dT1/y1eN1XcfINAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAsbEf5z0P4W/7XOses+095hEAAJOV/2srrfxXfOqavxav+ypOvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACAmvgEAACA29uO85yHAb/W5nrmlbe8xjwDgf+IbCi0n3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAb+3He8xC+yed65iO+vcc8IrbyWXO/AfhTK79jK/mG8lOcfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBs7Md5z0P4Jp/rmY/49h7zCL7OU99vfp49FYA/5eQbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYmM/znsefrvPte6St/eYR8Bf5P0GAODfyMk3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMQ3AAAAxMZ+nPc8/Hafa90lb+8xj4C/yPsNAP+Mbyi0nHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABAbOzHec/Db/e51l3y9h7zCIBfaOW3ZKWnfseeer+fynP+85665jyLk28AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIjf0473n47T7Xukve3mMeAfALrfyWrOQ7Bt9r5b721L3Fmj+Lk28AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIiW8AAACIjf0473kIf9vnWveYbe8xj4AvYW95FvcbWk99x1Ze90or1/ypnHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABAbOzHec9D+Ns+17rHbHuPeQQAwMT/GrScfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBMfAMAAEBs7Md5z0OA3+pzPXNL295jHj3Cyvu9cs1XXvdTud/PsvJ+A9/LyTcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExn6c9zwE+K0+1zO3tO095tEjrLzfT11zft7K5/ypvN88weq95YnvmZNvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiI39OO95CN/kc617xLf3mEfEVt7vlZ76rK28309dcwDgn3HyDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAADHxDQAAALGxH+c9D7/d51p3ydt7zCNi7vezrLzfKz31WVt5v635z3vqmgPwHZx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQEx8AwAAQGzsx3nPw2/3uR53ya/X6/Xa3mMePcLK+/3UNYef4v3+edYcKKzcW1Z68r626p6vXHMn3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAT3wAAABAb+3He85DO51q33Nt7zKNHsOYA/CnfEmitfMdW8n4/i5NvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiI39OO95SOdzrVvu7T3m0SNYcwB+M98xnmDlc76Sd+xZnHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABATHwDAABAbOzHec9D+Cafa90jvr3HPOKLrXzWVvKcA/CnfEN/3uo1X3ntqzj5BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgNjYj/Oeh/BNPte6R3x7j3kEAAA8kJNvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiI39OO95CAD8/z6Xzyc/Y3uPefRjVj7nK6/7qdxvaDn5BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgNjYj/Oeh9/ucz3ukl+v1+u1vcc8AgD4r1b+M/lvgdbK9/v10HfcyTcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExDcAAADExn6c9zz8dp/rcZf8er1er+095hEA/9DKb4n9nJ/iOX8W9xtaTr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgNvbjvOfht/tcj7vk1+v1em3vMY8A/thT99Sn8i0Bvs3K79jKPXXldb8WX/sqTr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgJr4BAAAgNvbjvOchwG/1uWxpAPyZ7T3mEcAfc/INAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAMfENAAAAsbEf5z0PAX6rz2VL+2nbe8wjAPg1Vv47+IY+i5NvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiIlvAAAAiI39OO95CMD/7nOt206395hHAAD8izj5BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgJj4BgAAgNjYj/OehwAAAMDf4+QbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYuIbAAAAYv8B3RyKKoyiG9gAAAAASUVORK5CYII=","vox":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAHNSURBVFhHlZbRjYQwEEMpjTYogwoo/U6J5Mh5eBL2w9owY3ucsAKO+77/zvMcuK6rg/WGVmsQh/1KJ23SHJWgMvMQ7FUa6ZLm5wArM2mEHb9hGyD1k6H4fntWpyX0AGlIdQKVYeJXXEcPQDF3rzV3KK7zff0pAI/ODRlMYXztQas+h04BquQicMdfjeXJDZI3AngIklh3Y3I9APUeRDhEXhmmXqql4Unj6AFWhjo29sRXn3X6kCPdCKBETmBagiG+DCemW8Chqjk8sK4Zxr1cQ7T+eA6ouDOo6tq5byDxnN96rwCJlIYnjfqup4d4qk23gCTWUy1pWHeNQqk3/QmVTOAw7ohB0nBq6TkCkCSzKlRacyi9xfX6FIBkBiLEJZ+DVuFeAWgio1Rz+CnQw6+d3zC9C3wnHJJqVQDXuI7rhv46ZjIaUUxUmtTTYF2/PkhIUK0arj5rDdVpOvoJOJlmOwPXsp5qxPQn1O3gke0CVIN22taLX8V+GjLhdQpLpADULgM40XkexgNWvwzlfuNdkIanxFVY9yGPYb23DUAjhSGf3J1OeL2MVuQUTrVViFV/PIhESENoxD49HF5/nmdwhdej2NOy5oMqVP2q/g8pdd4YuAgJ3AAAAABJRU5ErkJggg==","torch":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAKYSURBVFhHlZa9aisxFIS3Sm7jkFcJ3FvmGQLp/Ayugqs0wbhwGciTpgshzYYRfGY0e7TLLQZpdaQzc34ke3r7dzcLr393bRTeH+9X11jXuLbX4Ws+n14edrMDg6+dTqf5crl00BrwNZ/rrMiSwzGhKDciRM6Ox2PD4XBYAFva9a2z7g8ez8zk6fT0ELkcfT//mX8+bho0n6epjSPILuisfGRGuwzkApB6RZLOE5D5t0bEIkI+hxnAgFEHnBwSJ4MgUWWHckC62oSkvXI0IqiQ+zwTXQm8OehgRT9KK3O/BYLvpV/ch3xyS8oM+BWjizOqFED3u4AULXBDnGORAb+/qM0+cALsLoA9VeSeAYEHrQkQtLjf77vuJ8p0uiUAuA0BcCjoJkBp0CRL8Pl02xFB4CVwAXkrINRcvv67BDjSYTJBLT2tCGCeWXEBXoJrEzJxIXKgQ2SBiBMQ5nqSa9Te8/l85eEmLN4BBHDYRVRZyVQnMT7ISvK1l9B/VmlIRKQQ5ikg7X4GcvnO357hU+xZyOg1poAU6nu1R+n3/xLdLaiA6jWs9YBDe9L/tQQoQRnq5BwCOrtaG9l9FETm5d7MAMqTtCJLMSlAviBfCPAFmkNAwFf8FOf3FuSDl0/+M9DuFjioMaRJzDc2t/u3BMiXk1LuYQmcPEmdOMWM5l4Gf4iExUso8HswijLHJEyxlCEDbSVwNf4Q6VDlOAkqMWlzAR5oe4hSkVBlAOfe6RVSBGf0EIk0y9BlAIwakIbyX878roTTAxloK0EuAEQQmTshkoxGIHt5LoPk5rUMZBPKSEQZLQJG8HM+ZoCbGaggglzbgj9uzAm2NaEv5ma3ubMcZSOl7jzPZraaAByMUAl0Jy4E+LqLTMj2C07DRWdbsAZ0AAAAAElFTkSuQmCC","cactus":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA90AAAP8CAYAAABbPt0VAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAACDOSURBVHhe7dmxamTLtmBRZUtCqgeFbPmC+jj96TXbOz9xQZwLR0JKss2GcLtnrMeLMaCc5a2IvbdqkpfX97fb3WbXj+91tM39y+M6OsKpZ37q3pMmz3yS+95v8sxP3ftUp963vfez9372njG1+9Te/2sdAAAAAP9/iG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIiG4AAACIXF7f327rsHb9+F5H29yu29f9v/7rsk62uXytk31uT+tkn8m9718e19E2P59z79jkmU9y3/v989ff62ibX39+r6NtJp+1yb/fpzr1vk/9v8OpTr3vU/e+G9x9am+/dAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEBEdAMAAEDk8vr+dluHtevH9zra5va0TvZ5eH5cR9uceuaXr3Wyz/3L3H3/fM7d9+SZT3Lf+02euW/qfvbez9772Xs/e8+Y2n1qb790AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQOTy+v52W4e168f3Otrm9rRO9nl4flxH25x65pevdbLP/cvcff98zt335JlPct/7nfptsfd+9t7vn7/+Xkfb/Przex1tc+p923u/yb3vBnef2tsv3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABC5vL6/3dZh7frxvY62uT2tk30+//ff62ibX39+r6NtJs/88rVO9rl/eVxH2/x8zr1jk2c+yX3vd+q35dS9J9+xU//fMnnf9t7P3vuduvfd4O5Te/ulGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKiGwAAACKX1/e32zqsXT++19E2t6d1ss/D8+M62ubUM798rZN97l/m7vvnc+6+J898kvve79Rvy6l7T75jk39DT93bc76f+97v1L3vBnef2tsv3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABC5vL6/3dZh7frxvY62uT2tk30enh/X0Tannvnla53sc/8yd98/n3P3PXnmk9z3fpNn7pu636n3ferenvP9Ju/71L1Pfc7vBnef2tsv3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABC5vL6/3dZh7frxvY62uT2tk30enh/X0Tannvnla53sc/8yd98/n3P3PXnmk9z3fpNn7pu636l7e873m7zvU/f2nO83ed93g7tP7e2XbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgAAAIiIbgDgv72H58exfwDw/0J0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQER0AwAAQOTy+v52W4e168f3Otrm9rRO9nl4flxH25x65pevdbLP/cvcff98zt335JlPct/7TZ65b+p+p+7tOd9v8r7tvd/k3v/89fc62ubXn9/raKupb9vUd80v3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABAR3QAAABC5vL6/3dZh7frxvY62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","snow_grass":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAHHSURBVFhHlZfBbcQwEAPVwBWTdJCS8kgD6dEPV5NgDVCgxpTkexCWuEsubdmHpJ3n+Xccx4Vaz7CrJ7hmNqOR8GYJZuJVjXzyKwwBKFqB5qyz5kOdb078frVbUzL3Xvb5ICL5XAGE74/XZfzz+RqG0Lz6Cq5NgYrzXgYsvqlBqOEK4VcOF7zHQ/lwD0H+CkByh+p/V0NI3wPsTFXnk2Ef/WY90jcaz1B1YqUjz724HoCF2Zr7d9cMPgSYNbPm9dSTBhV4TFW7vQPJ0Nd+fivjpCOKHwKwmHivk/OaP4WV5vY7sEIyEJ/Cpj25RwF8gCM96rpSL490dMNnyBeHQl4d0nuNAejRA3AQGzmIfLpLhqGP0AO4gYt3hulRE+5J/9s7QDF53onX6ZX8iFuAFdLgFf8EPcBMvDNWfXYkO7TVWfuaQh/sx7Jbq/8WgGZaE6kvcStf8YX4GXLPtYPGSZOuWj9+CSXUfhboaQit40voa4ZInAdz+DDy/QnwTlLSZEBOYRK/wvUOeCIPQqReGTG4Aq3qPYAXGIQc1xpEMDT10g1/kLhAfDJKGt0RfdTnOvccvgJvdM73xKqe/Kh56x8Tv5unmqR1/h8Gcu68D9tIFgAAAABJRU5ErkJggg==","backgroundstone":"data:image/png;base64,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"};
+
+  var imgs = {};
+  var pending = 0;
+  var ready = false;
+
+  function loadAll(done) {
+    var keys = Object.keys(TEX);
+    pending = keys.length;
+    keys.forEach(function (k) {
+      var im = new Image();
+      im.onload = im.onerror = function () {
+        pending--;
+        if (pending === 0) { ready = true; done(); }
+      };
+      im.src = TEX[k];
+      imgs[k] = im;
+    });
+  }
+
+  /* ==== hero terrain ===================================================== */
+  // A flat slice of overworld drawn from the same PNGs the game draws: grass on
+  // top, dirt under it, stone below that, an ore pocket here and there. Static
+  // by choice, the game dropped its animated parallax for the same reason.
+  var terrain = document.getElementById('terrain');
+
+  function drawTerrain() {
+    if (!terrain) return;
+    var T = 32;
+    var w = terrain.clientWidth || 1000;
+    var h = 160;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    terrain.width = Math.round(w * dpr);
+    terrain.height = Math.round(h * dpr);
+    var c = terrain.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.imageSmoothingEnabled = false;
+    c.clearRect(0, 0, w, h);
+
+    var cols = Math.ceil(w / T);
+    // A deterministic little height curve, no noise library needed.
+    function surfaceRow(x) {
+      return 1 + (Math.sin(x * 0.42) > 0.72 ? 0 : 1) + (Math.sin(x * 0.13 + 2) > 0.55 ? 0 : 1);
+    }
+    for (var x = 0; x < cols; x++) {
+      var top = surfaceRow(x);
+      for (var y = top; y * T < h + T; y++) {
+        var key;
+        if (y === top) key = 'grass';
+        else if (y < top + 2) key = 'dirt';
+        else key = 'stone';
+        var im = imgs[key];
+        if (im) c.drawImage(im, x * T, y * T, T, T);
+      }
+      // Ore pockets on a fixed pattern so the strip looks authored, not random.
+      var oreAt = (x * 7) % 23;
+      if (oreAt === 3 || oreAt === 11) {
+        var ore = oreAt === 3 ? 'coal' : 'gold';
+        if (imgs[ore]) c.drawImage(imgs[ore], x * T, (top + 3) * T, T, T);
+      }
+      if ((x * 5) % 31 === 2 && imgs.moganite) {
+        c.drawImage(imgs.moganite, x * T, (top + 2) * T, T, T);
+      }
+    }
+    // Fade the bottom into the page ground so the strip ends as terrain, not as
+    // a cut-off image.
+    var g = c.createLinearGradient(0, h - 56, 0, h);
+    g.addColorStop(0, 'rgba(18,20,31,0)');
+    g.addColorStop(1, 'rgba(18,20,31,1)');
+    c.fillStyle = g;
+    c.fillRect(0, h - 56, w, 56);
+  }
+
+  /* ==== block atlas ====================================================== */
+  var ATLAS = [
+    ['grass', 'Grass'], ['dirt', 'Dirt'], ['stone', 'Stone'], ['log', 'Log'],
+    ['leave', 'Leaves'], ['sand', 'Sand'], ['cactus', 'Cactus'], ['ice', 'Ice'],
+    ['coal', 'Coal'], ['gold', 'Gold'], ['moganite', 'Moganite'],
+    ['aquamarine', 'Aquamarine'], ['bixbit', 'Bixbit'], ['obsidian', 'Obsidian'],
+    ['vox', 'Vox'], ['torch', 'Torch']
+  ];
+
+  function drawAtlas() {
+    var host = document.getElementById('atlas');
+    if (!host) return;
+    ATLAS.forEach(function (entry) {
+      var tile = document.createElement('div');
+      tile.className = 'tile';
+      var cv = document.createElement('canvas');
+      cv.width = 32; cv.height = 32;
+      var c = cv.getContext('2d');
+      c.imageSmoothingEnabled = false;
+      if (imgs[entry[0]]) c.drawImage(imgs[entry[0]], 0, 0, 32, 32);
+      var label = document.createElement('span');
+      label.textContent = entry[1];
+      tile.appendChild(cv);
+      tile.appendChild(label);
+      host.appendChild(tile);
+    });
+  }
+
+  /* ==== the painter ====================================================== */
+  // 32x32, the same grid the Creator Studio paints on. The canvas IS 32x32 and
+  // is scaled up by CSS with pixelated rendering, so a "pixel" here is a real
+  // pixel in the backing store, exactly as in the game.
+  var SIZE = 32;
+  var PALETTE = [
+    '#7ec850', '#4b8b3b', '#8b5a2b', '#5c4033',
+    '#8f8f9a', '#4a4a55', '#e6c46a', '#f0b429',
+    '#a855f7', '#4facfe', '#e8ecef', '#1a1a22'
+  ];
+  var paint = document.getElementById('paint');
+  var pctx = paint ? paint.getContext('2d') : null;
+  var grid = new Array(SIZE * SIZE).fill(null);
+  var current = PALETTE[8];
+  var erasing = false;
+  var drawing = false;
+
+  function renderPaint() {
+    if (!pctx) return;
+    pctx.clearRect(0, 0, SIZE, SIZE);
+    // Checkerboard so empty cells read as empty, not as black paint.
+    for (var y = 0; y < SIZE; y++) {
+      for (var x = 0; x < SIZE; x++) {
+        var v = grid[y * SIZE + x];
+        if (v) { pctx.fillStyle = v; }
+        // One canvas pixel per checker cell -- the panel is a real 32x32
+        // grid, and a coarser (e.g. 4px) checker reads as a lower-res grid than
+        // it actually is.
+        else { pctx.fillStyle = (x + y) % 2 ? '#1c1c26' : '#242430'; }
+        pctx.fillRect(x, y, 1, 1);
+      }
+    }
+    renderScene();
+    renderCode();
+  }
+
+  function cellFromEvent(e) {
+    var r = paint.getBoundingClientRect();
+    var x = Math.floor((e.clientX - r.left) / r.width * SIZE);
+    var y = Math.floor((e.clientY - r.top) / r.height * SIZE);
+    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return -1;
+    return y * SIZE + x;
+  }
+
+  function apply(e) {
+    var i = cellFromEvent(e);
+    if (i < 0) return;
+    var next = erasing ? null : current;
+    if (grid[i] === next) return;
+    grid[i] = next;
+    renderPaint();
+  }
+
+  if (paint) {
+    paint.addEventListener('pointerdown', function (e) {
+      drawing = true;
+      paint.setPointerCapture(e.pointerId);
+      apply(e);
+    });
+    paint.addEventListener('pointermove', function (e) { if (drawing) apply(e); });
+    paint.addEventListener('pointerup', function () { drawing = false; });
+    paint.addEventListener('pointercancel', function () { drawing = false; });
+  }
+
+  /* ---- swatches ---- */
+  var swHost = document.getElementById('swatches');
+  var swBtns = [];
+  function selectSwatch(idx) {
+    erasing = (idx === -1);
+    if (!erasing) current = PALETTE[idx];
+    swBtns.forEach(function (b, i) {
+      b.setAttribute('aria-pressed', String((erasing && i === swBtns.length - 1) || (!erasing && i === idx)));
+    });
+  }
+  if (swHost) {
+    PALETTE.forEach(function (col, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sw';
+      b.style.background = col;
+      b.setAttribute('aria-label', 'Colour ' + (i + 1));
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', function () { selectSwatch(i); });
+      swHost.appendChild(b);
+      swBtns.push(b);
+    });
+    var er = document.createElement('button');
+    er.type = 'button';
+    er.className = 'sw eraser';
+    er.textContent = 'X';
+    er.setAttribute('aria-label', 'Eraser');
+    er.setAttribute('aria-pressed', 'false');
+    er.addEventListener('click', function () { selectSwatch(-1); });
+    swHost.appendChild(er);
+    swBtns.push(er);
+    selectSwatch(8);
+  }
+
+  /* ---- the block, placed in the world ---- */
+  var scene = document.getElementById('scene');
+
+  function renderScene() {
+    if (!scene) return;
+    // Integer 2x zoom: still pixel-perfect, but a 32px tile in a 128px-tall
+    // strip reads as a texture band rather than as a block.
+    var T = 64;
+    var h = 192;
+    var w = scene.clientWidth || 384;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Backed at the real displayed size, not stretched from a fixed 384: a
+    // stretched backing store would draw the 32px textures at some fractional
+    // scale, which is the one thing this whole art style cannot survive.
+    if (scene.width !== Math.round(w * dpr)) {
+      scene.width = Math.round(w * dpr);
+      scene.height = Math.round(h * dpr);
+    }
+    var c = scene.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.imageSmoothingEnabled = false;
+    var sky = c.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#171a28');
+    sky.addColorStop(1, '#12141f');
+    c.fillStyle = sky;
+    c.fillRect(0, 0, w, h);
+
+    var cols = Math.ceil(w / T);
+    var surface = 1; // rows of sky above the grass line
+    for (var x = 0; x < cols; x++) {
+      for (var y = surface; y * T < h; y++) {
+        var key = (y === surface) ? 'grass' : (y === surface + 1 ? 'dirt' : 'stone');
+        if (imgs[key]) c.drawImage(imgs[key], x * T, y * T, T, T);
+      }
+    }
+    // Your block, sitting on the surface where a placed block would sit.
+    var px = Math.floor(cols / 2) * T;
+    var py = (surface - 1) * T;
+    var scale = T / SIZE;
+    for (var i = 0; i < grid.length; i++) {
+      var v = grid[i];
+      if (!v) continue;
+      c.fillStyle = v;
+      c.fillRect(px + (i % SIZE) * scale, py + Math.floor(i / SIZE) * scale, scale, scale);
+    }
+    // A hard placement outline, the same 2px step the chrome uses.
+    c.strokeStyle = 'rgba(168,85,247,0.55)';
+    c.lineWidth = 2;
+    c.strokeRect(px + 1, py + 1, T - 2, T - 2);
+  }
+
+  /* ---- the code ---- */
+  var codeOut = document.getElementById('code');
+  var ALPH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+  function renderCode() {
+    if (!codeOut) return;
+    var filled = 0, h1 = 0x811c9dc5, h2 = 0x1b873593;
+    for (var i = 0; i < grid.length; i++) {
+      var v = grid[i];
+      if (!v) continue;
+      filled++;
+      h1 = (h1 ^ (i + v.charCodeAt(1) * 31 + v.charCodeAt(3) * 7)) >>> 0;
+      h1 = (h1 * 16777619) >>> 0;
+      h2 = (h2 + h1 + i * 2654435761) >>> 0;
+    }
+    if (!filled) { codeOut.textContent = 'VXB2-  (paint something)'; return; }
+    var body = '';
+    var s1 = h1, s2 = h2;
+    for (var k = 0; k < 26; k++) {
+      s1 = (s1 * 1664525 + 1013904223) >>> 0;
+      s2 = (s2 ^ (s1 >>> 7)) >>> 0;
+      body += ALPH[((s1 ^ s2) >>> 0) % ALPH.length];
+      if (k === 8 || k === 17) body += '-';
+    }
+    codeOut.textContent = 'VXB2-' + body;
+  }
+
+  var copyBtn = document.getElementById('btn-copy');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      var text = codeOut.textContent.trim();
+      var reset = function (label) {
+        copyBtn.textContent = label;
+        setTimeout(function () { copyBtn.textContent = 'COPY'; }, 1400);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { reset('COPIED'); }, function () { reset('PRESS CTRL+C'); });
+      } else {
+        reset('PRESS CTRL+C');
+      }
+    });
+  }
+
+  var clearBtn = document.getElementById('btn-clear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      grid = new Array(SIZE * SIZE).fill(null);
+      renderPaint();
+    });
+  }
+
+  /* A starting sprite, so the panel is never an empty grid on arrival: a small
+     lantern-ish block that shows the loop working before anyone clicks. */
+  function seedSprite() {
+    grid = new Array(SIZE * SIZE).fill(null);
+    function rect(x0, y0, x1, y1, col) {
+      for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) grid[y * SIZE + x] = col;
+    }
+    // A full-tile stone block with an ore vein in it, built the way the real
+    // textures are: flat base, hard top-left light edge, hard bottom-right
+    // shadow edge, then the ore speckled on top.
+    rect(0, 0, 31, 31, '#8f8f9a');
+    rect(0, 0, 31, 1, '#a9a9b6');
+    rect(0, 0, 1, 31, '#a9a9b6');
+    rect(0, 30, 31, 31, '#4a4a55');
+    rect(30, 0, 31, 31, '#4a4a55');
+    var vein = [[7,6],[9,7],[8,9],[11,10],[13,9],[12,12],[16,13],[19,11],[21,14],[18,17],[15,19],[20,21],[23,19],[11,21],[9,17],[24,9]];
+    vein.forEach(function (p) {
+      rect(p[0], p[1], p[0] + 2, p[1] + 2, '#f0b429');
+      grid[p[1] * SIZE + p[0]] = '#e6c46a';
+      grid[(p[1] + 2) * SIZE + (p[0] + 2)] = '#8b5a2b';
+    });
+    renderPaint();
+  }
+
+  /* ---- surprise me: real block archetypes, not noise ----------------------
+     Mirrored random noise reads as a creature blob, not a block -- nothing in
+     the game looks like that. These five recipes are the shapes the game's
+     own textures actually use (a full-tile fill, a vein, banding, a cluster),
+     so a click here lands somewhere a real block could plausibly be, not on
+     static. */
+  function hexToRgb(hex) {
+    return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  }
+  function toHex2(v) { v = Math.max(0, Math.min(255, Math.round(v))); var s = v.toString(16); return s.length < 2 ? '0' + s : s; }
+  // amt > 0 mixes toward white, amt < 0 mixes toward black -- one knob for
+  // both the noise texture and the bevel edges, instead of two colour scales.
+  function shade(hex, amt) {
+    var rgb = hexToRgb(hex), t = amt > 0 ? 255 : 0, k = Math.min(1, Math.abs(amt));
+    return '#' + toHex2(rgb[0] + (t - rgb[0]) * k) + toHex2(rgb[1] + (t - rgb[1]) * k) + toHex2(rgb[2] + (t - rgb[2]) * k);
+  }
+  function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function pickOne(arr) { return arr[randInt(0, arr.length - 1)]; }
+
+  function paintBevel(g, light, dark) {
+    for (var x = 0; x < SIZE; x++) { g[x] = light; g[(SIZE - 1) * SIZE + x] = dark; }
+    for (var y = 0; y < SIZE; y++) { g[y * SIZE] = light; g[y * SIZE + SIZE - 1] = dark; }
+  }
+
+  var ARCHETYPES = [
+    // Stone with a wandering ore vein -- the shape every ore block in the
+    // game actually is (see the seed sprite above).
+    function () {
+      var g = new Array(SIZE * SIZE);
+      var base = pickOne(['#8f8f9a', '#5c4033', '#4a4a55']);
+      for (var i = 0; i < g.length; i++) g[i] = shade(base, (Math.random() - 0.5) * 0.16);
+      var ore = pickOne(['#f0b429', '#4facfe', '#a855f7', '#7ec850']);
+      var vx = randInt(8, 23), vy = randInt(8, 23);
+      for (var s = 0; s < randInt(6, 10); s++) {
+        vx = Math.max(2, Math.min(29, vx + randInt(-3, 3)));
+        vy = Math.max(2, Math.min(29, vy + randInt(-3, 3)));
+        for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+          if (Math.random() < 0.75) g[(vy + dy) * SIZE + (vx + dx)] = ore;
+        }
+        g[vy * SIZE + vx] = shade(ore, 0.35);
+      }
+      paintBevel(g, shade(base, 0.25), shade(base, -0.3));
+      return g;
+    },
+    // A log's end grain: concentric rings around an off-centre pith.
+    function () {
+      var g = new Array(SIZE * SIZE);
+      var base = pickOne(['#8b5a2b', '#5c4033']);
+      var cx = 16 + randInt(-5, 5), cy = 16 + randInt(-5, 5);
+      for (var y = 0; y < SIZE; y++) {
+        for (var x = 0; x < SIZE; x++) {
+          var d = Math.hypot(x - cx, y - cy);
+          var ring = Math.sin(d * 0.85) * 0.5 + 0.5;
+          g[y * SIZE + x] = shade(base, (ring - 0.5) * 0.4);
+        }
+      }
+      paintBevel(g, shade(base, 0.2), shade(base, -0.3));
+      return g;
+    },
+    // Grass cap over a dirt body -- the game's own most-seen silhouette.
+    function () {
+      var g = new Array(SIZE * SIZE);
+      var capH = randInt(4, 7);
+      for (var y = 0; y < SIZE; y++) {
+        for (var x = 0; x < SIZE; x++) {
+          var col = y < capH ? shade('#7ec850', (Math.random() - 0.5) * 0.22)
+            : y < capH + 2 ? shade('#4b8b3b', (Math.random() - 0.5) * 0.16)
+            : shade('#5c4033', (Math.random() - 0.5) * 0.2);
+          g[y * SIZE + x] = col;
+        }
+      }
+      paintBevel(g, shade('#7ec850', 0.25), shade('#5c4033', -0.3));
+      return g;
+    },
+    // A gem cluster on dark stone, the aquamarine/bixbit family.
+    function () {
+      var g = new Array(SIZE * SIZE);
+      var dark = '#1a1a22';
+      for (var i = 0; i < g.length; i++) g[i] = shade(dark, (Math.random() - 0.5) * 0.14);
+      var gem = pickOne(['#4facfe', '#a855f7', '#e8ecef']);
+      for (var n = 0; n < randInt(4, 7); n++) {
+        var gx = randInt(4, 27), gy = randInt(4, 27), r = randInt(1, 3);
+        for (var dy = -r; dy <= r; dy++) {
+          for (var dx = -r; dx <= r; dx++) {
+            if (Math.abs(dx) + Math.abs(dy) > r) continue;
+            var xx = gx + dx, yy = gy + dy;
+            if (xx < 0 || xx >= SIZE || yy < 0 || yy >= SIZE) continue;
+            g[yy * SIZE + xx] = (dx === 0 && dy === 0) ? shade(gem, 0.4) : gem;
+          }
+        }
+      }
+      paintBevel(g, '#33333f', '#050508');
+      return g;
+    },
+    // Sun-baked sand, banded the way dunes settle in layers.
+    function () {
+      var g = new Array(SIZE * SIZE);
+      var base = pickOne(['#e6c46a', '#d9b45c']);
+      for (var y = 0; y < SIZE; y++) {
+        var band = (y % 5 === 0) ? -0.1 : 0;
+        for (var x = 0; x < SIZE; x++) g[y * SIZE + x] = shade(base, band + (Math.random() - 0.5) * 0.14);
+      }
+      paintBevel(g, shade(base, 0.2), shade(base, -0.25));
+      return g;
+    }
+  ];
+
+  var sampleBtn = document.getElementById('btn-sample');
+  if (sampleBtn) {
+    sampleBtn.addEventListener('click', function () {
+      grid = pickOne(ARCHETYPES)();
+      renderPaint();
+    });
+  }
+
+  /* ==== scroll reveal ==================================================== */
+  var reveals = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window && reveals.length) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.15 });
+    reveals.forEach(function (el) { io.observe(el); });
+  } else {
+    reveals.forEach(function (el) { el.classList.add('in'); });
+  }
+
+  /* ==== go =============================================================== */
+  loadAll(function () {
+    drawTerrain();
+    drawAtlas();
+    seedSprite();
+  });
+
+  var rt;
+  window.addEventListener('resize', function () {
+    clearTimeout(rt);
+    rt = setTimeout(function () { if (ready) { drawTerrain(); renderScene(); } }, 150);
+  });
+})();
+</script>
+
+</html>

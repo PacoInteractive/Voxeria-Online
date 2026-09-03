@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Voxeria — Character Lab</title>
+<style>
+  :root {
+    --bg: #0b0d14; --surface1: #12151f; --surface2: #171b28; --surface3: #1f2433;
+    --line: #2a3040; --text1: #eef1f8; --text2: #a8b0c4; --text3: #6b7488;
+    --accent: #7a5bd0; --accent-hover: #8f6ee8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text1); margin: 0; padding: 20px;
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--text2); font-size: 13px; margin: 0 0 20px; max-width: 800px; line-height: 1.5; }
+  .layout { display: grid; grid-template-columns: 210px 1fr 300px; gap: 18px; align-items: start; }
+  .panel {
+    background: var(--surface1); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .label { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text3); }
+  .swatch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .swatch {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    background: var(--surface2); border: 2px solid var(--line); border-radius: 6px;
+    padding: 6px 2px; cursor: pointer; font-size: 10px; color: var(--text2);
+  }
+  .swatch:hover { border-color: var(--text3); }
+  .swatch.active { border-color: var(--accent); background: var(--surface3); color: var(--text1); }
+  .swatch .chip { width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15); }
+  .swatch .chip.dynamic {
+    background: repeating-linear-gradient(45deg, #ff6b6b, #ff6b6b 4px, #4facfe 4px, #4facfe 8px, #a8ff78 8px, #a8ff78 12px);
+  }
+  .swatch .chip.erase {
+    background: linear-gradient(45deg, transparent 45%, #d55 45%, #d55 55%, transparent 55%), var(--surface3);
+  }
+  .btn {
+    background: var(--surface2); color: var(--text1); border: 1px solid var(--line); border-radius: 6px;
+    padding: 8px 12px; cursor: pointer; font-size: 12.5px; font-weight: 600; font-family: inherit;
+  }
+  .btn:hover { background: var(--surface3); border-color: var(--text3); }
+  .btn-primary { background: var(--accent); border-color: transparent; color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-row { display: flex; flex-direction: column; gap: 6px; }
+  .btn-row.horiz { flex-direction: row; flex-wrap: wrap; }
+  .btn.toggle-on { background: var(--accent); border-color: transparent; color: #fff; }
+  #paintCanvas { image-rendering: pixelated; border-radius: 6px; cursor: crosshair; touch-action: none; }
+  .canvas-wrap { display: flex; justify-content: center; }
+  .hint { font-size: 11.5px; color: var(--text3); line-height: 1.5; }
+
+  .frame-tabs { display: flex; flex-direction: column; gap: 4px; }
+  .frame-tab {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    background: var(--surface2); border: 2px solid var(--line); border-radius: 6px;
+    padding: 7px 9px; cursor: pointer; font-size: 12px; color: var(--text2);
+  }
+  .frame-tab:hover { border-color: var(--text3); }
+  .frame-tab.active { border-color: var(--accent); background: var(--surface3); color: var(--text1); font-weight: 600; }
+  .frame-tab .mini { width: 16px; height: 22px; image-rendering: pixelated; border-radius: 2px; background: var(--bg); }
+
+  .recolor-target { display: flex; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+  .recolor-target .chip { width: 28px; height: 28px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); flex: none; }
+  .recolor-target .txt { font-size: 12px; color: var(--text2); }
+  .curated-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .curated-swatch { width: 100%; aspect-ratio: 1; border-radius: 4px; cursor: pointer; border: 2px solid transparent; }
+  .curated-swatch:hover { border-color: var(--text3); }
+  .curated-swatch.active { border-color: #fff; }
+
+  /* Free colour picker — the native <input type=color> opens the browser's
+     own full picker (spectrum/wheel + numeric entry), the same role "More
+     Colors…" plays in Word next to its standard-colours row above it. */
+  .custom-color-row { display: flex; align-items: center; gap: 8px; }
+  #customColorPicker {
+    width: 36px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--surface2); cursor: pointer;
+  }
+  #customColorPicker::-webkit-color-swatch-wrapper { padding: 3px; }
+  #customColorPicker::-webkit-color-swatch { border: none; border-radius: 3px; }
+  #customColorHex {
+    width: 84px; background: var(--surface2); color: var(--text1); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; font: 12px ui-monospace, Consolas, monospace; text-transform: uppercase;
+  }
+  #customColorHex:focus { outline: 1px solid var(--accent); }
+  .custom-color-row.disabled { opacity: 0.35; pointer-events: none; }
+
+  .big-preview-wrap { display: flex; justify-content: center; background: var(--surface2); border-radius: 6px; padding: 10px; }
+  #bigCanvas { image-rendering: pixelated; }
+  .skin-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .skin-dot { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .skin-dot.active { border-color: #fff; }
+  textarea {
+    width: 100%; height: 110px; background: var(--surface2); color: var(--text1); border: 1px solid var(--line);
+    border-radius: 6px; padding: 8px; font: 11px ui-monospace, Consolas, monospace; resize: vertical;
+  }
+  .status { font-size: 11.5px; color: var(--accent); min-height: 16px; }
+</style>
+</head>
+<body>
+
+<h1>🎨 Voxeria — Character Lab</h1>
+<p class="sub">
+  Fünf komplette Figuren-Bilder statt Kopf+Rumpf gemalt und Arme/Beine live berechnet: <b>Stehen A/B</b>, <b>Laufen A/B</b> und <b>Springen</b> — jedes für sich ein fertiges, vollständig gemaltes Bild mit Kopf, Armen, Rumpf und Beinen.
+  „Lebendig" entsteht dadurch, dass das Spiel schnell zwischen diesen fertigen Bildern hin- und herschaltet, nicht durch berechnete Bewegung. Wähle links ein Bild, mal es fertig, wechsle zum nächsten — die große Vorschau rechts spielt die Bilder in Echtzeit ab, genau wie im Spiel.
+  Nur die Augen bleiben separat (sie müssen blinzeln und zur Laufrichtung zeigen).
+</p>
+
+<div class="layout">
+
+  <!-- FRAME SELECT + BODY PART SELECT -->
+  <div class="panel">
+    <div class="label">Bild (Frame)</div>
+    <div class="frame-tabs" id="frameTabs"></div>
+    <button class="btn" id="btnDuplicate">⎘ In nächstes Bild kopieren</button>
+
+    <div class="label" style="margin-top:6px;">Körperteil</div>
+    <div class="swatch-grid" id="palette"></div>
+
+    <div class="label" style="margin-top:6px;">Werkzeug</div>
+    <div class="btn-row">
+      <button class="btn" id="btnUndo">↶ Rückgängig</button>
+      <button class="btn" id="btnClear">🗑️ Dieses Bild leeren</button>
+      <button class="btn" id="btnLoadDefault">📋 Alle 5 zurücksetzen</button>
+      <button class="btn" id="btnLoadDraft">💾 Entwurf laden</button>
+    </div>
+    <div class="hint">Klicken oder ziehen zum Malen. Rechtsklick löscht ein Pixel.</div>
+  </div>
+
+  <!-- PAINT GRID -->
+  <div class="panel">
+    <div class="label"><span id="gridLabel"></span> — Raster (24 × 56)</div>
+    <div class="canvas-wrap">
+      <canvas id="paintCanvas"></canvas>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- RECOLOR + LIVE PLAYBACK + EXPORT -->
+  <div class="panel">
+    <div class="label">Farbe von: <span id="recolorLabel"></span></div>
+    <div class="recolor-target" id="recolorTarget"></div>
+    <div class="curated-grid" id="curatedGrid"></div>
+    <div class="custom-color-row" id="customColorRow">
+      <input type="color" id="customColorPicker" title="Weitere Farben…">
+      <input type="text" id="customColorHex" maxlength="7" spellcheck="false">
+      <span class="hint" style="margin:0;">Weitere Farben</span>
+    </div>
+    <div class="hint">Schnellauswahl oben, oder links jede Farbe frei wählen — wie „Weitere Farben…" in Word. Gilt für alle 5 Bilder gleichzeitig, ein Charakter trägt ja überall dasselbe Hemd.</div>
+
+    <div class="label" style="margin-top:6px;">Abspielen (schnelles Umschalten der Bilder)</div>
+    <div class="big-preview-wrap"><canvas id="bigCanvas"></canvas></div>
+    <div class="btn-row horiz">
+      <button class="btn toggle-on" id="modeIdle">🧍 Stehen</button>
+      <button class="btn" id="modeWalk">🚶 Laufen</button>
+      <button class="btn" id="modeJump">⤴ Springen</button>
+      <button class="btn" id="btnFacing">⇄ Blickrichtung</button>
+    </div>
+
+    <div class="label" style="margin-top:6px;">Hautton testen</div>
+    <div class="skin-row" id="skinRow"></div>
+
+    <div class="label" style="margin-top:6px;">Code exportieren</div>
+    <button class="btn btn-primary" id="btnExport">Code exportieren</button>
+    <textarea id="exportOut" placeholder="Noch nichts exportiert…" readonly></textarea>
+    <button class="btn" id="btnCopy">📋 In Zwischenablage kopieren</button>
+  </div>
+
+</div>
+
+<script>
+// ============================================================================
+// Five fully-painted frames instead of "baked torso + live-computed limbs".
+// Arms and legs are now just pixels in the grid, exactly like the torso —
+// the "juicy" animated feel comes entirely from switching WHICH complete
+// frame is shown, fast, not from any per-frame limb math. Only the eyes stay
+// procedural (drawn on top of whichever frame is showing): they have to
+// track facing direction and blink independently of which body pose is up.
+//
+// This IS wired into the real game (voxeria-engine.js: PLAYER_FRAMES,
+// _getPlayerFrame, drawPlayer/drawOtherPlayers) — export from here and paste
+// the PLAYER_FRAME_W/H + PLAYER_FRAMES + PLAYER_PALETTE block over the ones
+// near the top of the "PLAYER SPRITE" section in that file to ship a change.
+// The shipped version also has a 6th frame ("place", a block-placing pose)
+// that this lab doesn't model — hand-edit that one directly in engine.js.
+//
+// 24x56 (not 32x74) so the sprite exactly fills the hitbox: 56 = 2*TILE
+// (TILE=28) makes the character exactly two blocks tall, matching
+// player.w/h in voxeria-boot.js pixel-for-pixel — see the PLAYER_FRAME_W
+// comment in voxeria-engine.js for why that match matters.
+// ============================================================================
+const W = 24, FRAME_H = 56;
+// Eyes are the one thing still drawn on top every frame — same position in
+// all five frames since the head doesn't move between poses here.
+const EYE = { y: 11, colX: [7, 14], w: 3, h: 3, shift: 2 };
+
+const FRAME_DEFS = [
+  { id: 'idleA', name: 'Stehen A' },
+  { id: 'idleB', name: 'Stehen B' },
+  { id: 'walkA', name: 'Laufen A' },
+  { id: 'walkB', name: 'Laufen B' },
+  { id: 'jump',  name: 'Springen' }
+];
+
+// Starting point: a from-scratch redesign at 32-wide (matching the block/
+// creature pixel grid exactly, up from the previous 22-wide version) --
+// brimmed explorer's cap, a diagonal satchel strap worn over the shirt,
+// rolled sleeves, warm earth-tone palette instead of the old cool blues (so
+// it doesn't read as "generic blue hero" next to Voxeria's own identity).
+// Generated with scratchpad/gen_design2.js -- regenerate there if the base
+// silhouette changes, then re-paste.
+const DEFAULT_FRAMES = {"idleA":[".......hhhhhhhhhh.......",".......hhhhhhhhhh.......","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....",".KKKKKKKKKKKKKKKKKKKKK..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","....SSSSSSSSSSSSSSS.....","....SSSSSSSSSSSSSSS.....",".......SSSSSSSSSS.......","....CCCCCCCCCCCCCCC.....","....CCCTTCCCCCCCCCC.....","....BBBTTTBbbBBBBBB.....","....BBBTTTBbbBBBBBB.....","....BBBBTTBbbBBBBBB.....",".bbbBBBBBTTbbBBBBBBbbbb.",".bbbBBBBBTTbbBBBBBBbbbb.",".bbbBBBBBBTTbBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBbTTBBBBBbbbb.",".bbbBBBBBBBbTTBBBBBbbbb.",".bbbBBBBBBBbbTTBBBBbbbb.",".SSSBBBBBBBbbTTTBBBSSSS.",".SSSBBBBBBBbbTTTBBBSSSS.",".SSSBBBBBBBbbBTTBBBSSSS.","....BBBBBBBbbBBTTBB.....","....WWWWWWWWWWWTTWW.....","....WWWWWWWWWWWWTTW.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO....."],"idleB":[".......hhhhhhhhhh.......",".......hhhhhhhhhh.......","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....",".KKKKKKKKKKKKKKKKKKKKK..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","....SSSSSSSSSSSSSSS.....","....SSSSSSSSSSSSSSS.....",".......SSSSSSSSSS.......","....CCCCCCCCCCCCCCC.....","....CCCTTCCCCCCCCCC.....","....BBBTTTBbbBBBBBB.....","....BBBTTTBbbBBBBBB.....","....BBBBTTBbbBBBBBB.....",".bbbBBBBBTTbbBBBBBBbbbb.",".bbbBBBBBTTbbBBBBBBbbbb.",".bbbBBBBBBTTbBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBbTTBBBBBbbbb.",".bbbBBBBBBBbTTBBBBBbbbb.",".bbbBBBBBBBbbTTBBBBbbbb.",".SSSBBBBBBBbbTTTBBBSSSS.",".SSSBBBBBBBbbTTTBBBSSSS.",".SSSBBBBBBBbbBTTBBBSSSS.",".SSSBBBBBBBbbBBTTBBSSSS.","....WWWWWWWWWWWTTWW.....","....WWWWWWWWWWWWTTW.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO....."],"walkA":[".......hhhhhhhhhh.......",".......hhhhhhhhhh.......","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....",".KKKKKKKKKKKKKKKKKKKKK..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","....SSSSSSSSSSSSSSS.....","....SSSSSSSSSSSSSSS.....",".......SSSSSSSSSS.......","....CCCCCCCCCCCCCCC.....","....CCCTTCCCCCCCCCC.....","....BBBTTTBbbBBBBBB.....","....BBBTTTBbbBBBBBB.....","....BBBBTTBbbBBBBBB.....",".bbbBBBBBTTbbBBBBBB.....",".bbbBBBBBTTbbBBBBBB.....",".bbbBBBBBBTTbBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBbTTBBBBBbbbb.",".bbbBBBBBBBbTTBBBBBbbbb.",".bbbBBBBBBBbbTTBBBBbbbb.",".SSSBBBBBBBbbTTTBBBbbbb.",".SSSBBBBBBBbbTTTBBBbbbb.",".SSSBBBBBBBbbBTTBBBSSSS.","....BBBBBBBbbBBTTBBSSSS.","....WWWWWWWWWWWTTWWSSSS.","....WWWWWWWWWWWWTTWSSSS.","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..OOOOOO.....","....PPPPPPP..OOOOOO.....","....PPPPPPP..OOOOOO.....","....PPPPPPP..OOOOOO.....","....OOOOOOO.............","....OOOOOOO.............","....OOOOOOO.............","....OOOOOOO.............","....OOOOOOO............."],"walkB":[".......hhhhhhhhhh.......",".......hhhhhhhhhh.......","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....",".KKKKKKKKKKKKKKKKKKKKK..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","....SSSSSSSSSSSSSSS.....","....SSSSSSSSSSSSSSS.....",".......SSSSSSSSSS.......","....CCCCCCCCCCCCCCC.....","....CCCTTCCCCCCCCCC.....","....BBBTTTBbbBBBBBB.....","....BBBTTTBbbBBBBBB.....","....BBBBTTBbbBBBBBB.....","....BBBBBTTbbBBBBBBbbbb.","....BBBBBTTbbBBBBBBbbbb.",".bbbBBBBBBTTbBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBbTTBBBBBbbbb.",".bbbBBBBBBBbTTBBBBBbbbb.",".bbbBBBBBBBbbTTBBBBbbbb.",".bbbBBBBBBBbbTTTBBBSSSS.",".bbbBBBBBBBbbTTTBBBSSSS.",".SSSBBBBBBBbbBTTBBBSSSS.",".SSSBBBBBBBbbBBTTBB.....",".SSSWWWWWWWWWWWTTWW.....",".SSSWWWWWWWWWWWWTTW.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....OOOOOOO..PPPPPP.....","....OOOOOOO..PPPPPP.....","....OOOOOOO..PPPPPP.....","....OOOOOOO..PPPPPP.....",".............OOOOOO.....",".............OOOOOO.....",".............OOOOOO.....",".............OOOOOO.....",".............OOOOOO....."],"jump":[".......hhhhhhhhhh.......",".......hhhhhhhhhh.......","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....","....hhhhhhhhhhhhhhh.....",".KKKKKKKKKKKKKKKKKKKKK..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..HHSSSSSSSSSSSSSSSHHH..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","..SSSSSSSSSSSSSSSSSSSS..","....SSSSSSSSSSSSSSS.....","....SSSSSSSSSSSSSSS.....",".......SSSSSSSSSS.......","....CCCCCCCCCCCCCCC.....","....CCCTTCCCCCCCCCC.....",".bbbBBBTTTBbbBBBBBBbbbb.",".bbbBBBTTTBbbBBBBBBbbbb.",".bbbBBBBTTBbbBBBBBBbbbb.",".bbbBBBBBTTbbBBBBBBbbbb.",".bbbBBBBBTTbbBBBBBBbbbb.",".bbbBBBBBBTTbBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBTTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".bbbBBBBBBBTTBBBBBBbbbb.",".SSSBBBBBBBbTTBBBBBSSSS.",".SSSBBBBBBBbTTBBBBBSSSS.",".SSSBBBBBBBbbTTBBBBSSSS.",".SSSBBBBBBBbbTTTBBBSSSS.","....BBBBBBBbbTTTBBB.....","....BBBBBBBbbBTTBBB.....","....BBBBBBBbbBBTTBB.....","....WWWWWWWWWWWTTWW.....","....WWWWWWWWWWWWTTW.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPPPPPPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..PPPPPP.....","....PPPPPPP..OOOOOO.....","....PPPPPPP..OOOOOO.....","....OOOOOOO..OOOOOO.....","....OOOOOOO..OOOOOO.....","....OOOOOOO.............","....OOOOOOO.............","....OOOOOOO.............","........................","........................"]};
+
+const DEFAULT_PAL = {
+  h:'#d97b52', H:'#4a2f1f', K:'#6b4226', C:'#3d2b1f', T:'#a86530',
+  B:'#c9a86a', b:'#e0c68a', W:'#4a2f1a', P:'#5c5a3e', O:'#241a12', E:'#1a120c'
+};
+const PALETTE_KEYS = ['h','H','K','C','T','B','b','W','P','O','E'];
+const PALETTE_NAMES = {
+  h:'Mütze (hell)', H:'Mütze (Schatten)', K:'Mützenschirm', C:'Kragen', T:'Trageriemen',
+  B:'Hemd', b:'Hemd-Naht/Ärmel', W:'Gürtel', P:'Hose', O:'Stiefel', E:'Augen'
+};
+
+// ── Curated recolor palette ──────────────────────────────────────────────
+// Deliberately not a full colour-spectrum picker: a fixed, closed set the
+// player picks from, same convention the game's own Block/Creature pixel
+// editor already uses — a design should only ever reach colours the game
+// itself defined, not arbitrary RGB.
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = x => Math.round(255 * x).toString(16).padStart(2, '0');
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
+const CURATED_PALETTE = [];
+for (const light of [30, 45, 60, 75]) {
+  for (const hue of [0, 25, 45, 90, 140, 190, 220, 270]) {
+    CURATED_PALETTE.push(hslToHex(hue, 60, light));
+  }
+}
+for (const light of [8, 22, 40, 62, 82, 96]) CURATED_PALETTE.push(hslToHex(0, 0, light));
+
+// ── Per-pixel texture noise (the "Minecraft" look) ───────────────────────
+// A flat fillRect per letter reads as a vector shape, not a material — real
+// block textures never use one solid colour for "dirt" or "wood", every
+// pixel sits a little lighter or darker than its neighbours. This does the
+// same thing here: each PIXEL of e.g. shirt colour gets its own small,
+// PERMANENT brightness offset, so "shirt" stays one colour family but no two
+// shirt pixels are quite identical.
+//
+// The offset has to be a pure function of the pixel's (row, col) rather than
+// Math.random() -- randomness re-rolled on every redraw would shimmer/static
+// every time the canvas repaints (every paint stroke, every colour change,
+// every animation tick). Hashing the coordinates instead makes the exact
+// same pixel always land on the exact same offset, forever, the same way a
+// real baked texture's noise doesn't change between frames.
+function hashRC(row, col) {
+  let h = Math.imul(row, 374761393) + Math.imul(col, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h / 4294967295; // stable float in [0,1)
+}
+const TEXTURE_NOISE = 16; // max +/- per RGB channel -- subtle, not static
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex(r, g, b) {
+  const c = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return '#' + c(r) + c(g) + c(b);
+}
+// Skin (S) is a dynamic CSS colour string (the player's own hsl(...), not a
+// fixed palette hex) — textured() only handles hex, so skin pixels get their
+// noise applied in HSL space directly by the caller instead (see
+// texturedSkin below) rather than through this hex path.
+function textured(hex, row, col) {
+  const [r, g, b] = hexToRgb(hex);
+  const n = (hashRC(row, col) - 0.5) * 2 * TEXTURE_NOISE;
+  return rgbToHex(r + n, g + n, b + n);
+}
+function texturedSkin(cssColor, row, col) {
+  // previewSkin is always 'hsl(H,S%,L%)' here (see SKIN_HUES below) -- jitter
+  // L directly rather than round-tripping through hex.
+  const m = /^hsl\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)%,\s*(\d+(?:\.\d+)?)%\)$/.exec(cssColor);
+  if (!m) return cssColor; // not the expected format -- leave untouched rather than guess
+  const [, h, s, l] = m.map(Number);
+  const jitter = (hashRC(row, col) - 0.5) * 2 * 6; // percentage points, smaller range than cloth -- skin reads worse over-noised
+  return `hsl(${h}, ${s}%, ${Math.max(0, Math.min(100, l + jitter))}%)`;
+}
+
+function cloneFrames(src) {
+  const out = {};
+  for (const id of Object.keys(src)) out[id] = src[id].map(row => row.split(''));
+  return out;
+}
+let frames = cloneFrames(DEFAULT_FRAMES);
+let palette = Object.assign({}, DEFAULT_PAL);
+let activeFrame = 'idleA';
+let selected = 'H';
+let undoStack = []; // per active frame, cleared on frame switch — undo across frames would be confusing
+let previewSkin = 'hsl(20,100%,70%)';
+
+const ZOOM = 8;
+const cv = document.getElementById('paintCanvas');
+cv.width = W * ZOOM; cv.height = FRAME_H * ZOOM;
+const cctx = cv.getContext('2d');
+cctx.imageSmoothingEnabled = false;
+
+function grid() { return frames[activeFrame]; }
+
+function snapshotForUndo() {
+  undoStack.push(grid().map(r => r.slice()));
+  if (undoStack.length > 60) undoStack.shift();
+}
+
+function renderGrid() {
+  const g = grid();
+  cctx.clearRect(0, 0, cv.width, cv.height);
+  for (let r = 0; r < FRAME_H; r++) {
+    for (let c = 0; c < W; c++) {
+      const ch = g[r][c];
+      if (ch === '.') {
+        cctx.fillStyle = ((r + c) % 2 === 0) ? '#181c28' : '#12151f';
+        cctx.fillRect(c*ZOOM, r*ZOOM, ZOOM, ZOOM);
+      } else {
+        cctx.fillStyle = (ch === 'S') ? texturedSkin(previewSkin, r, c) : textured(palette[ch] || '#ff00ff', r, c);
+        cctx.fillRect(c*ZOOM, r*ZOOM, ZOOM, ZOOM);
+      }
+    }
+  }
+  // faint region guides: brim / collar / waist / legTop, so painting stays
+  // roughly in the same anatomy every frame even without a fixed rectangle
+  // grid. Matches the band layout in scratchpad/gen_design2.js.
+  cctx.strokeStyle = 'rgba(255,255,255,0.08)'; cctx.lineWidth = 1;
+  for (const guideRow of [8, 24, 27, 49, 52, 58]) {
+    cctx.beginPath(); cctx.moveTo(0, guideRow*ZOOM); cctx.lineTo(W*ZOOM, guideRow*ZOOM); cctx.stroke();
+  }
+}
+
+function cellAt(evt) {
+  const r = cv.getBoundingClientRect();
+  const x = evt.clientX - r.left, y = evt.clientY - r.top;
+  const c = Math.floor(x / ZOOM), row = Math.floor(y / ZOOM);
+  if (c < 0 || c >= W || row < 0 || row >= FRAME_H) return null;
+  return { row, c };
+}
+
+let painting = false, paintChar = null, strokeStarted = false;
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('pointerdown', e => {
+  const cell = cellAt(e); if (!cell) return;
+  painting = true; strokeStarted = false;
+  paintChar = (e.button === 2) ? '.' : selected;
+  paintCell(cell);
+});
+cv.addEventListener('pointermove', e => { if (painting) { const cell = cellAt(e); if (cell) paintCell(cell); } });
+window.addEventListener('pointerup', () => { painting = false; });
+function paintCell(cell) {
+  if (!strokeStarted) { snapshotForUndo(); strokeStarted = true; }
+  const g = grid();
+  if (g[cell.row][cell.c] === paintChar) return;
+  g[cell.row][cell.c] = paintChar;
+  renderGrid();
+  renderFrameTabs();
+  autosave();
+}
+
+// ── Frame tabs ────────────────────────────────────────────────────────────
+function frameThumb(id) {
+  const g = frames[id];
+  const c = document.createElement('canvas');
+  c.className = 'mini'; c.width = W; c.height = FRAME_H;
+  const x = c.getContext('2d');
+  for (let r = 0; r < FRAME_H; r++) for (let col = 0; col < W; col++) {
+    const ch = g[r][col];
+    if (ch === '.') continue;
+    x.fillStyle = (ch === 'S') ? texturedSkin(previewSkin, r, col) : textured(palette[ch] || '#ff00ff', r, col);
+    x.fillRect(col, r, 1, 1);
+  }
+  return c;
+}
+function renderFrameTabs() {
+  const host = document.getElementById('frameTabs');
+  host.innerHTML = '';
+  for (const def of FRAME_DEFS) {
+    const el = document.createElement('div');
+    el.className = 'frame-tab' + (activeFrame === def.id ? ' active' : '');
+    el.appendChild(frameThumb(def.id));
+    const lbl = document.createElement('span'); lbl.textContent = def.name; lbl.style.flex = '1';
+    el.appendChild(lbl);
+    el.addEventListener('click', () => { activeFrame = def.id; undoStack = []; renderGrid(); renderFrameTabs(); updateGridLabel(); });
+    host.appendChild(el);
+  }
+}
+function updateGridLabel() {
+  document.getElementById('gridLabel').textContent = FRAME_DEFS.find(f => f.id === activeFrame).name;
+}
+document.getElementById('btnDuplicate').addEventListener('click', () => {
+  const idx = FRAME_DEFS.findIndex(f => f.id === activeFrame);
+  const next = FRAME_DEFS[(idx + 1) % FRAME_DEFS.length];
+  frames[next.id] = grid().map(r => r.slice());
+  setStatus(`In "${next.name}" kopiert.`);
+  renderFrameTabs();
+  autosave();
+});
+
+function buildPalette() {
+  const host = document.getElementById('palette');
+  host.innerHTML = '';
+  const mk = (key, isDynamic, isErase) => {
+    const el = document.createElement('div');
+    el.className = 'swatch' + (selected === key ? ' active' : '');
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (isDynamic ? ' dynamic' : '') + (isErase ? ' erase' : '');
+    if (!isDynamic && !isErase) chip.style.background = palette[key];
+    el.appendChild(chip);
+    const lbl = document.createElement('div');
+    lbl.textContent = isErase ? 'Radiergummi' : (isDynamic ? 'Haut (S)' : PALETTE_NAMES[key]);
+    el.appendChild(lbl);
+    el.addEventListener('click', () => { selected = isErase ? '.' : key; buildPalette(); buildRecolorPanel(); });
+    host.appendChild(el);
+  };
+  for (const k of PALETTE_KEYS) mk(k, false, false);
+  mk('S', true, false);
+  mk('.', false, true);
+}
+
+function buildRecolorPanel() {
+  const labelEl = document.getElementById('recolorLabel');
+  const targetEl = document.getElementById('recolorTarget');
+  const gridEl = document.getElementById('curatedGrid');
+  const customRow = document.getElementById('customColorRow');
+  const isRecolorable = PALETTE_KEYS.includes(selected);
+
+  labelEl.textContent = isRecolorable ? PALETTE_NAMES[selected] : '—';
+  targetEl.innerHTML = '';
+  gridEl.innerHTML = '';
+  gridEl.style.opacity = isRecolorable ? '1' : '0.35';
+  gridEl.style.pointerEvents = isRecolorable ? 'auto' : 'none';
+  customRow.classList.toggle('disabled', !isRecolorable);
+
+  if (isRecolorable) {
+    const chip = document.createElement('div'); chip.className = 'chip'; chip.style.background = palette[selected];
+    const txt = document.createElement('div'); txt.className = 'txt'; txt.textContent = palette[selected];
+    targetEl.appendChild(chip); targetEl.appendChild(txt);
+    // Native colour input only accepts #rrggbb (no shorthand, no alpha) --
+    // every value in `palette` is already stored that way, so no conversion
+    // needed here, only when a hand-typed hex comes back the other way.
+    document.getElementById('customColorPicker').value = palette[selected];
+    document.getElementById('customColorHex').value = palette[selected];
+  } else {
+    const txt = document.createElement('div'); txt.className = 'txt';
+    txt.textContent = selected === 'S' ? 'Haut folgt der Spielerfarbe, nicht fest wählbar.' : 'Radiergummi hat keine Farbe.';
+    targetEl.appendChild(txt);
+  }
+
+  for (const hex of CURATED_PALETTE) {
+    const sw = document.createElement('div');
+    sw.className = 'curated-swatch' + (isRecolorable && palette[selected] === hex ? ' active' : '');
+    sw.style.background = hex;
+    sw.addEventListener('click', () => {
+      if (!isRecolorable) return;
+      palette[selected] = hex;
+      buildPalette(); buildRecolorPanel(); renderGrid(); renderFrameTabs(); autosave();
+    });
+    gridEl.appendChild(sw);
+  }
+}
+
+// ── Free colour picker — "More Colors…" ─────────────────────────────────
+// The two inputs below are created once in the HTML and never rebuilt (only
+// their .value is re-synced by buildRecolorPanel above), so their listeners
+// are wired up exactly once here rather than re-attached on every repaint.
+function applyCustomColor(hex) {
+  if (!PALETTE_KEYS.includes(selected)) return;
+  palette[selected] = hex;
+  buildPalette(); buildRecolorPanel(); renderGrid(); renderFrameTabs(); autosave();
+}
+document.getElementById('customColorPicker').addEventListener('input', e => {
+  applyCustomColor(e.target.value);
+});
+document.getElementById('customColorHex').addEventListener('change', e => {
+  let v = e.target.value.trim();
+  if (!v.startsWith('#')) v = '#' + v;
+  // Accept 3-digit shorthand (#abc) by expanding it, same as CSS would --
+  // the native colour input and the exported code both expect 6 digits.
+  const shortMatch = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/.exec(v);
+  if (shortMatch) v = '#' + shortMatch.slice(1).map(c => c + c).join('');
+  if (!/^#[0-9a-fA-F]{6}$/.test(v)) {
+    setStatus('Ungültiger Hex-Code — Beispiel: #3f74c9');
+    e.target.value = PALETTE_KEYS.includes(selected) ? palette[selected] : '';
+    return;
+  }
+  applyCustomColor(v.toLowerCase());
+});
+
+// ── Playback: draws one COMPLETE baked frame (no per-frame limb math), then
+// the procedural eyes on top. "Animation" = which frame id is picked, on the
+// same per-tick timing the real game uses. ──────────────────────────────
+const bigCv = document.getElementById('bigCanvas');
+const BIG_ZOOM = 7;
+bigCv.width = W * BIG_ZOOM + 40; bigCv.height = FRAME_H * BIG_ZOOM + 20;
+const bigCtx = bigCv.getContext('2d');
+bigCtx.imageSmoothingEnabled = false;
+
+function drawFrame(ctx2, zoom, ox, oy, frameId, face, blink) {
+  const g = frames[frameId];
+  for (let r = 0; r < FRAME_H; r++) {
+    for (let c = 0; c < W; c++) {
+      const ch = g[r][c];
+      if (ch === '.') continue;
+      ctx2.fillStyle = (ch === 'S') ? texturedSkin(previewSkin, r, c) : textured(palette[ch] || '#ff00ff', r, c);
+      ctx2.fillRect((ox+c)*zoom, (oy+r)*zoom, zoom, zoom);
+    }
+  }
+  const eyeShift = face * EYE.shift;
+  ctx2.fillStyle = palette.E || '#14203a';
+  if (blink) {
+    ctx2.fillRect((ox+EYE.colX[0]+eyeShift)*zoom, (oy+EYE.y+1)*zoom, EYE.w*zoom, 1*zoom);
+    ctx2.fillRect((ox+EYE.colX[1]+eyeShift)*zoom, (oy+EYE.y+1)*zoom, EYE.w*zoom, 1*zoom);
+  } else {
+    ctx2.fillRect((ox+EYE.colX[0]+eyeShift)*zoom, (oy+EYE.y)*zoom, EYE.w*zoom, EYE.h*zoom);
+    ctx2.fillRect((ox+EYE.colX[1]+eyeShift)*zoom, (oy+EYE.y)*zoom, EYE.w*zoom, EYE.h*zoom);
+  }
+}
+
+let animMode = 'idle';
+let animFacing = 1;
+let labFrameCount = 0;
+
+// Same cadence the real game uses: stride flips every 6 frames (walk), idle
+// alternates on the same ~0.75s half-period sin(frameCount*0.07) crosses
+// zero at, blink is frameCount%260<8. Run via rAF so it's real animation
+// speed — see the chat note if this pane's rAF is throttled/not compositing:
+// call animFrame() directly to advance it by hand in that case.
+function animFrame() {
+  labFrameCount++;
+  const blinking = (labFrameCount % 260) < 8;
+  let frameId;
+  if (animMode === 'walk') {
+    frameId = (Math.floor(labFrameCount / 6) % 2) ? 'walkB' : 'walkA';
+  } else if (animMode === 'jump') {
+    frameId = 'jump';
+  } else {
+    frameId = (Math.sin(labFrameCount * 0.07) > 0) ? 'idleB' : 'idleA';
+  }
+  bigCtx.clearRect(0, 0, bigCv.width, bigCv.height);
+  drawFrame(bigCtx, BIG_ZOOM, 20/BIG_ZOOM, 10/BIG_ZOOM, frameId, animFacing, blinking);
+  requestAnimationFrame(animFrame);
+}
+requestAnimationFrame(animFrame);
+window._vxAnimStep = animFrame; // manual fallback, see comment above
+
+function setMode(mode) {
+  animMode = mode;
+  for (const [m, id] of [['idle','modeIdle'],['walk','modeWalk'],['jump','modeJump']]) {
+    document.getElementById(id).classList.toggle('toggle-on', m === mode);
+  }
+}
+document.getElementById('modeIdle').addEventListener('click', () => setMode('idle'));
+document.getElementById('modeWalk').addEventListener('click', () => setMode('walk'));
+document.getElementById('modeJump').addEventListener('click', () => setMode('jump'));
+document.getElementById('btnFacing').addEventListener('click', () => { animFacing *= -1; });
+
+const SKIN_HUES = [20, 40, 90, 150, 200, 240, 280, 320];
+function buildSkinRow() {
+  const host = document.getElementById('skinRow');
+  host.innerHTML = '';
+  for (const hue of SKIN_HUES) {
+    const col = `hsl(${hue},100%,70%)`;
+    const dot = document.createElement('div');
+    dot.className = 'skin-dot' + (previewSkin === col ? ' active' : '');
+    dot.style.background = col;
+    dot.title = 'hue ' + hue;
+    dot.addEventListener('click', () => { previewSkin = col; buildSkinRow(); renderGrid(); renderFrameTabs(); });
+    host.appendChild(dot);
+  }
+}
+
+function autosave() {
+  try {
+    const art = {};
+    for (const id of Object.keys(frames)) art[id] = frames[id].map(r => r.join(''));
+    localStorage.setItem('vx_character_lab_draft_v2', JSON.stringify({ frames: art, palette }));
+  } catch (e) {}
+}
+
+function loadDefault() {
+  snapshotForUndo();
+  frames = cloneFrames(DEFAULT_FRAMES);
+  palette = Object.assign({}, DEFAULT_PAL);
+  buildPalette(); buildRecolorPanel(); renderGrid(); renderFrameTabs();
+  setStatus('Alle 5 Bilder zurückgesetzt.');
+}
+
+function loadDraft() {
+  let raw = null;
+  try { raw = localStorage.getItem('vx_character_lab_draft_v2'); } catch (e) {}
+  if (!raw) { setStatus('Kein gespeicherter Entwurf gefunden.'); return; }
+  try {
+    const data = JSON.parse(raw);
+    frames = {};
+    for (const id of Object.keys(DEFAULT_FRAMES)) {
+      const rows = (data.frames && data.frames[id]) ? data.frames[id] : DEFAULT_FRAMES[id];
+      frames[id] = rows.map(r => r.split(''));
+    }
+    palette = Object.assign({}, DEFAULT_PAL, data.palette);
+    buildPalette(); buildRecolorPanel(); renderGrid(); renderFrameTabs();
+    setStatus('Gespeicherter Entwurf geladen.');
+  } catch (e) { setStatus('Entwurf konnte nicht gelesen werden.'); }
+}
+
+function setStatus(msg) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.textContent = ''; }, 2500);
+}
+
+document.getElementById('btnUndo').addEventListener('click', () => {
+  if (!undoStack.length) { setStatus('Nichts mehr rückgängig zu machen.'); return; }
+  frames[activeFrame] = undoStack.pop();
+  renderGrid(); renderFrameTabs(); autosave();
+});
+document.getElementById('btnClear').addEventListener('click', () => {
+  snapshotForUndo();
+  frames[activeFrame] = Array.from({length: FRAME_H}, () => Array(W).fill('.'));
+  renderGrid(); renderFrameTabs(); autosave();
+  setStatus('Bild geleert.');
+});
+document.getElementById('btnLoadDefault').addEventListener('click', loadDefault);
+document.getElementById('btnLoadDraft').addEventListener('click', loadDraft);
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  const used = new Set();
+  for (const id of Object.keys(frames)) {
+    for (const row of frames[id]) for (const ch of row) if (ch !== '.' && ch !== 'S') used.add(ch);
+  }
+  const ALWAYS_INCLUDE = new Set(['E']); // O is always painted now, no longer procedural-only
+  const palLines = PALETTE_KEYS.filter(k => used.has(k) || ALWAYS_INCLUDE.has(k))
+    .map(k => `  ${k}: '${palette[k]}',   // ${PALETTE_NAMES[k]}`).join('\n');
+
+  const frameBlocks = FRAME_DEFS.map(def => {
+    const rows = frames[def.id].map(r => `    '${r.join('')}'`).join(',\n');
+    return `  ${def.id}: [\n${rows}\n  ]`;
+  }).join(',\n');
+
+  const code =
+`// --- Von Character Lab exportiert (5-Frame-Version) ---
+// Braucht eine neue Blit-Logik in drawPlayer/drawOtherPlayers (voxeria-engine.js):
+// je nach Animationszustand eines von PLAYER_FRAMES.* zeichnen statt eines
+// einzelnen Sprites + berechneter Arme/Beine. Noch nicht eingebaut -- diesen
+// Block einfach schicken, das ist der nächste Schritt.
+//
+// WICHTIG -- die Textur-Unschärfe (jedes Pixel etwas heller/dunkler statt
+// Flatfill, siehe Character Lab) steckt NICHT in diesen Daten, sondern ist
+// reine Zeichenlogik: hashRC()/textured()/texturedSkin() aus character-lab.html
+// müssen beim Einbau mit übernommen und im Blit-Loop verwendet werden --
+// sonst kommt die Figur im Spiel flach gefüllt raus, nicht "Minecraft-artig".
+const PLAYER_FRAME_W = ${W}, PLAYER_FRAME_H = ${FRAME_H};
+const PLAYER_FRAMES = {
+${frameBlocks}
+};
+const PLAYER_PALETTE = {
+${palLines}
+};`;
+  document.getElementById('exportOut').value = code;
+  setStatus('Code erzeugt — unten kopieren.');
+});
+document.getElementById('btnCopy').addEventListener('click', () => {
+  const ta = document.getElementById('exportOut');
+  if (!ta.value) { setStatus('Erst „Code exportieren" klicken.'); return; }
+  ta.select();
+  navigator.clipboard && navigator.clipboard.writeText(ta.value).then(
+    () => setStatus('In Zwischenablage kopiert.'),
+    () => setStatus('Kopieren fehlgeschlagen — manuell markieren (Strg+C).')
+  );
+});
+
+// ── init ──────────────────────────────────────────────────────────────────
+buildPalette();
+buildRecolorPanel();
+buildSkinRow();
+renderGrid();
+renderFrameTabs();
+updateGridLabel();
+{
+  let raw = null;
+  try { raw = localStorage.getItem('vx_character_lab_draft_v2'); } catch (e) {}
+  if (raw) setStatus('Gespeicherter Entwurf gefunden — „Entwurf laden" zum Fortsetzen.');
+}
+</script>
+</body>
+</html>

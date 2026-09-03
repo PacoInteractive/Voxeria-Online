@@ -1,0 +1,17 @@
+Join the Discord to report bugs and suggest features! https://discord.gg/6X9sSjZ9e
+
+Voxeria is a mining/exploration game where the actual point is that you can build your own stuff into it (blocks, creatures, whole rule sets) and hand it to a friend as one short code. No install, no separate tool, nothing to compile.
+
+Open the Creator Studio and you get a pixel editor for painting a 32x32 block or creature by hand, and a node graph for wiring up what it does: when the player touches it, when it's mined, when it takes damage, connect that to an action, add a condition if you want it to only fire sometimes. No scripting, just boxes and lines. You can also just turn a few knobs instead: gravity, weather, how many enemies spawn, what you start with, without touching the graph at all.
+
+Whatever you build gets packed into a mod code. Post it, your friend pastes it in, they're standing in your world. That's the whole loop: no accounts, no upload step, no waiting on approval.
+
+Underneath the modding, it's still a real mining game: dig through the overworld and five hidden dimensions, each with its own terrain, ores and a forge where you craft that dimension's armor piece. Wear the full set and you get a bonus on top. No shop, no grinding for coins, you earn gear by getting there and clearing it.
+
+The world reacts while you dig: lava that flows and cools into obsidian, blocks that drop when whatever was under them is gone, day turning into night, weather rolling through. If you'd rather skip the structure entirely, Exploration mode drops the Portal Book and the progression and just gives you an endless world to build in.
+
+Play solo or drop into a shared world with other people running at the same time, both are fully supported, not one bolted onto the other.
+
+This is still a playtest build, so if something's confusing, tedious, or just doesn't click, tell me. Especially anything around the mod tools, since that's the part I care most about getting right. Comment here or find me on Discord: neon_violl.
+
+Free in the browser. No install, no account.
