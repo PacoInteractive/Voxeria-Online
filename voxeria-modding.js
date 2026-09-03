@@ -9385,6 +9385,37 @@ function toggleModEditor() {
 }
 window.toggleModEditor = toggleModEditor;
 
+// Puts a SHARED rule onto the editor's board. Called from the gallery's
+// "look inside" button, which is the rung between playing someone's mod and
+// building one: almost nobody starts at an empty board, they start by changing
+// one thing about something that already works and that they just enjoyed.
+//
+// Deliberately the same shape as the editor's own Import field rather than a
+// second path beside it: ngEditingId stays null, so the board holds a copy and
+// Save writes the player's OWN mod instead of overwriting the piece they
+// opened. Looking inside somebody's work can't damage it, and can't damage
+// anything of theirs either.
+//
+// Returns false if the editor refused to open, which happens in Normal worlds
+// where the creator tools are gated. toggleModEditor has already said so in
+// that case, so there is nothing to add here.
+function vxOpenGraphInEditor(code, note) {
+  const g = decodeGraphCode(code);
+  if (!g) { showNotification('† That rule could not be read.'); return false; }
+  const modal = document.getElementById('mod-editor-modal');
+  if (!modal) return false;
+  if (!modal.classList.contains('open')) {
+    toggleModEditor();
+    if (!modal.classList.contains('open')) return false;
+  }
+  ngEditingId = null;
+  ngLoadGraph(g);
+  showNotification('üîç "' + g.name + '" is on the board. Change anything you like, Save makes your own copy.' +
+                   (note ? ' ' + note : ''));
+  return true;
+}
+window.vxOpenGraphInEditor = vxOpenGraphInEditor;
+
 async function mbBuildModData() {
   const name = document.getElementById('mb-name').value.trim().slice(0, 30);
   if (!name) {

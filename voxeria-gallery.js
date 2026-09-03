@@ -314,6 +314,29 @@ window.VxGallery = (function () {
     const n = entry && entry.pieceCount;
     return (typeof n === 'number' && isFinite(n) && n > 0) ? Math.min(99, Math.floor(n)) : 0;
   }
+  // The rule pieces inside a listing, in publish order. Drives both whether
+  // the "look inside" button appears at all and what it opens: an entry made
+  // only of blocks or creatures has no rules to show, and offering a button
+  // that then says "nothing here" would be worse than not offering it.
+  function entryGraphCodes(entry) {
+    const loadout = decodeEntry(entry);
+    if (!loadout || !Array.isArray(loadout.pieceCodes)) return [];
+    return loadout.pieceCodes.filter(c => typeof isGraphCode === 'function' && isGraphCode(c));
+  }
+
+  // Opens the first rule and, when there are more, says so rather than
+  // pretending the mod is one rule. One real rule on the board is the whole
+  // point; claiming it is the entire mod would not be true.
+  function peekGalleryEntry(entry) {
+    const codes = entryGraphCodes(entry);
+    if (!codes.length) return;
+    const note = codes.length > 1
+      ? 'This mod has ' + codes.length + ' rules, and this is the first.'
+      : '';
+    closeFullGallery();
+    if (typeof vxOpenGraphInEditor === 'function') vxOpenGraphInEditor(codes[0], note);
+  }
+
   function piecesLabel(entry) {
     const n = safeCount(entry);
     return n ? ' &middot; ' + n + (n === 1 ? ' piece' : ' pieces') : '';
@@ -411,6 +434,23 @@ window.VxGallery = (function () {
         '<div class="vx-gallery-card-actions">' +
           '<button class="vx-gallery-act vx-gallery-report" data-id="' + id + '" title="Report this mod">' + iconHtml('gallery-flag') + '</button>' +
           '<button class="vx-gallery-act vx-gallery-details" data-id="' + id + '" title="What is in this mod">' + iconHtml('gallery-info') + '</button>' +
+          // Only where there is something to see. The node-graph icon is the
+          // one the "Rules" category already uses, so it reads as "the rules
+          // of this mod" without a second visual language for the same thing.
+          //
+          // Shown regardless of world mode, unlike the mod tip in
+          // voxeria-modding.js which hides itself where the tools are gated.
+          // The difference is who started it: the tip is unasked-for
+          // advertising and a dead link would be its own fault, while this is
+          // the answer to a deliberate click on one mod. It is also drawn from
+          // the menu, where the mode of the world the player is about to start
+          // is not decided yet, so hiding it would guess wrong as often as
+          // right. A Normal world answers with the existing lock message,
+          // which explains the rule instead of leaving a button that does
+          // nothing.
+          (ok && entryGraphCodes(entry).length
+            ? '<button class="vx-gallery-act vx-gallery-peek" data-id="' + id + '" title="Look inside: open the rules of this mod in the editor">' + iconHtml('gallery-nodes') + '</button>'
+            : '') +
           (ok
             ? '<button class="vx-gallery-act primary vx-gallery-play" data-id="' + id + '" title="Play this mod">' + iconHtml('gallery-play') + '</button>'
             : '<button class="vx-gallery-act" disabled title="This entry is corrupted">' + iconHtml('gallery-info') + '</button>') +
@@ -423,6 +463,11 @@ window.VxGallery = (function () {
       btn.addEventListener('click', () => openReportModal(btn.dataset.id)));
     grid.querySelectorAll('.vx-gallery-details').forEach(btn =>
       btn.addEventListener('click', () => openDetails(btn.dataset.id)));
+    grid.querySelectorAll('.vx-gallery-peek').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const entry = cachedEntries.find(e => e.id === btn.dataset.id);
+        if (entry) peekGalleryEntry(entry);
+      }));
   }
 
   // -- details --------------------------------------------------------------
