@@ -41,7 +41,17 @@ window.VxWorlds = (function () {
     // nothing ever read the flag — dying there behaved exactly like Normal.
     // The mode is gone rather than left as a promise the game never kept.
     explore:  { label: 'Exploration', portalBook: false, studio: true  },
-    normal:   { label: 'Normal',      portalBook: true,  studio: false }
+    normal:   { label: 'Normal',      portalBook: true,  studio: false },
+    // Arena gab es schon, aber NUR ueber "Multiplayer-Raum hosten". Dabei
+    // laeuft ein Match seit jeher auch allein (siehe den Offline-Zweig in
+    // VxArena.startMatch), und die Bauphase ist genau das, was man zum Testen
+    // eigener Minispielregeln braucht. Als eigener Weltmodus ist sie deshalb
+    // hier, damit man ein Feld bauen und seine Regeln ausprobieren kann, ohne
+    // vorher jemanden einladen zu muessen.
+    //
+    // `studio: true`, weil ohne die Werkzeuge der halbe Sinn fehlt: eine Arena
+    // ohne eigene Regeln ist nur ein leerer Kasten.
+    arena:    { label: 'Arena',       portalBook: false, studio: true  }
   };
 
   // Every button, panel and prompt that leads into the creator tools. Listed
@@ -320,6 +330,28 @@ window.VxWorlds = (function () {
     // and fully usable over it.
     if (!cfg.studio && typeof window.vxCloseCreatorModals === 'function') window.vxCloseCreatorModals();
     document.body.dataset.vxMode = gameMode;
+
+    // Normal mode moves #health down to sit above #hotbar (see the CSS next
+    // to body[data-vx-mode="normal"] #health in index.html) rather than
+    // leaving it at the top of #info-bar like every other mode. A CSS
+    // position alone cannot do that move: #info-bar has backdrop-filter,
+    // which makes IT the containing block for any fixed/absolute descendant,
+    // so #health has to actually leave the DOM subtree #info-bar's filter
+    // applies to. Reparented here (not left a one-way move) so switching
+    // back out of Normal -- joining another room, loading a different save
+    // -- restores it to #info-bar's flow instead of leaving a stray node
+    // sitting over the canvas in a mode that never asked for it.
+    const healthEl = document.getElementById('health');
+    const hotbarEl = document.getElementById('hotbar');
+    const infoBarEl = document.getElementById('info-bar');
+    if (healthEl && hotbarEl && infoBarEl) {
+      if (gameMode === 'normal') {
+        if (healthEl.parentElement !== hotbarEl.parentElement) hotbarEl.parentElement.insertBefore(healthEl, hotbarEl);
+      } else if (healthEl.parentElement !== infoBarEl) {
+        infoBarEl.insertBefore(healthEl, infoBarEl.firstChild);
+      }
+    }
+
     hideEmptyMenuSections();
   }
 
@@ -361,10 +393,17 @@ window.VxWorlds = (function () {
   // world while a Normal one happened to be loaded would hide the studio panel
   // and refuse its own tiles. Anywhere else, the running world's mode is what
   // matters.
+  // All three screens of the create-a-world flow count: the mode picker and
+  // the two mode screens that follow it. The Exploration screen in particular
+  // MUST count, or its own creator tools would be gated by whatever mode
+  // happened to be loaded before rather than by the one being chosen.
   function onNewWorldView() {
     const menu = document.getElementById('vx-menu');
-    const view = document.getElementById('vx-view-new');
-    return !!menu && menu.classList.contains('show') && !!view && view.style.display !== 'none';
+    if (!menu || !menu.classList.contains('show')) return false;
+    return ['new', 'explore', 'normal'].some(v => {
+      const el = document.getElementById('vx-view-' + v);
+      return !!el && el.style.display !== 'none';
+    });
   }
   // "Is a world running right now?" A multiplayer room is one, even though it
   // deliberately has NO named save behind it (see _leaveNamedWorldForRoom in
@@ -395,25 +434,70 @@ window.VxWorlds = (function () {
     }
     err.textContent = '';
     const seed = (seedEl.value || '').trim() || ('vx-' + Math.random().toString(36).slice(2, 10));
+    // Die Breite gehoert zur WELT, nicht zur Sitzung: applySave liest sie beim
+    // Laden wieder heraus (siehe VxArena.setWorldWidth dort), damit eine
+    // gespeicherte Arena beim naechsten Oeffnen dieselbe Groesse hat.
+    const isArena = pendingMode === 'arena';
+    // Der Bauplan ersetzt die schmale Startplattform durch ein fertiges
+    // Baufeld -- ueber genau die Bearbeitungsliste, die ein Speicherstand
+    // beim Laden ohnehin abspielt (siehe applySave weiter unten), kein
+    // zweiter Mechanismus.
+    const templateEdits = (isArena && typeof ARENA_TEMPLATES !== 'undefined' && ARENA_TEMPLATES[pendingArenaTemplate])
+      ? ARENA_TEMPLATES[pendingArenaTemplate].build(pendingArenaWidth)
+      : [];
     applySave({
       id: 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       name: name, seed: seed, mode: pendingMode,
-      player: null, inventory: null, armor: null, edits: []
+      arenaWidth: isArena ? pendingArenaWidth : 0,
+      player: null, inventory: null, armor: null, edits: templateEdits
     }, /* fresh */ true);
     save();
     showNotification('New world: ' + name + ' (' + MODES[pendingMode].label + ')');
   }
 
+  // Picking a mode is now a step, not a toggle: each mode has a screen of its
+  // own and that is where its world gets started. Selecting one here and
+  // leaving the player on the same page was what buried Exploration's creator
+  // tools at the bottom of a form.
   function pickMode(m) {
     pendingMode = m;
     document.querySelectorAll('#vx-view-new .vx-mode').forEach(el => {
       el.classList.toggle('sel', el.dataset.mode === m);
     });
-    // The studio panel IS mode-gated again: the creator tools belong to
-    // Exploration (see MODES). Refreshed here rather than only in view() so
-    // switching mode on the new-world screen shows and hides the panel as the
-    // player toggles, instead of leaving whatever the screen opened with.
-    vxStudioSetVisible(studioAllowed());
+    view(m === 'explore' ? 'explore' : m === 'arena' ? 'arena' : 'normal');
+  }
+
+  // Die Breitenwahl auf dem SOLO-Arena-Bildschirm. Eigene Zeile, aber dieselbe
+  // Liste und dieselbe gemerkte Breite wie beim Hosten, damit beide Wege nicht
+  // unterschiedliche Groessen anbieten koennen.
+  function renderSoloWidthRow() {
+    const row = document.getElementById('vx-arena-width-row');
+    if (!row || !window.VxArena) return;
+    row.innerHTML = VxArena.WIDTHS.map(w =>
+      '<div class="vx-seg-opt' + (w.blocks === pendingArenaWidth ? ' sel' : '') + '" ' +
+      'onclick="VxWorlds.pickArenaWidth(' + w.blocks + ')">' +
+      escapeHtml(w.label) + '</div>').join('');
+  }
+
+  // Welcher Bauplan eine frisch erstellte Solo-Arena bekommt, statt der
+  // schmalen Startplattform. Nur auf dem Solo-Bildschirm -- ein gehosteter
+  // Raum hat kein Verfahren, um vorgefertigte Bloecke in sein geteiltes
+  // Firestore-Dokument zu schreiben, das waere eine eigene Erweiterung.
+  let pendingArenaTemplate = 'empty';
+
+  function renderArenaTemplateRow() {
+    const row = document.getElementById('vx-arena-template-row');
+    if (!row || typeof ARENA_TEMPLATES === 'undefined') return;
+    row.innerHTML = Object.keys(ARENA_TEMPLATES).map(key =>
+      '<div class="vx-seg-opt' + (key === pendingArenaTemplate ? ' sel' : '') + '" ' +
+      'onclick="VxWorlds.pickArenaTemplate(\'' + key + '\')">' +
+      escapeHtml(ARENA_TEMPLATES[key].label) + '</div>').join('');
+  }
+
+  function pickArenaTemplate(key) {
+    if (!ARENA_TEMPLATES[key]) return;
+    pendingArenaTemplate = key;
+    renderArenaTemplateRow();
   }
 
   // ---- Creator Studio invitation ----------------------------------------
@@ -424,14 +508,17 @@ window.VxWorlds = (function () {
   // and the creator tools are not part of it.
 
   // The rule tile has no pixel art to show, so it borrows the game's own icon
-  // renderer (VX_ICONS) rather than inventing a second glyph system.
+  // renderer (VX_ICONS) rather than inventing a second glyph system. Puzzle,
+  // not star: it is the same icon the Mod Editor wears everywhere else it
+  // appears (the menu entry, its own header), so a star here would be pointing
+  // at the wrong thing.
   function studioDrawRuleTile() {
     const cv = document.getElementById('vx-studio-art-rule');
-    if (!cv || typeof VX_ICONS === 'undefined' || !VX_ICONS.star) return;
+    if (!cv || typeof VX_ICONS === 'undefined' || !VX_ICONS.puzzle) return;
     // The drawIcon* functions take a canvas and size it themselves (16px), so
     // it gets its own buffer and is blitted up to the tile, pixels intact.
     const tmp = document.createElement('canvas');
-    VX_ICONS.star(tmp);
+    VX_ICONS.puzzle(tmp);
     const c = cv.getContext('2d');
     c.clearRect(0, 0, cv.width, cv.height);
     c.imageSmoothingEnabled = false;
@@ -454,36 +541,13 @@ window.VxWorlds = (function () {
     studioDrawRuleTile();
   }
 
+  // No collapsed state any more: the panel has the Exploration screen to
+  // itself, so there is nothing for it to be in the way of.
   function vxStudioSetVisible(on) {
     const panel = document.getElementById('vx-studio');
     if (!panel) return;
     panel.classList.toggle('show', !!on);
-    if (on) {
-      // Applied every time the panel becomes visible (not just once at load),
-      // so the collapsed/expanded choice a player made last time follows them
-      // back here rather than resetting on every visit to this screen.
-      panel.classList.toggle('collapsed', studioCollapsedPref());
-      vxStudioRefresh();
-    }
-  }
-
-  // Defaults to COLLAPSED: the new-world screen already overflows its own
-  // viewport with the panel open (measured — the full studio pitch pushed the
-  // screen past 720px), so the safe default is closed, one click away rather
-  // than always eating the space.
-  const STUDIO_COLLAPSE_KEY = 'voxeria_studio_collapsed';
-  function studioCollapsedPref() {
-    try {
-      const v = localStorage.getItem(STUDIO_COLLAPSE_KEY);
-      return v === null ? true : v === '1';
-    } catch (e) { return true; }
-  }
-  function toggleStudioCollapse() {
-    const panel = document.getElementById('vx-studio');
-    if (!panel) return;
-    const collapsed = !panel.classList.contains('collapsed');
-    panel.classList.toggle('collapsed', collapsed);
-    try { localStorage.setItem(STUDIO_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {}
+    if (on) vxStudioRefresh();
   }
 
   // Opens a designer straight from the menu. The designer modals live in the
@@ -494,9 +558,15 @@ window.VxWorlds = (function () {
     const open = {
       BLOCK: window.toggleBlockDesigner,
       CREATURE: window.toggleCreatureDesigner,
-      GRAPH: window.toggleModEditor
+      GRAPH: window.toggleModEditor,
+      // Optional on purpose: voxeria-terminal.js is one <script> tag, and
+      // removing it must leave this button inert rather than throwing.
+      TERMINAL: window.toggleWorldTerminal
     }[kind];
     if (typeof open === 'function') open();
+    else if (typeof showNotification === 'function') {
+      showNotification('That tool is not available in this build.');
+    }
   }
   window.vxStudioRefresh = vxStudioRefresh;
 
@@ -619,7 +689,10 @@ window.VxWorlds = (function () {
 
   function pickArenaWidth(n) {
     pendingArenaWidth = n;
+    // Beide Zeilen aktualisieren: welche gerade sichtbar ist, entscheidet der
+    // Bildschirm, und die jeweils andere findet ihr Element schlicht nicht.
     renderWidthRow();
+    renderSoloWidthRow();
   }
 
   // ASYNC, because createRoom() now waits for the room to be registered and
@@ -738,16 +811,24 @@ window.VxWorlds = (function () {
 
   // ---- menu views --------------------------------------------------------
   function view(which) {
-    for (const v of ['root', 'new', 'load', 'mp', 'host', 'opts']) {
+    for (const v of ['root', 'new', 'explore', 'normal', 'arena', 'load', 'mp', 'host', 'opts']) {
       const el = document.getElementById('vx-view-' + v);
       if (el) el.style.display = (v === which) ? '' : 'none';
     }
     if (which === 'load') renderList();
     if (which === 'mp') refreshMpView();
     if (which === 'host') pickHostMode(pendingHostMode);
-    // The studio panel belongs to the new-world view, and only in a mode that
-    // allows the creator tools at all.
-    vxStudioSetVisible(which === 'new' && studioAllowed());
+    if (which === 'arena') { renderSoloWidthRow(); renderArenaTemplateRow(); }
+    // The name/seed form is one element shared by both mode screens, parked
+    // outside them until one is showing. Moved rather than duplicated so
+    // createWorld() keeps reading a single #vx-new-name and the two screens
+    // cannot drift apart.
+    const setup = document.getElementById('vx-world-setup');
+    const slot = document.querySelector('#vx-view-' + which + ' .vx-setup-slot');
+    if (setup && slot && setup.parentNode !== slot) slot.appendChild(setup);
+    // The studio panel belongs to the Exploration screen, and only in a mode
+    // that allows the creator tools at all.
+    vxStudioSetVisible(which === 'explore' && studioAllowed());
     // Only offer "back to game" once a world is actually running, otherwise the
     // button would dismiss the menu onto an empty session.
     const resume = document.getElementById('vx-resume');
@@ -793,11 +874,21 @@ window.VxWorlds = (function () {
   // starting it, otherwise the guards inside the engine see the old state.
   function show() {
     document.getElementById('vx-menu').classList.add('show');
+    // #vx-menu's own background is a translucent scrim now, not a solid
+    // fill (see index.html) -- drawMenuPanorama() in voxeria-engine.js paints
+    // real terrain onto the game canvas behind it. That canvas was always
+    // there, previously just hidden behind the opaque menu; its OWN HUD
+    // chrome (hearts, hotbar, the X/Y/biome bar, the minimap) would now show
+    // through too if left alone, so it rides its own class rather than the
+    // player's F4 "hide UI" preference (body.vx-hide-ui / toggleUIVisibility
+    // in voxeria-engine.js), which this must not read or overwrite.
+    document.body.classList.add('vx-menu-open');
     if (typeof window.vxStopBgMusic === 'function') window.vxStopBgMusic();
     view('root');
   }
   function hide() {
     document.getElementById('vx-menu').classList.remove('show');
+    document.body.classList.remove('vx-menu-open');
     if (typeof window.vxStartBgMusic === 'function') window.vxStartBgMusic();
     // rAF-driven; without this the studio tile animation would keep ticking
     // behind a running world for the rest of the session.
@@ -810,7 +901,36 @@ window.VxWorlds = (function () {
       if (ev.target.files && ev.target.files[0]) importFile(ev.target.files[0]);
       ev.target.value = '';
     });
-    show();
+    // NOT the full show() here on purpose. The very first time the page
+    // loads, gameState "INTRO" (introKind "BOOT" — see voxeria-engine.js)
+    // plays a one-off scene on the game canvas itself before the menu is
+    // allowed to appear; updateAndDrawIntro() calls the real show() once
+    // that finishes. Only the HUD-hiding half of show() happens here, so the
+    // real game's hearts/hotbar/etc. don't flash behind that scene in the
+    // meantime -- #vx-menu itself stays un-.show'd until the scene is done.
+    document.body.classList.add('vx-menu-open');
+    // Independent last-resort net, completely decoupled from the game engine:
+    // before this existed, show() ran unconditionally right here, so the menu
+    // always came up no matter what else on the page failed. Making it wait
+    // for the BOOT scene traded that guarantee away -- if requestAnimationFrame
+    // (gameLoop) never even gets its first call (e.g. initFirebase() in
+    // voxeria-boot.js throwing synchronously, which real itch.io hosting can
+    // trigger: the game runs inside a sandboxed iframe there, and Firebase's
+    // storage/network access from a third-party iframe context is a known
+    // failure mode), nothing else was left to ever show #vx-menu again -- a
+    // permanently black page with no error the player could see. This timer
+    // doesn't know or care why the engine didn't make it; it only checks
+    // whether the menu is already open, and force-shows it if not. Reads the
+    // DOM directly rather than calling window.vxMenuIsOpen() -- if
+    // voxeria-engine.js is exactly what failed to finish executing, that
+    // function might not even exist yet, and this net has to work regardless.
+    // Longer than BOOT's own 12s worst-case (INTRO_BOOT_MAX_MS in
+    // voxeria-engine.js) so a slow-but-working scene isn't cut off by its own
+    // safety net.
+    setTimeout(() => {
+      const m = document.getElementById('vx-menu');
+      if (m && !m.classList.contains('show')) show();
+    }, 15000);
   });
 
   // Autosave. 20s is a compromise: frequent enough that a crash costs little,
@@ -826,12 +946,15 @@ window.VxWorlds = (function () {
 
   return {
     view: view, pickMode: pickMode, createWorld: createWorld, openStudio: openStudio,
-    toggleStudioCollapse: toggleStudioCollapse,
     load: load, confirmRemove: confirmRemove,
     exportCurrent: exportCurrent, save: save,
     hostRoom: hostRoom, joinRoom: joinRoom,
-    pickHostMode: pickHostMode, pickArenaWidth: pickArenaWidth, confirmHostRoom: confirmHostRoom,
+    pickHostMode: pickHostMode, pickArenaWidth: pickArenaWidth, pickArenaTemplate: pickArenaTemplate, confirmHostRoom: confirmHostRoom,
     show: show, hide: hide, applyModeGating: applyModeGating,
+    // Exposed for voxeria-gallery.js: playing a gallery entry needs the exact
+    // same "start a fresh world from this data" path createWorld() itself
+    // uses, rather than a second, drift-prone copy of it.
+    applySave: applySave,
     MODES: MODES
   };
 })();

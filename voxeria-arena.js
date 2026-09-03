@@ -85,6 +85,54 @@ window.VxArena = (function () {
   let scoreUnsub = null;
   let subscribedSeed = null;
   let panelOpen = false;
+  // War die Arena im LETZTEN tick() noch aktiv? Der Uebergang von true auf
+  // false ist der einzige Moment, in dem tick() trotz des fruehen Ausstiegs
+  // unten noch einmal renderHud() aufrufen muss -- sonst bleibt das HUD auf
+  // dem Stand seines letzten Bildes eingefroren stehen, wenn eine neue,
+  // nicht-Arena-Welt geladen wird: renderHud() selbst wuerde sich korrekt
+  // verstecken, wird aber nie wieder aufgerufen, weil tick() ab dann sofort
+  // zurueckkehrt.
+  let wasActive = false;
+
+  // ── Bauphase: Kreativ-Werkzeuge ──────────────────────────────────────────
+  // Die Arena war bisher eine reine Stein-Plattform im Nichts, auf der man mit
+  // genau den Werkzeugen bauen musste, die auch in der normalen Welt gelten:
+  // erst abbauen, dann in die Hotbar, dann platzieren. Fuer einen Modus, dessen
+  // einziger Zweck das schnelle Bauen und Ausprobieren ist, war das genau die
+  // Reibung, die ihn unbrauchbar gemacht hat. Alle fuenf Stuecke unten beheben
+  // das, ausschliesslich waehrend der Bauphase (phase === 'build'):
+  //   * Flug statt Schwerkraft (siehe der updatePlayer-Ersatz weiter unten)
+  //   * Sofortiges Abbauen und Platzieren statt Halte-Ladezeit
+  //   * Unbegrenzte Reichweite, statt in der Naehe der Plattform bauen zu muessen
+  //   * Unbegrenzt viele Bloecke, statt sie erst finden zu muessen
+  // Ausserhalb der Bauphase (Countdown/laufende Runde/Ende) gilt wieder die
+  // normale Physik -- ein echtes Match soll sich wie ein Minispiel anfuehlen,
+  // nicht wie ein Kreativmodus.
+  const ARENA_INF_COUNT = 999;
+  // Neun Faecher, damit das zehnte frei bleibt fuer alles, was ausserhalb
+  // dieser Liste gefunden oder gebraucht wird.
+  const ARENA_BUILD_PALETTE = [BLOCKS.STONE, BLOCKS.DIRT, BLOCKS.GRASS, BLOCKS.WOOD,
+                               BLOCKS.PLANKS, BLOCKS.LOG, BLOCKS.GLASS, BLOCKS.SAND, BLOCKS.TORCH];
+  // Welcher SEED die Palette schon bekommen hat. Einmal pro Welt, nicht jeden
+  // Frame neu: sonst ueberschriebe das staendig, was der Spieler gerade selbst
+  // in der Hotbar einraeumt oder wegwirft.
+  let paletteGrantedForSeed = null;
+  function grantBuildPalette() {
+    if (typeof inventory === 'undefined') return;
+    ARENA_BUILD_PALETTE.forEach((block, i) => { inventory[i] = { block, count: ARENA_INF_COUNT }; });
+    if (typeof drawHotbar === 'function') drawHotbar();
+  }
+
+  // Gegenstueck zu grantBuildPalette: unendliche Baubloecke ins gewertete
+  // Match mitzunehmen waere sinnlos, es gibt sie ja nur unbegrenzt zum Bauen.
+  // paletteGrantedForSeed wird mit zurueckgesetzt, damit tick() sie beim
+  // naechsten Betreten der Bauphase (nach dieser Runde) wieder vergibt.
+  function clearBuildPalette() {
+    if (typeof inventory === 'undefined') return;
+    for (let i = 0; i < ARENA_BUILD_PALETTE.length; i++) inventory[i] = null;
+    paletteGrantedForSeed = null;
+    if (typeof drawHotbar === 'function') drawHotbar();
+  }
 
   // Beim Phasenwechsel genau einmal feuern, nicht in jedem Frame, in dem die
   // Phase zufaellig noch dieselbe ist.
@@ -460,12 +508,20 @@ window.VxArena = (function () {
 
     // Sichern beim Betreten des Countdowns: da ist die Bauphase vorbei und
     // noch nichts kaputt.
-    if (prev === 'build' && next === 'countdown') captureSnapshot();
+    if (prev === 'build' && next === 'countdown') { captureSnapshot(); clearBuildPalette(); }
 
-    // Zuruecksetzen erst beim Verlassen der Siegerehrung, nicht beim
-    // Rundenende -- sonst verschwaende das Feld unter dem Sieger, waehrend
-    // alle noch auf die Tabelle schauen.
-    if (prev === 'ended' && next === 'build') resetArena(false);
+    // Zuruecksetzen auf JEDEM Rueckweg ins Bauen, nicht nur nach der
+    // Siegerehrung. Aus 'ended' ist es der normale Rundenabschluss -- bewusst
+    // erst hier und nicht schon beim Rundenende, sonst verschwaende das Feld
+    // unter dem Sieger, waehrend alle noch auf die Tabelle schauen.
+    //
+    // Aus 'running'/'countdown' kommt "Match beenden". Ohne diesen Zweig
+    // bliebe das Feld nach einem Abbruch zerlegt stehen, UND der naechste
+    // captureSnapshot() oben wuerde genau diesen zerlegten Stand als neuen
+    // Ausgangspunkt sichern -- der urspruengliche Bau waere damit endgueltig
+    // weg. Aus 'countdown' ist es ein Leerlauf (der Snapshot ist keine Sekunde
+    // alt und nichts hat sich geaendert), aber ein billiger.
+    if (prev !== 'build' && next === 'build') resetArena(false);
 
     renderHud();
     renderPanel();
@@ -529,6 +585,18 @@ window.VxArena = (function () {
     if (reason) showNotification(reason);
   }
 
+  // Manueller Abbruch zum Testen: ein Mod-Ersteller, der nur pruefen will, ob
+  // eine Regel ueberhaupt feuert, soll nicht die volle Rundenlaenge absitzen
+  // muessen. Geht direkt zurueck zum Bauen statt ueber die Siegerehrung --
+  // die ist fuer einen echten Rundenabschluss gedacht, nicht fuer "Abbrechen".
+  function stopMatch() {
+    if (!active() || (phase !== 'running' && phase !== 'countdown')) return;
+    if (online()) writeMatch({ phase: 'build', winner: null });
+    else if (match) match.phase = 'build';
+    applyPhase('build');
+    showNotification('⏹️ Match stopped');
+  }
+
   function backToBuild() {
     if (online()) writeMatch({ phase: 'build', winner: null });
     else if (match) match.phase = 'build';
@@ -561,7 +629,20 @@ window.VxArena = (function () {
   // =========================================================================
 
   function tick(now) {
-    if (!active()) return;
+    if (!active()) {
+      // Genau EIN Aufruf beim Uebergang, nicht bei jedem inaktiven Frame:
+      // renderHud() versteckt das HUD selbst korrekt (siehe dort), es musste
+      // nur nach dem Verlassen der Arena noch einmal aufgerufen werden.
+      if (wasActive) { wasActive = false; renderHud(); }
+      return;
+    }
+    wasActive = true;
+
+    if (phase === 'build' && paletteGrantedForSeed !== SEED) {
+      grantBuildPalette();
+      paletteGrantedForSeed = SEED;
+    }
+
     // Bewusst NICHT in subscribe(): das laeuft nur online, und der
     // Solo-Bastler, fuer den der gespeicherte Snapshot ueberhaupt da ist,
     // erreicht es damit nie.
@@ -716,6 +797,12 @@ window.VxArena = (function () {
       // der vorher da ist und nichts tut, liest sich als kaputt.
       resetBtn.disabled = !snapshot || phase === 'running' || phase === 'countdown';
     }
+    const stopBtn = document.getElementById('arena-stop-btn');
+    if (stopBtn) {
+      // Nur sichtbar, waehrend es ueberhaupt etwas zu beenden gibt -- sonst
+      // steht ein toter Knopf permanent neben "Start match" herum.
+      stopBtn.style.display = (phase === 'running' || phase === 'countdown') ? '' : 'none';
+    }
     const hostEl = document.getElementById('arena-host-note');
     if (hostEl) {
       hostEl.textContent = !online() ? 'Offline - solo test run'
@@ -767,6 +854,185 @@ window.VxArena = (function () {
         if (active() && typeof arenaWorldWidth !== 'undefined' && arenaWorldWidth > 0) {
           return Math.floor(arenaWorldWidth / 2);
         }
+        return original();
+      };
+    }
+
+    // Flug waehrend der Bauphase. Ersetzt updatePlayer komplett statt es zu
+    // umschliessen: Schwerkraft, Sprung und Kollisionsaufloesung liegen in
+    // EINER Funktion hintereinander, ein Aufruf-vorher-oder-nachher haette
+    // also mitten in fremder Physik ansetzen muessen. Wiederverwendet werden
+    // trotzdem dieselben resolveCollisionX/Y wie das Original, damit man an
+    // Waenden und der Plattform weiterhin abprallt statt hindurchzufliegen --
+    // kein Geisterflug, nur keine Schwerkraft.
+    // Deutlich schneller als Laufen (Flug soll sich kraftvoll anfuehlen, nicht
+    // wie Schweben), mit einer Anlaufzeit statt einem harten Umschalten
+    // zwischen 0 und Vollgeschwindigkeit -- genau das "Saftige", das vorher
+    // fehlte. FLY_EASE ist bewusst hoch: das Anlaufen soll sich in unter einer
+    // halben Sekunde anfuehlen, nicht traege.
+    const FLY_SPEED = playerSpeed * 2.4;
+    const FLY_EASE = 0.32;
+    // Nur beim WECHSEL von "steht" zu "steigt/sinkt" ausgeloest (Flanken-
+    // Erkennung), nicht in jedem Frame, in dem die Taste weiter haelt -- sonst
+    // waere jeder einzelne Frame ein neuer "Abheben"-Moment.
+    let wasFlyingUp = false, wasFlyingDown = false;
+    if (typeof updatePlayer === 'function') {
+      const original = updatePlayer;
+      window.updatePlayer = function (dt) {
+        if (!(active() && phase === 'build')) { wasFlyingUp = wasFlyingDown = false; return original(dt); }
+        if (typeof player === 'undefined') return original(dt);
+        // Erste Zeile wie im Original: waehrend der Sterbe-/Respawn-Sequenz
+        // gehoert der Spieler nicht sich selbst. Ohne das fliegt er mitten in
+        // der eigenen Todesexplosion weiter.
+        if (typeof deathPending !== 'undefined' && deathPending) return;
+        if (player.frozenTimer > 0) { player.frozenTimer -= dt; return; }
+        if (player.goldFrozenTimer > 0) { player.goldFrozenTimer -= dt; return; }
+        if (keys[keyBinds.left] || keys['arrowleft']) player.vx = -playerSpeed;
+        else if (keys[keyBinds.right] || keys['arrowright']) player.vx = playerSpeed;
+        else player.vx *= Math.pow(0.7, dt);
+
+        const up = keys[keyBinds.jump] || keys['arrowup'] || keys['w'];
+        const down = keys['s'] || keys['arrowdown'];
+        const targetVy = up ? -FLY_SPEED : down ? FLY_SPEED : 0;
+        // Angenaehert statt gesetzt: dieselbe Anlauf-/Bremskurve, die die
+        // horizontale Bewegung ueberall im Spiel schon hat (siehe player.vx
+        // oben), nur senkrecht. Das gibt dem Flug Gewicht, ohne traege zu wirken.
+        player.vy += (targetVy - player.vy) * Math.min(1, FLY_EASE * dt);
+
+        // Abheben: derselbe Stauch-Streck-Effekt wie beim Sprung, dazu ein
+        // Sound und eine kleine Schuetteler, damit der Moment einen Schlag hat.
+        if (up && !wasFlyingUp) {
+          player.scaleX = 0.55; player.scaleY = 1.55;
+          playSound('jump');
+          screenShake = Math.max(screenShake, 3);
+          spawnPlayerDustPuffBurst(player.x + player.w/2, player.y + player.h);
+        }
+        if (down && !wasFlyingDown) {
+          player.scaleX = 1.25; player.scaleY = 0.8;
+        }
+        wasFlyingUp = up; wasFlyingDown = down;
+
+        // Schubduese: ein staendiger, aber duenn gestreuter Partikel-Strahl
+        // unter den Fuessen waehrend des Steigens, damit sich Fliegen wie ein
+        // andauernder Vorgang anfuehlt statt wie eine reine Positionsaenderung.
+        if (up && Math.random() < 0.5 * dt) {
+          spawnPlayerDustPuff(player.x + player.w/2, player.y + player.h);
+        }
+
+        player.x += player.vx * dt; resolveCollisionX();
+        player.y += player.vy * dt; resolveCollisionY();
+        // Derselbe Sicherheitsnetz-Wert wie im Original: langes Sinken am
+        // Plattformrand vorbei soll zurueckholen statt endlos ins Leere zu fallen.
+        if (player.y > WORLD_H * TILE) { player.y = -100; player.vy = 0; }
+
+        // Ablaufende Zaehler, die sonst NUR im Original heruntergezaehlt
+        // werden. Weil dieser Ersatz die Funktion komplett ersetzt, standen
+        // sie in der Bauphase still -- und ein Zaehler, der stillsteht, bleibt
+        // fuer immer ueber null:
+        //   * placeAnim/mineAnim steuern die Arm-Pose. Beim Bauen wird
+        //     pausenlos platziert und abgebaut, der Spieler klebte also schon
+        //     nach dem ersten Block dauerhaft in der Platzier-Pose.
+        //   * die drei Flash-Zaehler faerben den Bildschirm. Tut eine Regel
+        //     dem Spieler in der Bauphase weh, bliebe das Rot fuer immer.
+        // Reine Zaehler ohne Nebenwirkung, deshalb ist das Verdoppeln hier
+        // ungefaehrlich. Die Rang-Buffs (Haste, Luck, Reach, Hazard) bleiben
+        // bewusst aussen vor: die zaehlen ihr Ende mit Meldung und HUD-Update
+        // herunter, und das gehoert nicht in eine zweite Kopie.
+        if (player.placeAnimTimer > 0) player.placeAnimTimer -= dt;
+        if (player.mineAnimTimer > 0) player.mineAnimTimer -= dt;
+        if (typeof damageFlashTimer !== 'undefined' && damageFlashTimer > 0) damageFlashTimer -= dt;
+        if (typeof healFlashTimer !== 'undefined' && healFlashTimer > 0) healFlashTimer -= dt;
+        if (typeof outOfRangeFlashTimer !== 'undefined' && outOfRangeFlashTimer > 0) outOfRangeFlashTimer -= dt;
+
+        // Kamera-Nachfuehrung. Das Original erledigt das am Ende SEINES
+        // updatePlayer -- weil dieser Ersatz die Funktion komplett ersetzt
+        // statt sie zu umschliessen, lief camX/camY hier bisher nie mit, und
+        // der Spieler flog beim schnellen Bau-Flug einfach aus dem sichtbaren
+        // Bereich hinaus. Dieselbe Formel wie im Original, damit sich das
+        // Verhalten nicht unterscheidet, sobald ein Match startet.
+        const tcamX = player.x - (COLS >> 1) * TILE;
+        const tcamY = player.y - (ROWS >> 1) * TILE;
+        camX += (tcamX - camX) * (1 - Math.pow(0.80, dt));
+        camY += (tcamY - camY) * (1 - Math.pow(0.80, dt));
+        camY = Math.max(-ROWS * TILE, Math.min(camY, (WORLD_H - ROWS + 4) * TILE));
+      };
+    }
+
+    // Sofortiges Abbauen. _holdRequiredMs liefert die Ladezeit in Millisekunden
+    // fuer updateMiningHold; auf 0 gesetzt bricht ein Block beim allerersten
+    // Frame, in dem die Maustaste haelt (positive Millisekunden geteilt durch 0
+    // ergibt Infinity, auf 1 gekappt -- siehe dort).
+    if (typeof _holdRequiredMs === 'function') {
+      const original = _holdRequiredMs;
+      window._holdRequiredMs = function (hardness) {
+        if (active() && phase === 'build') return 0;
+        return original(hardness);
+      };
+    }
+
+    // Unbegrenzte Reichweite. isInRange ist die einzige Stelle, an der Mining,
+    // Platzieren UND der Ausser-Reichweite-Hinweis nachsehen -- ein Wrapper
+    // hier reicht deshalb fuer alle drei zugleich, statt jede Aufrufstelle
+    // einzeln aufzuweichen.
+    if (typeof isInRange === 'function') {
+      const original = isInRange;
+      window.isInRange = function (wx, wy) {
+        if (active() && phase === 'build') return true;
+        return original(wx, wy);
+      };
+    }
+
+    // Sofortiges Platzieren. PLACE_HOLD_MS ist eine Konstante, laesst sich
+    // also anders als _holdRequiredMs nicht von aussen auf 0 setzen -- deshalb
+    // hier keine Ladezeit, sondern derselbe Ziel-Test wie im Original
+    // (platzierbarer Untergrund, in Reichweite) direkt gefolgt vom Platzieren.
+    if (typeof updatePlaceHold === 'function') {
+      const original = updatePlaceHold;
+      window.updatePlaceHold = function (now) {
+        if (!(active() && phase === 'build')) return original(now);
+        if (!placeActive) return;
+        if (player.frozenTimer > 0 || player.goldFrozenTimer > 0) { _cancelPlaceCharge(); return; }
+        const item = inventory[selectedSlot];
+        if (!item || item.count <= 0) { _cancelPlaceCharge(); return; }
+        const { wx, wy } = getMouseWorldCoords();
+        const b = getBlock(wx, wy);
+        const placeable = b===BLOCKS.AIR||b===BLOCKS.WATER||b===BLOCKS.BG_PLANKS||b===BLOCKS.FLOWER||b===BLOCKS.PORTAL;
+        if (!placeable || !isInRange(wx, wy)) return;
+        executePlace(wx, wy);
+        spawnPlaceJuice(wx, wy, item.block);
+        paintPlaceMode = true; paintLastX = wx; paintLastY = wy;
+        placeWx = placeWy = null; placeProgressMs = 0;
+      };
+    }
+
+    // Unbegrenzter Vorrat. executePlace zaehlt intern herunter (bis hin zum
+    // Leeren des ganzen Hotbar-Faches); hier wird nach jedem Platzieren wieder
+    // aufgefuellt, egal ob der Zaehler nur sank oder das Fach ganz leer wurde.
+    if (typeof executePlace === 'function') {
+      const original = executePlace;
+      window.executePlace = function (wx, wy) {
+        if (!(active() && phase === 'build')) return original(wx, wy);
+        const held = inventory[selectedSlot] ? inventory[selectedSlot].block : null;
+        original(wx, wy);
+        if (held !== null) {
+          if (inventory[selectedSlot]) inventory[selectedSlot].count = ARENA_INF_COUNT;
+          else inventory[selectedSlot] = { block: held, count: ARENA_INF_COUNT };
+          if (typeof drawHotbar === 'function') drawHotbar();
+        }
+      };
+    }
+
+    // Die leere Arena-Leinwand braucht keinen Hoehlenhintergrund: drawCaveBackground
+    // haengt seine Starthoehe an getBiomeHeight(), das fuer die Arena nichts
+    // Sinnvolles liefert (sie hat keine echte Gelaendehoehe), und malte dadurch
+    // die dunkle Hoehlenwand-Textur ueber praktisch die ganze Plattform herum
+    // und darunter -- das "Nichts" sah aus wie eine steinerne Hoehle statt wie
+    // leerer Raum. Gilt fuer die GANZE Arena (jede Phase), nicht nur die
+    // Bauphase: das Nichts soll auch waehrend eines laufenden Matches leer bleiben.
+    if (typeof drawCaveBackground === 'function') {
+      const original = drawCaveBackground;
+      window.drawCaveBackground = function () {
+        if (active()) return;
         return original();
       };
     }
@@ -843,7 +1109,43 @@ window.VxArena = (function () {
     },
     setTeam: (t) => { myTeam = t | 0; scoreDirty = true; },
     getTeam: () => myTeam,
+    // Mannschaftspunkte sind bewusst kein eigener Zaehler: sie sind einfach die
+    // Summe der Einzelpunkte aller Mitglieder, dieselben Zahlen, die die Tafel
+    // ohnehin schon synchron haelt. Kein zweiter Schreibpfad, also auch keine
+    // Moeglichkeit, dass Team- und Einzelsumme je auseinanderlaufen.
+    teamScore: (t) => {
+      const team = t | 0;
+      return sortedScores().reduce((sum, s) => (((s.team | 0) === team) ? sum + (s.score || 0) : sum), 0);
+    },
+    // "Fuehrt mein Team?" derselbe Gleichstand-zaehlt-als-Fuehrung-Gedanke wie
+    // isLeading, nur ueber Mannschaftssummen. Spieler ohne Mannschaft (team 0)
+    // bilden dabei ganz normal ihre eigene "Mannschaft 0".
+    isTeamLeading: () => {
+      const board = sortedScores();
+      if (!board.length) return true;
+      const totals = {};
+      for (const s of board) { const t = s.team | 0; totals[t] = (totals[t] || 0) + (s.score || 0); }
+      const mine = totals[myTeam] || 0;
+      for (const t in totals) { if (Number(t) !== myTeam && totals[t] > mine) return false; }
+      return true;
+    },
+    // Die Mannschaft eines ANDEREN Spielers, nach seiner UID. Die Mod-Regeln
+    // lesen sie ueber den Live-Wert "nearest player team"; die Position kommt
+    // aus voxeria_players, die Mannschaft steht aber im Punktedokument, also
+    // muss die Zuordnung hier passieren und nicht dort.
+    //
+    // 0 fuer jeden, der noch kein Punktedokument hat: das ist genau der Wert,
+    // auf dem auch myTeam startet, ein Vergleich "gleiche Mannschaft" ist damit
+    // vor der Mannschaftswahl fuer alle wahr statt fuer niemanden.
+    teamOf: (uid) => { const s = scores[uid]; return s ? (s.team | 0) : 0; },
     playerCount: () => sortedScores().length,
+    // Die fertige Rangliste, damit die Mod-Karte "Show the scoreboard" sie
+    // anzeigen kann, ohne die Punkte ein zweites Mal zu synchronisieren. Eine
+    // Kopie, keine Referenz: eine Regel soll die Tafel lesen koennen, aber
+    // nicht in sie hineinschreiben -- Punkte vergibt ausschliesslich addScore.
+    board: () => sortedScores().map(s => ({
+      uid: s.uid, name: s.name || null, score: s.score | 0, team: s.team | 0
+    })),
 
     // Weltbreite -- gesetzt vom Host beim Erstellen des Raums und von jedem
     // Beitretenden aus dem Raum-Dokument (siehe joinRoomByCode).
@@ -854,6 +1156,7 @@ window.VxArena = (function () {
     // UI
     startMatch: startMatch,
     endMatch: endMatch,
+    stopMatch: stopMatch,
     togglePanel: togglePanel,
     resetArena: () => resetArena(true),
     hasSnapshot: () => !!snapshot,

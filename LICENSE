@@ -1,21 +1,27 @@
-Copyright (c) 2026 Jaylen Winkler (voxeriahub.com)
+# Copyright & Usage Notice
+
+Copyright © 2026 Jaylen Winkler (voxeriahub.com)
 All Rights Reserved.
 
-This repository contains the source code, assets, and other materials for
-the game "Voxeria" (the "Software").
+This repository contains the source code, assets, documentation, and other materials comprising the game **“Voxeria”** (collectively, the “Software”).
 
-No part of the Software may be copied, modified, merged, published,
-distributed, sublicensed, sold, or otherwise used, in whole or in part,
-without the prior written permission of the copyright holder.
+All rights to the Software are reserved by the copyright holder. No part of the Software, in whole or in part, may be copied, reproduced, modified, adapted, merged, published, distributed, sublicensed, sold, transferred, or otherwise used without the prior express written permission of the copyright holder.
 
-This restriction applies to all contents of this repository, including but
-not limited to:
-  - source code (all .html and .js files)
-  - game assets (images, audio, and other media in Assets/ and Music/)
-  - documentation
+This restriction applies to all contents of this repository, including, but not limited to:
 
-Viewing this repository's source (e.g. for the purpose of evaluating the
-project, such as a prospective publisher or collaborator) does not grant
-any license to use, copy, or redistribute it.
+* Source code, including all `.html` and `.js` files
+* Game assets, including images, audio, music, and other media contained in the `Assets/` and `Music/` directories
+* Documentation and related materials
+* Any other files or materials included in this repository
 
-For licensing inquiries, contact: winklerjaylen@gmail.com
+Access to or viewing of this repository does **not** grant any license, permission, ownership interest, or other rights to use, reproduce, modify, distribute, or otherwise exploit any portion of the Software.
+
+Repository access may be granted for legitimate evaluation purposes, including review by prospective publishers, collaborators, investors, or other authorized parties. Such access does not constitute a license or transfer of intellectual property rights.
+
+Any use of the Software or its contents beyond permitted viewing requires the prior written authorization of the copyright holder.
+
+For licensing requests, permissions, or other inquiries regarding the Software, please contact:
+
+**[winklerjaylen@gmail.com](mailto:winklerjaylen@gmail.com)**
+
+© 2026 Jaylen Winkler. All Rights Reserved.
